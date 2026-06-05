@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth, signOut } from "@/auth";
+import { auth } from "@/auth";
+import AppHeader from "@/components/AppHeader";
 import {
   getIntakeProgress,
   getLifeContextGate,
@@ -39,24 +40,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-dvh bg-slate-50">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-        <span className="text-lg font-semibold tracking-tight text-slate-900">
-          Critiq
-        </span>
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/login" });
-          }}
-        >
-          <button
-            type="submit"
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-          >
-            Sign out
-          </button>
-        </form>
-      </header>
+      <AppHeader />
 
       <main className="mx-auto max-w-2xl px-6 py-16">
         <h1 className="text-2xl font-semibold text-slate-900">
@@ -70,6 +54,23 @@ export default async function DashboardPage() {
           Keep going whenever you&apos;re ready — the more Critiq knows, the
           sharper your coaching gets.
         </p>
+
+        <Link
+          href="/accounts"
+          className="mt-8 flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-slate-300"
+        >
+          <span>
+            <span className="block text-base font-semibold text-slate-900">
+              Your accounts
+            </span>
+            <span className="mt-1 block text-sm text-slate-500">
+              The companies you sell into — track each one and its contacts.
+            </span>
+          </span>
+          <span aria-hidden className="text-slate-400">
+            →
+          </span>
+        </Link>
 
         {!session2Done && (
           <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
