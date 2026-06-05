@@ -20,15 +20,25 @@ function init(): DB {
 }
 
 /**
+ * Returns the real (non-proxied) Drizzle instance. Use this where a consumer
+ * inspects the instance synchronously — e.g. `@auth/drizzle-adapter`, which
+ * detects the SQL dialect from the object and chokes on a Proxy.
+ */
+export function getDb(): DB {
+  if (!_db) _db = init();
+  return _db;
+}
+
+/**
  * Lazy DB handle. `neon()` is deferred until the first query via a Proxy, so
  * importing this module never opens a connection at build time. Always use
  * `export const dynamic = "force-dynamic"` on routes that touch the DB.
  */
 export const db = new Proxy({} as DB, {
   get(_target, prop) {
-    if (!_db) _db = init();
-    const value = _db[prop as keyof DB];
-    return typeof value === "function" ? value.bind(_db) : value;
+    const real = getDb();
+    const value = real[prop as keyof DB];
+    return typeof value === "function" ? value.bind(real) : value;
   },
 });
 
