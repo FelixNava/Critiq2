@@ -27,11 +27,11 @@ Each phase has a status indicator:
 
 ## Status snapshot (auto-updated by Full Auto)
 
-- Last updated: 2026-06-05 ~09:20am ET
-- Mode: Phases 2–5 built **supervised (direct)**. Phase 6 now being built **via /critiq-full-auto orchestrator (Gate-1 dry-run)**. Phase 7 queued for a **one-shot scheduled-task cron (Gate-2 autonomous test)**.
-- Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit/headers) ✅
-- Current phase: Phase 6 — Rep Intake Session 1 (via orchestrator)
-- Next: Phase 7 — Rep Intake Extended Dimensions (scheduled cron test)
+- Last updated: 2026-06-05 ~10:02am ET
+- Mode: Phases 2–5 built **supervised (direct)**; Phase 6 built **via /critiq-full-auto orchestrator (Gate-1 ✅ passed — mesh works, orchestrator caught 1 reconciliation + 1 Builder defect)**. Phase 7 queued for the **one-shot scheduled-task cron at 10:20 ET (Gate-2 autonomous test)**.
+- Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅
+- Current phase: none — awaiting the 10:20 cron to autonomously build Phase 7.
+- Next: Phase 7 — Rep Intake Extended Dimensions.
 
 ---
 
@@ -177,7 +177,9 @@ The Full Auto control plane.
 
 ---
 
-## Phase 6 — Rep Intake Assessment: Session 1 UI ☐ Planned
+## Phase 6 — Rep Intake Assessment: Session 1 UI ✅ Done (PR #6, merged to review-for-main 2026-06-05)
+
+> Built via /critiq-full-auto orchestrator (Gate-1). Identity + Relationship intake, /api/intake/session1, onboarding flow, dashboard 33% + gate. Verified end-to-end vs real Neon. PR: https://github.com/FelixNava/Critiq2/pull/6
 
 **Goal:** Progressive 6-dimension intake. Session 1 covers Identity & Motivation + Relationship Style. Schema, persistence, UI, navigation flow.
 
@@ -210,7 +212,29 @@ The Full Auto control plane.
 
 ## Phase 7 — Rep Intake: Extended Dimensions ☐ Planned
 
-Sales Psychology + Operational Habits + Market Intelligence. Surfaced contextually after Session 1.
+**Goal:** Session 2 of intake — extend the Phase 6 pattern to 3 more dimensions: **Sales Psychology**, **Operational Habits**, **Market Intelligence**. Reuse the existing intake infrastructure (do NOT rebuild it).
+
+**Reuse from Phase 6 (do not duplicate):**
+- `rep_intake_responses` + `rep_intake_progress` tables (no schema change needed — `dimension`/`question_key` are free text).
+- `src/components/onboarding/RadioCardGroup.tsx`, `StepProgress.tsx`, `ui.ts`.
+- `src/lib/intake.ts` (`INTAKE_DIMENSIONS` already includes `sales_psychology`, `operational_habits`, `market_intelligence`, `life_context`).
+- The `/api/intake/session1` route as the pattern.
+
+**Acceptance criteria:**
+1. New API route `src/app/api/intake/session2/route.ts` (or generalize to `/api/intake/[session]`) — auth-gated, `force-dynamic`, enum + ≤2000-char validation, idempotent upserts into `rep_intake_responses` (ON CONFLICT (user_id, question_key)), and marks `rep_intake_progress` for the 3 dimensions. Mirror session1's validation + error shapes exactly.
+2. Onboarding Session-2 pages under `src/app/(app)/onboarding/` — one screen per dimension (sales-psychology, operational-habits, market-intelligence), each with 1 radio (RadioCardGroup) + 1 optional textarea. Reuse the localStorage draft pattern (`critiq:intake:v1:s2:*`). Conversational copy, no dev jargon, no "Life Context" surfaced.
+   - Sales Psychology: e.g. "When a deal stalls, what's your instinct?" (push / pause / diagnose) + a free-text.
+   - Operational Habits: e.g. "How do you run your pipeline?" (crm-religiously / memory-and-notes / hybrid) + free-text.
+   - Market Intelligence: e.g. "How do you keep an edge on your accounts' world?" (news-alerts / relationships / vendor-intel) + free-text. (Builder/Architect may refine the exact questions — keep them on-domain and rep-friendly.)
+3. Entry point: from `/dashboard`, when Session 1 is complete but Session 2 isn't, show a "Continue your profile" CTA → Session 2 flow. (Don't force-redirect; Session 2 is optional/contextual per the spec.)
+4. `src/lib/intake.ts`: add `isSession2Complete(progress)` (the 3 dims done). Dashboard progress now reflects up to 5 of 6 (83%) once Session 2 is done — keep the existing `getIntakeProgress` math (it already counts all completed dimensions / 6).
+5. Dashboard copy updates to reflect current `progress.percent` dynamically (already dynamic from Phase 6 — just ensure the CTA appears/disappears correctly).
+6. `pnpm build` + `pnpm typecheck` clean. No new dependencies (match Phase 6: plain Tailwind, plain validation).
+7. **Verification:** complete a fresh account through Session 1 then Session 2 → dashboard shows 83% (5 of 6); `rep_intake_responses` has the new rows; idempotent on re-submit. (Cron/headless: build + typecheck + curl the API for 401/400/200; if MCP available, drive the flow.)
+
+**Notes:** life_context (6th dimension) remains NOT surfaced (Phase 8, trust-gated). Additive only — zero data-loss risk.
+
+**Depends on:** Phase 6.
 
 ## Phase 8 — Rep Intake: Life Context (Delayed) ☐ Planned
 

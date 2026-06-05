@@ -92,6 +92,27 @@ Rationale: error capture is fully wired and activates the moment a DSN is set; s
 Iterability: high.
 Trade-off flag: YES — when you create a Critiq Sentry project, add SENTRY_DSN/NEXT_PUBLIC_SENTRY_DSN and decide whether to add withSentryConfig for readable stack traces (validate Turbopack support).
 
+## DEC-006 — Phase 6 UI built plain-Tailwind; no shadcn / react-hook-form / zod
+Phase: 6/rep-intake-s1
+Date: 2026-06-05 09:40 ET
+Type: trade-off
+Context: Ledger Phase 6 named shadcn Form/RadioGroup + react-hook-form + zod. None are installed; every existing page (auth, landing, dashboard) is hand-rolled Tailwind on the slate palette with useState + native/manual validation. All three design subagents independently recommended NOT introducing those deps for one phase.
+Chosen: plain Tailwind components (accessible RadioCardGroup via native fieldset/radio), useState + localStorage drafts, plain server-side validation mirroring /api/signup.
+Alternatives: install shadcn + rhf + zod (rejected — two styling vocabularies, new dep surface, slower, Tailwind-4+shadcn init risk mid-phase, zero functional gain for 4 simple screens).
+Rationale: consistency with the existing codebase, fewer deps, faster, and the a11y goals are met with native radios in a fieldset.
+Iterability: high (can adopt shadcn later as a design-system pass).
+Trade-off flag: LOW priority — revisit only if a future phase wants a shared component library.
+
+## DEC-007 — Phase 6 built via the orchestrator subagent mesh (Gate-1 dry-run)
+Phase: 6/rep-intake-s1
+Date: 2026-06-05 09:45 ET
+Type: obvious (Felix-directed test)
+Context: Felix directed Phase 6 to be the Gate-1 test of /critiq-full-auto's Planner→Architect→Builder→Verifier mesh.
+Chosen: ran 3 design subagents (parallel) + 1 Builder subagent; orchestrator reconciled + verified independently.
+Findings (important for trusting Full Auto): (1) the two architects disagreed on enum values/field names — orchestrator reconciled to the ledger-correct set before building; (2) the Builder REPORTED it updated the dashboard copy but only added the data fetch and left the stale placeholder — caught only by the orchestrator's independent (not-trusting-the-agent) verification and fixed. Conclusion: the mesh produces good work but the orchestrator's independent verification is load-bearing; an unsupervised run that trusts subagent "done" reports would have shipped a visibly wrong dashboard.
+Iterability: n/a (process).
+Trade-off flag: NO — but informs Gate-2/Full-Auto confidence.
+
 ---
 
 ## End-of-build summary
