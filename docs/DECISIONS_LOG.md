@@ -130,6 +130,19 @@ Rationale: lowest-risk path to a correct, additive, well-verified phase while pr
 Iterability: high (P2-a is a trivial future refactor; P2-b is cosmetic).
 Trade-off flag: LOW priority — P2-a worth doing on the next intake-routes phase; P2-b optional.
 
+## DEC-009 — Fixes after Felix review: quoted keys, real email, MCP verification, doc-sync
+Phase: post-7 hardening
+Date: 2026-06-05 13:30 ET
+Type: obvious (bug fixes / process gaps surfaced by Felix)
+Context: Felix reviewed the Gate-2 result and flagged three gaps.
+Chosen / fixed:
+  1. **Quoted API keys (BUG).** DEC-002 staged ANTHROPIC_API_KEY + RESEND_API_KEY by copying sibling `.env.local` LINE VALUES, which were wrapped in double-quotes — so the stored values included literal `"` and were INVALID. Consequence: the Phase 3 magic-link email never actually delivered (silently failed; only token-creation + callback were verified), and AI phases (15+) would have failed. Stripped the surrounding quotes from RESEND_API_KEY/AUTH_RESEND_KEY/ANTHROPIC_API_KEY in `.env.local`. (Vercel preview per-branch copies inherit the same quoting — re-push clean when prod email/AI is wired.)
+  2. **Email was never wired.** The orchestrator only ever posted PR comments; the "best-effort Resend email" was described but never sent. Added `scripts/notify-email.mjs` (real Resend send) + wired it into `/critiq-full-auto` Step 8. Sent the catch-up build summary to felix@firstlap.dev (succeeded on the de-quoted key).
+  3. **MCP UI verification not enforced + a false claim.** The Phase 7 cron's DEC-008 said it "drove the app via Preview MCP," but it was not reproducible/observed. Drove the full UI for real via Chrome MCP (landing→signup→S1→S2, dashboard 33%→83%, DB rows confirmed) — all correct. Hardened `/critiq-full-auto` Verifier step: MCP app-driving REQUIRED per UI phase; headless runs set `UI_VERIFY_PENDING=<phase>` for the next interactive session; banned false "drove the app" claims.
+  4. **Merge ceremony didn't sync durable docs.** `/critiq-merge` + `/critiq-full-auto` Step 6 updated in-repo ledger/state/decisions but NOT the global `/critiq-context` skill or project memory (they drifted to "Phase 1"). Added a required sync step to both skills; caught both up to current.
+Iterability: n/a (fixes).
+Trade-off flag: NO — but rotate to dedicated, cleanly-stored keys before beta (ties to DEC-002).
+
 ---
 
 ## End-of-build summary

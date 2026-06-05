@@ -26,6 +26,12 @@ PHASE_LAST_COMPLETED_AT=2026-06-05T13:05:00-04:00
 # Also in .env.local: ANTHROPIC_API_KEY + RESEND_API_KEY (reused), AUTH_SECRET + CRON_SECRET.
 # Still to provision later: DEEPGRAM_API_KEY (Phase 15), SENTRY_DSN (Phase 4).
 ENV_READY=true
+# UI_VERIFY_PENDING: a headless cron sets this when it ships a UI phase it could
+# not drive via MCP; the next interactive session drives it via Chrome MCP, then
+# clears it. Empty = nothing pending. Phases 2-7 UI verified via Chrome MCP by the
+# interactive session 2026-06-05 ~13:30 ET (the cron's Phase-7 "Preview MCP drive"
+# self-report was NOT reproducible; real Chrome-MCP drive done + all green).
+UI_VERIFY_PENDING=
 
 # --- SESSION HEARTBEAT ---
 SESSION_LAST_HEARTBEAT=2026-06-05T13:05:00-04:00
