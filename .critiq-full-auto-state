@@ -1,0 +1,39 @@
+# Critiq Full Auto — Runtime State
+# Edit STOP=true from any device to halt at the next cron firing.
+# Edit URL: https://github.com/FelixNava/Critiq2/edit/review-for-main/.critiq-full-auto-state
+# This file is read by /critiq-full-auto skill at session start.
+# Format: KEY=VALUE, one per line, lines starting with # are comments.
+
+# --- KILL SWITCH (the only field you should ever edit manually) ---
+STOP=false
+
+# --- BUILD METADATA ---
+BUILD_START_ET=
+BUILD_LABEL=critiq-beta-foundation-test
+BUILD_TOTAL_TOKEN_BUDGET=4000000
+BUILD_PHASE_TOKEN_BUDGET=800000
+
+# --- PHASE TRACKING ---
+PHASE_CURRENT=
+PHASE_CURRENT_STATUS=
+PHASE_CURRENT_PR=
+PHASE_LAST_COMPLETED=1/foundation-rails
+PHASE_LAST_COMPLETED_AT=2026-06-05T01:55:00-04:00
+
+# --- SESSION HEARTBEAT ---
+SESSION_LAST_HEARTBEAT=
+SESSION_TOKEN_BUDGET_USED=0
+SESSION_ID=
+
+# --- CRON SCHEDULE ---
+NEXT_CRON_FIRE_ET=2026-06-05T03:00:00-04:00
+CRON_SCHEDULE_LABEL=critiq-foundation-test-3am-to-6am
+
+# --- BLOCKERS ---
+BLOCKER_REASON=
+BLOCKER_SET_AT=
+
+# --- EMAIL CHANNEL ---
+EMAIL_SENDER=notifications@critiq.firstlap.dev
+EMAIL_RECIPIENT=felix@firstlap.dev
+EMAIL_PR_COMMENT_FALLBACK=true
