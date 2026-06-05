@@ -81,6 +81,17 @@ Rationale: lower risk for the first autonomous phase; proves the build/verify/me
 Iterability: high (per-phase choice).
 Trade-off flag: NO (process choice, easily changed).
 
+## DEC-005 — Sentry wired without withSentryConfig (no source-map upload yet)
+Phase: 4/landing-sentry
+Date: 2026-06-05 03:25 ET
+Type: trade-off
+Context: Ledger Phase 4 specified `withSentryConfig` wrapping. On Next 16 the build uses Turbopack, and @sentry/nextjs's source-map/bundler plugin path on Turbopack is unvalidated. Also no SENTRY_DSN exists yet (Sentry is inert regardless tonight).
+Chosen: wire Sentry via `instrumentation.ts` + `instrumentation-client.ts` + error-boundary `captureException`, all guarded by DSN. Skipped `withSentryConfig` (source-map upload + tunneling).
+Alternatives: full withSentryConfig now (rejected — Turbopack-compat risk to a clean build, for zero functional gain without a DSN).
+Rationale: error capture is fully wired and activates the moment a DSN is set; source maps are a deploy-quality concern that can be added deliberately with the DSN.
+Iterability: high.
+Trade-off flag: YES — when you create a Critiq Sentry project, add SENTRY_DSN/NEXT_PUBLIC_SENTRY_DSN and decide whether to add withSentryConfig for readable stack traces (validate Turbopack support).
+
 ---
 
 ## End-of-build summary

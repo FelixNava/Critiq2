@@ -14,12 +14,12 @@ BUILD_TOTAL_TOKEN_BUDGET=4000000
 BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
-PHASE_CURRENT=4/landing-sentry
+PHASE_CURRENT=5/rate-limit-headers
 PHASE_CURRENT_STATUS=building
 PHASE_CURRENT_PR=
-PHASE_NEXT=5/rate-limit-headers
-PHASE_LAST_COMPLETED=3/auth-resend
-PHASE_LAST_COMPLETED_AT=2026-06-05T03:08:00-04:00
+PHASE_NEXT=6/rep-intake-s1
+PHASE_LAST_COMPLETED=4/landing-sentry
+PHASE_LAST_COMPLETED_AT=2026-06-05T03:28:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.

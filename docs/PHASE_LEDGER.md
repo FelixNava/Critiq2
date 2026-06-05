@@ -27,11 +27,11 @@ Each phase has a status indicator:
 
 ## Status snapshot (auto-updated by Full Auto)
 
-- Last updated: 2026-06-05 ~03:10am ET
+- Last updated: 2026-06-05 ~03:30am ET
 - Mode: **live supervised build** in-session (not cron) — building foundation phases directly with full MCP + real-service verification.
-- Last completed: **Phase 3 — NextAuth v5 + Resend** ✅ (PR #3)
-- Done so far tonight: Phase 2 (DB) ✅, Phase 3 (auth) ✅
-- Current phase: Phase 4 — Marketing landing + footer + Sentry (starting)
+- Last completed: **Phase 4 — Landing + Sentry** ✅ (PR #4)
+- Done so far tonight: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅
+- Current phase: Phase 5 — Rate limiting + security headers (starting)
 - Cron: still UNARMED (not needed while building live in-session).
 
 ---
@@ -127,7 +127,9 @@ The Full Auto control plane.
 
 ---
 
-## Phase 4 — Marketing Landing + Footer + Stub Legal ☐ Planned
+## Phase 4 — Marketing Landing + Footer + Stub Legal ✅ Done (PR #4, merged to review-for-main 2026-06-05)
+
+> Landing + footer + legal stubs + branded error boundaries + Sentry (inert until DSN). Verified: build clean, pages render, preview green. Sentry source-map upload deferred (DEC-005). PR: https://github.com/FelixNava/Critiq2/pull/4
 
 **Goal:** Public-facing `/` page. Footer with stub Terms + Privacy links. Beta CTA. Sentry wired.
 
