@@ -6,18 +6,21 @@ type DB = ReturnType<typeof drizzle<typeof schema>>;
 
 let _db: DB | null = null;
 
-function init(): DB {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error(
-      "DATABASE_URL is not set. Add it to .env.local (local) or the Vercel project env (deployed).",
-    );
-  }
-  // cache: "no-store" is REQUIRED — without it Next.js Data Cache memoizes DB
-  // reads indefinitely and deleted rows can reappear (project convention).
-  const sql = neon(url, { fetchOptions: { cache: "no-store" } });
-  return drizzle(sql, { schema });
+// cache: "no-store" is REQUIRED — without it Next.js Data Cache memoizes DB
+// reads indefinitely and deleted rows can reappear (project convention).
+function build(url: string): DB {
+  return drizzle(neon(url, { fetchOptions: { cache: "no-store" } }), { schema });
 }
+
+/**
+ * Build-time fallback. `next build` collects page data by importing route
+ * modules (including the Auth.js Drizzle adapter, which inspects the instance at
+ * construction). DATABASE_URL may be absent in that build step — return a
+ * non-cached placeholder so dialect detection succeeds. No query ever runs at
+ * build; at request time the real env is present and a real instance is cached.
+ */
+const PLACEHOLDER_URL =
+  "postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder";
 
 /**
  * Returns the real (non-proxied) Drizzle instance. Use this where a consumer
@@ -25,7 +28,9 @@ function init(): DB {
  * detects the SQL dialect from the object and chokes on a Proxy.
  */
 export function getDb(): DB {
-  if (!_db) _db = init();
+  const url = process.env.DATABASE_URL ?? process.env.DATABASE_URL_UNPOOLED;
+  if (!url) return build(PLACEHOLDER_URL); // ephemeral, not cached
+  if (!_db) _db = build(url);
   return _db;
 }
 
