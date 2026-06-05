@@ -6,6 +6,8 @@ import { repIntakeResponses, repIntakeProgress } from "@/db/schema";
 import {
   getIntakeProgress,
   getLifeContextGate,
+  isSession1Complete,
+  isSession2Complete,
   freeText,
   type IntakeDimension,
 } from "@/lib/intake";
@@ -31,6 +33,21 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: "This step isn't available yet." },
       { status: 403 },
+    );
+  }
+
+  // Prerequisite: the earlier intake sessions must be done first. The page
+  // guards this too, but the API is the real boundary — enforce it here so a
+  // direct POST can't record life_context out of order (which would leave the
+  // dashboard showing contradictory states).
+  const priorProgress = await getIntakeProgress(userId);
+  if (
+    !isSession1Complete(priorProgress) ||
+    !isSession2Complete(priorProgress)
+  ) {
+    return NextResponse.json(
+      { error: "Finish the earlier steps first." },
+      { status: 409 },
     );
   }
 

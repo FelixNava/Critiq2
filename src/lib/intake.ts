@@ -127,10 +127,16 @@ export function freeText(raw: unknown): FreeText {
  * activity without changing callers.
  * ------------------------------------------------------------------ */
 
-/** Days after account creation before Life Context unlocks. Env-overridable. */
+/**
+ * Days after account creation before Life Context unlocks. Env-overridable.
+ * Empty / whitespace / unset / non-numeric all fall back to the safe default —
+ * only an explicit numeric string (including "0" to disable the gate) wins, so
+ * a blank env var can never silently turn the gate off.
+ */
 export const LIFE_CONTEXT_GATE_DAYS = (() => {
   const raw = process.env.LIFE_CONTEXT_GATE_DAYS;
-  const n = raw != null ? Number(raw) : NaN;
+  if (raw == null || raw.trim() === "") return 7;
+  const n = Number(raw);
   return Number.isFinite(n) && n >= 0 ? n : 7;
 })();
 
@@ -172,10 +178,9 @@ export async function getLifeContextGate(
   const createdAt = rows[0]?.createdAt;
   if (!createdAt) return null;
 
-  const unlockAt = lifeContextUnlockAt(createdAt);
   return {
-    unlocked: now.getTime() >= unlockAt.getTime(),
-    unlockAt,
+    unlocked: isLifeContextUnlocked(createdAt, now),
+    unlockAt: lifeContextUnlockAt(createdAt),
     createdAt,
   };
 }
