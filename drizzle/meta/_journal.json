@@ -15,6 +15,13 @@
       "when": 1780664863905,
       "tag": "0001_flowery_rage",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780666290665,
+      "tag": "0002_busy_karma",
+      "breakpoints": true
     }
   ]
 }

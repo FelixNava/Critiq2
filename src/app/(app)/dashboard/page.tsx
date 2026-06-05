@@ -1,11 +1,19 @@
+import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
+import { getIntakeProgress, isSession1Complete } from "@/lib/intake";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) redirect("/login");
+
   const name =
     session?.user?.name?.split(" ")[0] || session?.user?.email || "there";
+
+  const progress = await getIntakeProgress(userId);
+  if (!isSession1Complete(progress)) redirect("/onboarding");
 
   return (
     <div className="min-h-dvh bg-slate-50">
@@ -33,8 +41,12 @@ export default async function DashboardPage() {
           Welcome, {name}.
         </h1>
         <p className="mt-2 text-slate-500">
-          You&apos;re signed in. Your coaching workspace will appear here as we
-          build it out.
+          Your intake is {progress.percent}% complete — {progress.completed} of{" "}
+          {progress.total} areas done.
+        </p>
+        <p className="mt-1 text-sm text-slate-400">
+          Keep going whenever you&apos;re ready — the more Critiq knows, the
+          sharper your coaching gets.
         </p>
       </main>
     </div>
