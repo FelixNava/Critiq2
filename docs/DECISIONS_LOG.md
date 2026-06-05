@@ -174,6 +174,48 @@ Chosen: built directly by the orchestrator with full context (DEC-004/008 preced
 Iterability: high.
 Trade-off flag: LOW — F3 worth tidying when a future phase touches the dashboard (render the unlock date client-side or in the rep's TZ).
 
+## DEC-013 — Phase 9 built directly by the orchestrator (cron), no subagent mesh
+Phase: 9/account-domain-model
+Date: 2026-06-05 18:25 ET
+Type: trade-off
+Context: Phase 9 is a small, fully-specified, mostly-CRUD phase (3 additive tables + a basic list + a create flow). Per the DEC-004/008 precedent, the autonomous cron firing chose between spinning the Planner→Architect→Builder→Verifier subagent mesh vs building directly with full context.
+Chosen: built directly with full context; ran `/code-review` (2 independent finder agents + verify) at the review stage rather than the full build mesh. Independent verification was the load-bearing step (it caught the neon-http no-transaction bug + the probe's typecheck breakage before merge).
+Rationale: lower token/flake cost for a small additive phase; the mesh's value is independent verification, which was done. A headless cron also can't run the Chrome-MCP verifier subagent anyway.
+Iterability: n/a (process).
+Trade-off flag: NO.
+
+## DEC-014 — Added account CREATION flow in Phase 9 (ledger only named the list)
+Phase: 9/account-domain-model
+Date: 2026-06-05 18:25 ET
+Type: trade-off
+Context: The ledger scoped Phase 9 as "`/accounts` list page (basic)" but named no creation path. A list with no way to add accounts is permanently empty, unusable, and unverifiable, and no earlier phase (before recording, Ph 11+) introduces account creation.
+Chosen: added `/accounts/new` (client form) + `POST /api/accounts` (auth-gated, validated) + `createAccountForUser`, which also auto-links the creator as `owner` in `account_rep_joins`.
+Alternatives: defer creation to a later phase (rejected — leaves the list dead and untestable, and there's no natural earlier home); seed via SQL only (rejected — reps need to create their own accounts).
+Rationale: makes the phase actually usable + verifiable end-to-end; minimal, on-spec surface.
+Iterability: high (creation UI/route can be reworked freely).
+Trade-off flag: LOW — confirm the basic create UX is acceptable; richer fields (contacts on create, etc.) can follow.
+
+## DEC-015 — Business account table named `account_records`, not `accounts`
+Phase: 9/account-domain-model
+Date: 2026-06-05 18:25 ET
+Type: obvious
+Context: NextAuth's Drizzle adapter already owns a table literally named `accounts` (OAuth provider links) with JS export `accounts` in schema.ts. The Critiq business "account" entity needed a non-colliding name.
+Chosen: DB table `account_records`, JS export `accountsTbl`. No collision on either the SQL table name or the JS export.
+Rationale: avoids a hard schema/identifier clash; the rep-facing UI still says "account" (no dev jargon leaks).
+Iterability: medium (renaming a table later is a migration, but there's no reason to).
+Trade-off flag: NO.
+
+## DEC-016 — Account stage set + atomic create via db.batch
+Phase: 9/account-domain-model
+Date: 2026-06-05 18:25 ET
+Type: trade-off (stages) + obvious (atomicity)
+Context: (a) The plan was silent on account sales stages. (b) `createAccountForUser` does two writes (account + owner join); they must be atomic so a partial failure can't orphan an account invisible to every rep — but the neon-http driver has NO interactive `transaction()` support (confirmed: it throws "No transactions support in neon-http driver").
+Chosen: (a) stage set = prospecting / active / at_risk / won / dormant (`ACCOUNT_STAGES` in `src/lib/accounts.ts`, rep-facing labels, default `prospecting`). (b) wrap both inserts in `db.batch([...])` with a pre-generated UUID — neon-http runs a batch as one atomic transaction, and pre-generating the id removes the inter-statement dependency a batch can't express.
+Alternatives (stages): a longer pipeline taxonomy (rejected — premature; beta wants a simple, legible set). Alternatives (atomicity): leave as two unguarded inserts (REJECTED by code review — orphan risk); raw multi-statement SQL via the unpooled connection (rejected — `db.batch` is the idiomatic, type-safe primitive).
+Rationale: minimal, honest beta stage set that's a one-line edit to change; `db.batch` is the correct atomic primitive for this driver.
+Iterability: high (stages: edit `ACCOUNT_STAGES`).
+Trade-off flag: LOW — confirm the stage set fits Alex's pipeline language; easy to adjust.
+
 ---
 
 ## End-of-build summary

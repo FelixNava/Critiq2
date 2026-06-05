@@ -27,11 +27,11 @@ Each phase has a status indicator:
 
 ## Status snapshot (auto-updated by Full Auto)
 
-- Last updated: 2026-06-05 ~3:55pm ET
-- Mode: Phases 2–5 **supervised (direct)**; Phase 6 **via /critiq-full-auto orchestrator (Gate-1 ✅)**; Phase 7 **autonomously via the scheduled-task cron (Gate-2 ✅)**; Phase 8 **live/supervised in-session (Felix-approved merge)**.
-- Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅, Phase 7 (intake S2) ✅, Phase 8 (intake Life Context, trust-gated) ✅
-- Current phase: none — Phase 8 merged to review-for-main (PR #8, squash 4c57c25).
-- Next: Phase 9 — Account Domain Model. Hourly self-bounding cron armed to build 9, 10 → review-for-main and 11 → recording-staging, then stop (Phase 11 left for joint device verification).
+- Last updated: 2026-06-05 ~6:30pm ET
+- Mode: Phases 2–5 **supervised (direct)**; Phase 6 **via /critiq-full-auto orchestrator (Gate-1 ✅)**; Phase 7 **autonomously via the scheduled-task cron (Gate-2 ✅)**; Phase 8 **live/supervised in-session (Felix-approved merge)**; Phase 9 **autonomously via the hourly cron (`critiq-fullauto-9-10-11`)**.
+- Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅, Phase 7 (intake S2) ✅, Phase 8 (intake Life Context, trust-gated) ✅, Phase 9 (account domain model) ✅
+- Current phase: none — Phase 9 merged to review-for-main (PR #9, squash eaa72e9). **`UI_VERIFY_PENDING=9`** — headless cron could not drive Chrome MCP; next interactive session must drive signup→/accounts→create→list, then clear the flag.
+- Next: Phase 10 — Account Intelligence Card UI. Hourly self-bounding cron continues: builds 10 → review-for-main and 11 → recording-staging, then stops (Phase 11 left for joint device verification).
 
 ---
 
@@ -254,11 +254,25 @@ The Full Auto control plane.
 
 **Depends on:** Phase 7.
 
-## Phase 9 — Account Domain Model ☐ Planned (NEXT — queued for the hourly cron → review-for-main)
+## Phase 9 — Account Domain Model ✅ Done (PR #9, merged to review-for-main 2026-06-05, squash eaa72e9)
 
-`accounts` table (shared single summary per Felix decision OQ-04 #2). `account_rep_joins`. `contacts`. `/accounts` list page (basic).
+> Built autonomously via the hourly cron (`critiq-fullauto-9-10-11`). Additive — zero data-loss risk. **UI NOT driven via Chrome MCP (headless cron) → `UI_VERIFY_PENDING=9`**; verified at build/typecheck/data-layer/HTTP-boundary level only.
 
-## Phase 10 — Account Intelligence Card UI ☐ Planned
+**Built:**
+- Schema (migration 0003, applied to Neon — additive):
+  - `account_records` (export `accountsTbl`) — the SHARED, first-class account: `name`, `stage`, shared `summary` (null until later AI intelligence phase, per OQ-04 #2), `createdBy` (provenance, SET NULL on user delete — account outlives any rep because it's shared), soft-deleted via `deletedAt`. Named `account_records` to avoid colliding with the existing NextAuth `accounts` table (DEC-015).
+  - `account_rep_joins` — M:N rep↔account assignment (composite PK `(account_id,user_id)`, `role` owner/collaborator). The reassignment surface for **full inheritance on rep transitions** — the shared account summary stays put.
+  - `contacts` — account-scoped people (name/title/email/phone/notes/isPrimary), soft-deleted.
+- `src/lib/accounts.ts` — `ACCOUNT_STAGES` (prospecting/active/at_risk/won/dormant, DEC-016), `listAccountsForUser` (joins via assignments, counts non-deleted contacts, omits large `summary`), `createAccountForUser` (atomic via `db.batch` — neon-http has no interactive transaction).
+- `/accounts` list page (basic, empty state + stage badges) + `/accounts/new` create form + `/api/accounts` POST (auth-gated, validated). Account creation added even though the ledger only named the list — the list is unusable/unverifiable without a way to create accounts and no earlier phase adds it (DEC-014).
+- `AppHeader` shared signed-in header; dashboard refactored to consume it (removed duplicated inline header) + links to `/accounts`.
+- Code review (medium, 2 finder agents + verify): the known Drizzle bare-column correlated-subquery gotcha was verified NOT to apply (table-qualified in drizzle 0.45.2). Fixed: non-atomic create → `db.batch`; header duplication → consume `AppHeader`; list select pulled unused `summary` → trimmed; swallowed create error → logged.
+
+**Verified:** `pnpm build` + `tsc --noEmit` clean. `scripts/verify-phase9.ts` drives the REAL helpers vs Neon dev DB (empty→create 2→owner role+stage+contactCount 0→join rows→soft-delete excluded→cleanup, all ✓). HTTP: unauth POST `/api/accounts`→401, unauth GET `/accounts`→307→login. Vercel preview READY. **NOT human/MCP UI-driven (headless) — `UI_VERIFY_PENDING=9`.**
+
+**Depends on:** Phase 8.
+
+## Phase 10 — Account Intelligence Card UI ☐ Planned (NEXT)
 
 Per-account view: behavioral profile, last interaction summary, current stage, cold-start learning indicator.
 
