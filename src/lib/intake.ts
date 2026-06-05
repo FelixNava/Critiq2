@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { repIntakeProgress } from "@/db/schema";
+import { repIntakeProgress, users } from "@/db/schema";
 
 /**
  * The six areas the rep intake assessment covers. Order is the presentation
@@ -87,4 +87,100 @@ export function isSession2Complete(p: IntakeProgress): boolean {
     p.dimensions.operational_habits &&
     p.dimensions.market_intelligence
   );
+}
+
+/**
+ * Life Context is complete once its dimension is recorded. It is the sixth and
+ * final intake area, surfaced only after the trust-gate opens.
+ */
+export function isLifeContextComplete(p: IntakeProgress): boolean {
+  return p.dimensions.life_context;
+}
+
+/* ------------------------------------------------------------------ *
+ * Free-text validation — shared by every intake route.
+ *
+ * Hoisted here in Phase 8 so session1 / session2 / life-context share one
+ * copy (resolves the byte-for-byte duplication flagged as DEC-008 P2-a).
+ * ------------------------------------------------------------------ */
+
+export const MAX_FREE_TEXT = 2000;
+
+export type FreeText = { value: string | null; tooLong: boolean };
+
+/** Coerce a free-text field: non-string → null, trim, empty → null, flag >2000. */
+export function freeText(raw: unknown): FreeText {
+  if (typeof raw !== "string") return { value: null, tooLong: false };
+  const trimmed = raw.trim();
+  if (trimmed.length > MAX_FREE_TEXT) return { value: null, tooLong: true };
+  return { value: trimmed.length === 0 ? null : trimmed, tooLong: false };
+}
+
+/* ------------------------------------------------------------------ *
+ * Life Context (dimension 6) trust-gate.
+ *
+ * Life Context is the most personal dimension, so it stays hidden until the
+ * rep has been with Critiq a while ("delayed / trust-gated" per the Signal
+ * spec). There are no call/debrief "use" events yet (those arrive in later
+ * phases), so for now the gate keys off elapsed time since the account was
+ * created. It is structured so a later phase can swap the anchor to real
+ * activity without changing callers.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Days after account creation before Life Context unlocks. Env-overridable.
+ * Empty / whitespace / unset / non-numeric all fall back to the safe default —
+ * only an explicit numeric string (including "0" to disable the gate) wins, so
+ * a blank env var can never silently turn the gate off.
+ */
+export const LIFE_CONTEXT_GATE_DAYS = (() => {
+  const raw = process.env.LIFE_CONTEXT_GATE_DAYS;
+  if (raw == null || raw.trim() === "") return 7;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : 7;
+})();
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** When Life Context unlocks for an account created at the given time. */
+export function lifeContextUnlockAt(accountCreatedAt: Date): Date {
+  return new Date(accountCreatedAt.getTime() + LIFE_CONTEXT_GATE_DAYS * DAY_MS);
+}
+
+/** Whether Life Context is unlocked for an account of the given age. */
+export function isLifeContextUnlocked(
+  accountCreatedAt: Date,
+  now: Date = new Date(),
+): boolean {
+  return now.getTime() >= lifeContextUnlockAt(accountCreatedAt).getTime();
+}
+
+export type LifeContextGate = {
+  unlocked: boolean;
+  unlockAt: Date;
+  createdAt: Date;
+};
+
+/**
+ * Resolve the Life Context gate for a user from their account age. Returns null
+ * if the user can't be found.
+ */
+export async function getLifeContextGate(
+  userId: string,
+  now: Date = new Date(),
+): Promise<LifeContextGate | null> {
+  const rows = await db
+    .select({ createdAt: users.createdAt })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  const createdAt = rows[0]?.createdAt;
+  if (!createdAt) return null;
+
+  return {
+    unlocked: isLifeContextUnlocked(createdAt, now),
+    unlockAt: lifeContextUnlockAt(createdAt),
+    createdAt,
+  };
 }

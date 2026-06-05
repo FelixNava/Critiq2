@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { repIntakeResponses, repIntakeProgress } from "@/db/schema";
-import { getIntakeProgress, type IntakeDimension } from "@/lib/intake";
+import { getIntakeProgress, freeText, type IntakeDimension } from "@/lib/intake";
 
 export const dynamic = "force-dynamic";
 
@@ -16,17 +16,6 @@ const MOTIVATORS = new Set([
   "growth",
 ]);
 const LEAD_OR_LISTEN = new Set(["lead", "listen", "depends"]);
-const MAX_FREE_TEXT = 2000;
-
-type FreeText = { value: string | null; tooLong: boolean };
-
-/** Coerce a free-text field: non-string → null, trim, empty → null, flag >2000. */
-function freeText(raw: unknown): FreeText {
-  if (typeof raw !== "string") return { value: null, tooLong: false };
-  const trimmed = raw.trim();
-  if (trimmed.length > MAX_FREE_TEXT) return { value: null, tooLong: true };
-  return { value: trimmed.length === 0 ? null : trimmed, tooLong: false };
-}
 
 export async function POST(req: Request) {
   const session = await auth();
