@@ -40,14 +40,17 @@ SESSION_TOKEN_BUDGET_USED=520000
 SESSION_ID=live-supervised-phase8-1530ET-2026-06-05
 
 # --- CRON SCHEDULE ---
-# Phase 8 merged live/supervised 2026-06-05. An hourly self-bounding scheduled
-# task is being armed (Part B of this session) to build Phases 9 & 10 into
-# review-for-main and Phase 11 into recording-staging, then STOP (next phase > 11
-# -> exit). Phase 11 is browser-media code a headless cron cannot truly verify, so
-# it sets UI_VERIFY_PENDING=11 and stops for joint device verification.
-# (NEXT_CRON_FIRE_ET + CRON_SCHEDULE_LABEL are finalized at arming time.)
-NEXT_CRON_FIRE_ET=
-CRON_SCHEDULE_LABEL=arming-9-10-11-self-bounding
+# Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL
+# scheduled task "critiq-fullauto-9-10-11" (cron "0 * * * *", fires ~:06 past each
+# hour, local TZ) -> builds Phase 9 & 10 into review-for-main and Phase 11 into
+# recording-staging, then self-stops (next phase > 11 -> exit + best-effort
+# disable via update_scheduled_task). Phase 11 is browser-media a headless cron
+# cannot verify -> it sets UI_VERIFY_PENDING=11 and stops for joint device
+# verification. Overlap guard: a firing skips if PHASE_CURRENT is set with a
+# heartbeat < 90 min old. Only fires while the desktop app is open (closed ->
+# runs on next launch). First run ~2026-06-05T17:06 ET (Phase 9).
+NEXT_CRON_FIRE_ET=2026-06-05T17:06:00-04:00
+CRON_SCHEDULE_LABEL=critiq-fullauto-9-10-11-hourly-armed
 
 # --- BLOCKERS ---
 BLOCKER_REASON=
