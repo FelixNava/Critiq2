@@ -27,12 +27,11 @@ Each phase has a status indicator:
 
 ## Status snapshot (auto-updated by Full Auto)
 
-- Last updated: 2026-06-05 ~03:30am ET
-- Mode: **live supervised build** in-session (not cron) — building foundation phases directly with full MCP + real-service verification.
-- Last completed: **Phase 4 — Landing + Sentry** ✅ (PR #4)
-- Done so far tonight: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅
-- Current phase: Phase 5 — Rate limiting + security headers (starting)
-- Cron: still UNARMED (not needed while building live in-session).
+- Last updated: 2026-06-05 ~09:20am ET
+- Mode: Phases 2–5 built **supervised (direct)**. Phase 6 now being built **via /critiq-full-auto orchestrator (Gate-1 dry-run)**. Phase 7 queued for a **one-shot scheduled-task cron (Gate-2 autonomous test)**.
+- Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit/headers) ✅
+- Current phase: Phase 6 — Rep Intake Session 1 (via orchestrator)
+- Next: Phase 7 — Rep Intake Extended Dimensions (scheduled cron test)
 
 ---
 
@@ -153,7 +152,9 @@ The Full Auto control plane.
 
 ---
 
-## Phase 5 — Rate Limiting + Security Headers ☐ Planned
+## Phase 5 — Rate Limiting + Security Headers ✅ Done (PR #5, merged to review-for-main 2026-06-05)
+
+> Postgres counters (auth 5/min, signup 3/min, ai 20/min stub) + security headers (HSTS/CSP/frame/etc). Verified: 4th signup→429, headers present, build clean, preview green. CSP hardening (nonce) flagged for pre-launch. PR: https://github.com/FelixNava/Critiq2/pull/5
 
 **Goal:** Postgres-based rate limiting (DT Phase 38b pattern). CSP, HSTS, security headers. Guards against abuse before any AI endpoint exists.
 
