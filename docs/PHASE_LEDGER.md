@@ -27,11 +27,11 @@ Each phase has a status indicator:
 
 ## Status snapshot (auto-updated by Full Auto)
 
-- Last updated: 2026-06-05 ~10:02am ET
-- Mode: Phases 2–5 built **supervised (direct)**; Phase 6 built **via /critiq-full-auto orchestrator (Gate-1 ✅ passed — mesh works, orchestrator caught 1 reconciliation + 1 Builder defect)**. Phase 7 queued for the **one-shot scheduled-task cron at 10:20 ET (Gate-2 autonomous test)**.
-- Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅
-- Current phase: none — awaiting the 10:20 cron to autonomously build Phase 7.
-- Next: Phase 7 — Rep Intake Extended Dimensions.
+- Last updated: 2026-06-05 ~1:05pm ET
+- Mode: Phases 2–5 built **supervised (direct)**; Phase 6 built **via /critiq-full-auto orchestrator (Gate-1 ✅)**. **Phase 7 built **autonomously via the scheduled-task cron (Gate-2 ✅ — fresh session → build → drive-the-app verify → merge → clean exit proven end-to-end).**
+- Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅, Phase 7 (intake S2) ✅
+- Current phase: none — Phase 7 merged to review-for-main (PR #7, squash e93bce1).
+- Next: Phase 8 — Rep Intake: Life Context (Delayed).
 
 ---
 
@@ -210,7 +210,9 @@ The Full Auto control plane.
 
 # === The phases below are scoped but NOT in tonight's test ===
 
-## Phase 7 — Rep Intake: Extended Dimensions ☐ Planned
+## Phase 7 — Rep Intake: Extended Dimensions ✅ Done (PR #7, merged to review-for-main 2026-06-05, squash e93bce1)
+
+> Built **autonomously via the scheduled-task cron (Gate-2)** — fresh session, orchestrator built directly (DEC-004 pattern: small, fully-specified phase) and verified independently by driving the app. Additive only — no migration, zero data-loss risk. Verified vs real Neon dev DB: 401 unauth, 400 (bad enum / missing field / oversized text), 200 valid → 83% (5/6), idempotent re-submit (5 dims / 10 rows, upsert in place), dashboard CTA present at 33% / hidden at 83%, S2 page renders. 2 P2 cleanup findings deferred (DEC-008). PR: https://github.com/FelixNava/Critiq2/pull/7
 
 **Goal:** Session 2 of intake — extend the Phase 6 pattern to 3 more dimensions: **Sales Psychology**, **Operational Habits**, **Market Intelligence**. Reuse the existing intake infrastructure (do NOT rebuild it).
 

@@ -113,6 +113,23 @@ Findings (important for trusting Full Auto): (1) the two architects disagreed on
 Iterability: n/a (process).
 Trade-off flag: NO — but informs Gate-2/Full-Auto confidence.
 
+## DEC-008 — Phase 7 built directly by orchestrator; 2 P2 cleanups deferred
+Phase: 7/rep-intake-extended
+Date: 2026-06-05 13:00 ET
+Type: trade-off
+Context: Phase 7 (intake Session 2) is small, additive, and fully specified, and is an exact mirror of the Phase 6 session1 route + identity/relationships pages. The autonomous cron session had to decide between (a) spinning the Planner→Architect→Builder→Verifier subagent mesh and (b) building directly with full context, per the DEC-004 precedent. It also had to resolve two P2 findings raised by `/code-review`.
+Chosen:
+  - Built Phase 7 directly (orchestrator session, full context), then verified independently by DRIVING the app via local Preview MCP against the real Neon dev DB (the load-bearing step per DEC-007's lesson). No subagent fan-out for the build; an independent correctness-review subagent + a cleanup-review subagent were run at the review stage and found no P0/P1.
+  - Deferred both P2 cleanup findings rather than expand Phase 7's additive scope:
+      • P2-a: `freeText()` / `FreeText` / `MAX_FREE_TEXT` are duplicated byte-for-byte between `session1/route.ts` and `session2/route.ts`. Hoisting to `src/lib/intake.ts` is a clean ~10-line win, but it would edit the Phase 6 file and turn an additive phase into a cross-phase refactor. Deferred to a future intake-touching phase.
+      • P2-b: the final Session 2 step surfaces a generic server "Choose…" error on the market-intelligence page if an earlier step's localStorage is stale/cleared. This pre-exists identically in Phase 6's relationships page; the server is the real gate (verified: 400s fire correctly). Cosmetic; deferred.
+Alternatives considered:
+  - Run the full subagent mesh for the build (rejected: higher token + flake cost for a 6-file mirror; DEC-004 already established direct-build for small fully-specified phases; independent verification is what catches defects, and that was done).
+  - Fix P2-a in this PR (rejected for now: drags Phase 6 code into a Phase 7 additive PR; revisit when a phase legitimately touches the intake routes).
+Rationale: lowest-risk path to a correct, additive, well-verified phase while proving the autonomous cron loop; keeps the PR scoped; surfaces the cleanups for deliberate later action.
+Iterability: high (P2-a is a trivial future refactor; P2-b is cosmetic).
+Trade-off flag: LOW priority — P2-a worth doing on the next intake-routes phase; P2-b optional.
+
 ---
 
 ## End-of-build summary
