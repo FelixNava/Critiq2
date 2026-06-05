@@ -1,6 +1,11 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
-import { getIntakeProgress, isSession1Complete } from "@/lib/intake";
+import {
+  getIntakeProgress,
+  isSession1Complete,
+  isSession2Complete,
+} from "@/lib/intake";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +19,8 @@ export default async function DashboardPage() {
 
   const progress = await getIntakeProgress(userId);
   if (!isSession1Complete(progress)) redirect("/onboarding");
+
+  const session2Done = isSession2Complete(progress);
 
   return (
     <div className="min-h-dvh bg-slate-50">
@@ -48,6 +55,24 @@ export default async function DashboardPage() {
           Keep going whenever you&apos;re ready — the more Critiq knows, the
           sharper your coaching gets.
         </p>
+
+        {!session2Done && (
+          <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-base font-semibold text-slate-900">
+              Continue your profile
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              A few more questions about how you sell — your psychology,
+              habits, and how you read a market. About three minutes.
+            </p>
+            <Link
+              href="/onboarding/sales-psychology"
+              className="mt-4 inline-block rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+            >
+              Continue →
+            </Link>
+          </div>
+        )}
       </main>
     </div>
   );
