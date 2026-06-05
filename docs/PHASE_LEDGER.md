@@ -27,11 +27,11 @@ Each phase has a status indicator:
 
 ## Status snapshot (auto-updated by Full Auto)
 
-- Last updated: 2026-06-05 ~1:05pm ET
-- Mode: Phases 2–5 built **supervised (direct)**; Phase 6 built **via /critiq-full-auto orchestrator (Gate-1 ✅)**. **Phase 7 built **autonomously via the scheduled-task cron (Gate-2 ✅ — fresh session → build → drive-the-app verify → merge → clean exit proven end-to-end).**
-- Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅, Phase 7 (intake S2) ✅
-- Current phase: none — Phase 7 merged to review-for-main (PR #7, squash e93bce1).
-- Next: Phase 8 — Rep Intake: Life Context (Delayed).
+- Last updated: 2026-06-05 ~3:55pm ET
+- Mode: Phases 2–5 **supervised (direct)**; Phase 6 **via /critiq-full-auto orchestrator (Gate-1 ✅)**; Phase 7 **autonomously via the scheduled-task cron (Gate-2 ✅)**; Phase 8 **live/supervised in-session (Felix-approved merge)**.
+- Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅, Phase 7 (intake S2) ✅, Phase 8 (intake Life Context, trust-gated) ✅
+- Current phase: none — Phase 8 merged to review-for-main (PR #8, squash 4c57c25).
+- Next: Phase 9 — Account Domain Model. Hourly self-bounding cron armed to build 9, 10 → review-for-main and 11 → recording-staging, then stop (Phase 11 left for joint device verification).
 
 ---
 
@@ -238,11 +238,23 @@ The Full Auto control plane.
 
 **Depends on:** Phase 6.
 
-## Phase 8 — Rep Intake: Life Context (Delayed) ☐ Planned
+## Phase 8 — Rep Intake: Life Context (Delayed) ✅ Done (PR #8, merged to review-for-main 2026-06-05, squash 4c57c25)
 
-After 1 week of use, surface Life Context dimension. Trust-gating logic.
+> Built live/supervised in-session; Felix-approved merge. Adds the 6th intake dimension behind a time-based trust-gate. Verified end-to-end via Chrome/Preview MCP vs real Neon dev DB. Additive — zero schema change, zero data-loss risk. PR: https://github.com/FelixNava/Critiq2/pull/8
 
-## Phase 9 — Account Domain Model ☐ Planned
+**Built:**
+- Trust-gate in `src/lib/intake.ts`: Life Context unlocks `LIFE_CONTEXT_GATE_DAYS` (default 7, env-overridable, fail-safe to 7 on blank/garbage) days after `users.createdAt`. No call/debrief "use" events exist yet (Phases 18–22), so the gate keys off account age; structured so a later phase can swap the anchor to real activity without changing callers (DEC-010).
+- Enforced server-side: `/onboarding/life-context` (server page) redirects when locked / out-of-sequence; `/api/intake/life-context` returns 403 (locked) / 409 (Session 1–2 incomplete). The API is the real boundary, not just the UI.
+- New: `/api/intake/life-context`, `src/components/onboarding/LifeContextForm.tsx`, `src/app/(app)/onboarding/life-context/page.tsx`.
+- Dashboard: locked ("One last piece, a little later" + unlock date) / unlocked ("One more thing") / complete (6/6) states.
+- Cleanup: hoisted shared `freeText` into `src/lib/intake.ts` (resolves DEC-008 P2-a; session1/session2/life-context share one copy → DEC-011).
+- Code review (3 finder agents): F1 (blank-env fail-safe), F2 (API session-order 409 guard), F4 (dedupe unlock check) fixed + re-verified; F3 (server-TZ date label) deferred (DEC-012).
+
+**Verified (live, Chrome/Preview MCP vs real Neon dev DB):** locked → 403 + redirect + dashboard card w/ correct date; backdate `created_at` → unlocked → form → 100%; idempotent re-submit (no dup rows); out-of-order → 409; freeText hoist regression (400/200). Vercel preview READY (auth-protected).
+
+**Depends on:** Phase 7.
+
+## Phase 9 — Account Domain Model ☐ Planned (NEXT — queued for the hourly cron → review-for-main)
 
 `accounts` table (shared single summary per Felix decision OQ-04 #2). `account_rep_joins`. `contacts`. `/accounts` list page (basic).
 

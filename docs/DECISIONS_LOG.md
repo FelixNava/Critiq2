@@ -143,6 +143,37 @@ Chosen / fixed:
 Iterability: n/a (fixes).
 Trade-off flag: NO — but rotate to dedicated, cleanly-stored keys before beta (ties to DEC-002).
 
+## DEC-010 — Life Context trust-gate anchors on account age (not activity)
+Phase: 8/rep-intake-life-context
+Date: 2026-06-05 15:40 ET
+Type: trade-off
+Context: Phase 8's ledger spec ("after 1 week of use, trust-gating logic") is silent on what "use" means. No call/debrief activity exists yet (those arrive in Phases 18–22), so there is no real usage signal to gate on at this build stage.
+Chosen: the gate keys off elapsed time since `users.createdAt` — Life Context unlocks LIFE_CONTEXT_GATE_DAYS (default 7) after signup. Helpers (`isLifeContextUnlocked`, `getLifeContextGate`) are structured so a later phase can swap the anchor to real activity without changing callers.
+Alternatives considered:
+  - Anchor on Session 1–2 completion time (reasonable; rejected for now — "use" hasn't really begun until later phases, and account-age is the simplest honest proxy with zero schema change).
+  - Activity-based (rejected — no activity events exist yet).
+Rationale: simplest honest proxy at this stage; zero schema change; fully reversible.
+Iterability: high (swap the anchor in one function).
+Trade-off flag: YES — but Felix was shown this at the merge gate and explicitly chose "Merge" over "Re-anchor on intake-completion." Revisit when call activity exists.
+
+## DEC-011 — Resolved DEC-008 P2-a: hoisted freeText into src/lib/intake.ts
+Phase: 8/rep-intake-life-context
+Date: 2026-06-05 15:40 ET
+Type: obvious
+Context: DEC-008 deferred de-duplicating the byte-for-byte `freeText`/`FreeText`/`MAX_FREE_TEXT` helper (duplicated in session1 + session2) to "the next intake-touching phase." Phase 8 is that phase; inlining a 3rd copy would be a clear smell.
+Chosen: moved the helper into `src/lib/intake.ts`; session1/session2/life-context all import it. Verified byte-identical and re-verified both routes still validate (too-long → 400, valid → 200).
+Iterability: high.
+Trade-off flag: NO.
+
+## DEC-012 — Phase 8 built live/supervised; code-review fixes F1/F2/F4 applied, F3 deferred
+Phase: 8/rep-intake-life-context
+Date: 2026-06-05 15:42 ET
+Type: obvious
+Context: Felix directed Phase 8 to be built live/supervised in-session (not via cron). A max-effort /code-review (3 independent finder agents) surfaced 4 findings.
+Chosen: built directly by the orchestrator with full context (DEC-004/008 precedent for small, fully-specified phases); drove verification via Chrome MCP against the live dev server vs real Neon (the Preview MCP server-tracking was flaky this session — servers died instantly — so drove the running dev server directly; noted to Felix). Applied F1 (blank/whitespace LIFE_CONTEXT_GATE_DAYS now fail-safes to 7 instead of parsing to 0 and disabling the gate), F2 (life-context API now enforces Session 1–2 completion → 409, mirroring the page guard so a direct POST can't write life_context out of order), F4 (getLifeContextGate calls isLifeContextUnlocked rather than duplicating the comparison). Deferred F3 (server-TZ on the "around {date}" label — cosmetic, the label is already fuzzy).
+Iterability: high.
+Trade-off flag: LOW — F3 worth tidying when a future phase touches the dashboard (render the unlock date client-side or in the rep's TZ).
+
 ---
 
 ## End-of-build summary
