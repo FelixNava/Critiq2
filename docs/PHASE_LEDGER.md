@@ -27,9 +27,11 @@ Each phase has a status indicator:
 
 ## Status snapshot (auto-updated by Full Auto)
 
-- Last updated: 2026-06-05 ~01:55am ET
-- Current phase: none (Full Auto not yet armed)
-- Last completed: Phase 1 — Foundation Rails (this file + skills + state)
+- Last updated: 2026-06-05 ~02:10am ET
+- Current phase: none (Full Auto NOT armed — Path B)
+- Last completed: Phase 1 — Foundation Rails (docs + all 4 skills + state + secrets pre-staged)
+- Next phase: Phase 2 — Drizzle + Neon. 🚦 **BLOCKED** on `DATABASE_URL` (Felix to provision a dedicated Critiq Neon DB).
+- Cron: **UNARMED**. Rails are built; arming is deliberate and deferred until DB is provisioned + a dry-run passes.
 
 ---
 
@@ -47,21 +49,29 @@ Scaffolded with `create-next-app`. Live on Vercel.
 
 The Full Auto control plane.
 
-**Built (manual):**
+**Built (manual + Path B rails session 2026-06-05 ~02:10 ET):**
 - `docs/PHASE_LEDGER.md` (this file)
 - `docs/CLAUDE.md`
 - `docs/DECISIONS_LOG.md`
 - `.critiq-full-auto-state`
-- `~/.claude/skills/critiq-full-auto/SKILL.md`
-- `~/.claude/skills/critiq-merge/SKILL.md`
-- `~/.claude/skills/critiq-status/SKILL.md`
+- `~/.claude/skills/critiq-context/SKILL.md` ✅
+- `~/.claude/skills/critiq-status/SKILL.md` ✅
+- `~/.claude/skills/critiq-full-auto/SKILL.md` ✅ (written this session — master orchestrator, incl. env-readiness gate)
+- `~/.claude/skills/critiq-merge/SKILL.md` ✅ (written this session — merge ceremony, review-for-main only)
 - `review-for-main` branch
-- Expanded `.claude/settings.json` for Full Auto permissions
-- Cron armed: 3am / 4am / 5am / 6am ET on 2026-06-05
+- `.claude/settings.json` already expanded for Full Auto permissions ✅
+- Repo made **public** ✅ (so `/critiq-status` works anonymously from mobile)
+- Secrets **pre-staged** in `.env.local` ✅ (Anthropic + Resend reused account-wide; AUTH_SECRET + CRON_SECRET fresh) — see DEC-002
+
+**NOT done (deliberate, Path B):**
+- ❌ Cron NOT armed (was planned for 3–6am ET; deferred until DB provisioned + dry-run)
+- ❌ `DATABASE_URL` not provisioned — Felix's one task (blocks Phase 2+)
 
 ---
 
-## Phase 2 — Drizzle + Neon + First Migration ☐ Planned
+## Phase 2 — Drizzle + Neon + First Migration 🚦 Blocked (needs DATABASE_URL)
+
+> **Unblock:** Felix creates a dedicated Critiq Neon project at console.neon.tech and pastes the pooled connection string into `.env.local` (line `DATABASE_URL=`) and Vercel env (`vercel env add DATABASE_URL`). Do NOT reuse a sibling DB. Once set, this phase is ready — the env-readiness gate in `/critiq-full-auto` re-checks live.
 
 **Goal:** Database foundation. NextAuth-compatible schema. Lazy connection pattern. FKs + indexes from day one.
 
@@ -297,16 +307,23 @@ Drive every flow end-to-end. Document known limitations. Final test pass.
 
 ---
 
-# Tonight's test scope
+# What actually happened on 2026-06-05 (Path B)
 
-Cron firings at 3am / 4am / 5am / 6am ET on 2026-06-05.
+The original plan was to arm cron firings at 3/4/5/6am ET to autobuild Phases 2–6.
+During pre-flight, diligence found a hard blocker: **no Neon DB and no secrets existed
+anywhere** (local, Vercel, or GitHub). An armed cron would have failed Phase 2 on the
+first firing and produced zero phases. Felix chose **Path B**: build the rails, leave the
+cron unarmed, provision the DB in the morning.
 
-Target: complete Phases 2-6 by morning. If a phase exceeds 1 cron session (800k token cap), it pauses and the next cron resumes.
+**Done this session:** repo public · `/critiq-full-auto` + `/critiq-merge` skills written ·
+secrets pre-staged (Anthropic + Resend reused; AUTH_SECRET + CRON_SECRET generated) ·
+umbrella PR opened · ledger/state corrected.
 
-Realistic outcome:
-- Cron 3am: Phase 2 (DB foundation)
-- Cron 4am: Phase 3 (Auth + Resend)
-- Cron 5am: Phases 4 + 5 (Landing + Rate limiting — both small)
-- Cron 6am: Phase 6 (Rep Intake Session 1)
+**To arm the real run (AM):**
+1. Create a dedicated Critiq Neon project → paste `DATABASE_URL` into `.env.local` + Vercel.
+2. (Recommended) `/critiq-full-auto` dry-run of Phase 2, supervised, to verify orchestration.
+3. Arm the cron via `/schedule` (caveat: remote firings lack local Preview/Chrome MCP — the
+   Verifier falls back to build+type+test+curl; confirm secrets reach the firing environment).
 
-If we hit blockers or paused phases, scope contracts. Email summarizes morning of.
+Phases 2–6 remain the foundation target. If a phase exceeds the 800k token cap it pauses and
+the next session resumes.

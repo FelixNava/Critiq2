@@ -32,7 +32,33 @@ Trade-off flag: [YES / NO] — does this need Felix's review post-build?
 
 ## Decisions
 
-(none yet — log starts empty)
+## DEC-001 — Repo made public
+Phase: 1/foundation-rails
+Date: 2026-06-05 02:05 ET
+Type: obvious
+Context: `/critiq-status` uses anonymous `WebFetch` against raw.githubusercontent.com, which 404s on a private repo — so mobile status checks were broken. Felix explicitly chose "Make Critiq2 public" when asked.
+Chosen: `gh repo edit FelixNava/Critiq2 --visibility public`. Verified raw URL returns 200.
+Rationale: Repo is just a Next.js scaffold + docs — no secrets committed (`.env*` gitignored). Mobile status now works.
+Iterability: high (can re-privatize anytime; if so, `/critiq-status` must switch to authed `gh api`).
+Trade-off flag: NO (Felix's explicit choice).
+
+## DEC-002 — Secret sourcing for the build
+Phase: 1/foundation-rails
+Date: 2026-06-05 02:10 ET
+Type: trade-off
+Context: Critiq had no secrets anywhere. Felix asked whether secrets could be sourced from sibling projects (drawdown-tracker / apextrust) and gave latitude ("do what you think is right"). Investigated what's reusable.
+Chosen:
+  - Reused account-wide `ANTHROPIC_API_KEY` + `RESEND_API_KEY` from drawdown-tracker's `.env.local` (Critiq's domain `critiq.firstlap.dev` is already Resend-verified).
+  - Generated fresh `AUTH_SECRET` + `CRON_SECRET` (random).
+  - Left `DATABASE_URL` unset for Felix — each project must have its own isolated Neon DB.
+  All written to `critiq2/.env.local` (gitignored; values never printed to transcript).
+Alternatives considered:
+  - Dedicated per-project Anthropic/Resend keys (rejected for now: more setup, no functional difference for beta; reuse is reversible).
+  - Reuse a sibling `DATABASE_URL` (REJECTED hard: commingles data, violates Critiq's locked privacy model, and the only available connections point at production DBs).
+  - Create a Critiq Neon project via `neonctl` (rejected: CLI not authenticated — browser OAuth timed out; needs Felix interactively).
+Rationale: Unblocks AI/email/auth autonomously while keeping data isolation intact and leaving the one genuinely-Felix decision (the DB) to him.
+Iterability: high for the API keys (rotate to dedicated keys anytime); the DB choice is still open (Felix provisions it).
+Trade-off flag: YES — review whether to rotate Critiq onto its own dedicated Anthropic + Resend keys before beta (best practice for revocability/rate-limit isolation).
 
 ---
 
