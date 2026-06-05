@@ -3,8 +3,10 @@ import {
   text,
   timestamp,
   integer,
+  jsonb,
   primaryKey,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -96,5 +98,73 @@ export const rateLimitCounters = pgTable(
   (t) => [index("rate_limit_counters_expires_at_idx").on(t.expiresAt)],
 );
 
+/**
+ * Rep intake assessment — one row per answered question. `answer` is JSON so we
+ * can store strings today and richer shapes (arrays/objects) later without a
+ * schema change. A rep can only have one answer per question (upsert target).
+ */
+export const repIntakeResponses = pgTable(
+  "rep_intake_responses",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    dimension: text("dimension").notNull(),
+    questionKey: text("question_key").notNull(),
+    answer: jsonb("answer"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("rep_intake_responses_user_question_key").on(
+      t.userId,
+      t.questionKey,
+    ),
+    index("rep_intake_responses_user_id_idx").on(t.userId),
+  ],
+);
+
+/**
+ * Rep intake progress — one row per completed dimension. Drives the dashboard
+ * completion meter and gating. `completedAt` is preserved across re-submissions;
+ * only `updatedAt` advances.
+ */
+export const repIntakeProgress = pgTable(
+  "rep_intake_progress",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    dimension: text("dimension").notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("rep_intake_progress_user_dimension_key").on(
+      t.userId,
+      t.dimension,
+    ),
+    index("rep_intake_progress_user_id_idx").on(t.userId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type RepIntakeResponse = typeof repIntakeResponses.$inferSelect;
+export type NewRepIntakeResponse = typeof repIntakeResponses.$inferInsert;
+export type RepIntakeProgress = typeof repIntakeProgress.$inferSelect;
+export type NewRepIntakeProgress = typeof repIntakeProgress.$inferInsert;
