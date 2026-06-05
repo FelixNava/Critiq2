@@ -27,11 +27,11 @@ Each phase has a status indicator:
 
 ## Status snapshot (auto-updated by Full Auto)
 
-- Last updated: 2026-06-05 ~02:10am ET
-- Current phase: none (Full Auto NOT armed — Path B)
-- Last completed: Phase 1 — Foundation Rails (docs + all 4 skills + state + secrets pre-staged)
-- Next phase: Phase 2 — Drizzle + Neon. 🚦 **BLOCKED** on `DATABASE_URL` (Felix to provision a dedicated Critiq Neon DB).
-- Cron: **UNARMED**. Rails are built; arming is deliberate and deferred until DB is provisioned + a dry-run passes.
+- Last updated: 2026-06-05 ~02:40am ET
+- Mode: **live supervised build** in-session (not cron) — DB provisioned, building foundation phases directly with full MCP verification.
+- Last completed: **Phase 2 — Drizzle + Neon** ✅ (PR #2, merged to review-for-main)
+- Current phase: Phase 3 — NextAuth v5 + Resend (starting)
+- Cron: still UNARMED (not needed while building live in-session).
 
 ---
 
@@ -69,9 +69,9 @@ The Full Auto control plane.
 
 ---
 
-## Phase 2 — Drizzle + Neon + First Migration 🚦 Blocked (needs DATABASE_URL)
+## Phase 2 — Drizzle + Neon + First Migration ✅ Done (PR #2, merged to review-for-main 2026-06-05)
 
-> **Unblock:** Felix creates a dedicated Critiq Neon project at console.neon.tech and pastes the pooled connection string into `.env.local` (line `DATABASE_URL=`) and Vercel env (`vercel env add DATABASE_URL`). Do NOT reuse a sibling DB. Once set, this phase is ready — the env-readiness gate in `/critiq-full-auto` re-checks live.
+> Built + verified in a live supervised session. DB provisioned by Felix (dedicated Critiq Neon project). Schema applied + confirmed in Neon. PR: https://github.com/FelixNava/Critiq2/pull/2
 
 **Goal:** Database foundation. NextAuth-compatible schema. Lazy connection pattern. FKs + indexes from day one.
 

@@ -60,6 +60,27 @@ Rationale: Unblocks AI/email/auth autonomously while keeping data isolation inta
 Iterability: high for the API keys (rotate to dedicated keys anytime); the DB choice is still open (Felix provisions it).
 Trade-off flag: YES — review whether to rotate Critiq onto its own dedicated Anthropic + Resend keys before beta (best practice for revocability/rate-limit isolation).
 
+## DEC-003 — Phase branches cut from review-for-main, not master
+Phase: 2/drizzle-neon
+Date: 2026-06-05 02:25 ET
+Type: conflict-resolution
+Context: docs/CLAUDE.md says "branch from master," but master is frozen at the scaffold (Felix promotes it manually) while review-for-main accumulates each merged phase. Branching Phase 3 from master would give it no Phase 2 code, breaking the dependency chain.
+Chosen: cut each phase branch from `review-for-main`; PR back into `review-for-main`. master stays Felix's manual-promotion target, untouched.
+Alternatives: branch from master (rejected — phases wouldn't contain prior phases' code).
+Rationale: review-for-main is this project's integration mainline; the global "branch from master, never from a feature branch" rule is about not stacking on unmerged sibling features — review-for-main is neither. Preserves the build chain.
+Iterability: high (purely a branching convention).
+Trade-off flag: YES — confirm you're OK with this convention; if you'd rather, promote review-for-main→master between phases so master can be the base.
+
+## DEC-004 — Built Phase 2 directly as orchestrator (no subagent fan-out)
+Phase: 2/drizzle-neon
+Date: 2026-06-05 02:25 ET
+Type: trade-off
+Context: /critiq-full-auto specifies a Planner→Architect→Builder→Verifier subagent mesh. That mesh is brand-new and untested. Phase 2 is small + fully specified in the ledger.
+Chosen: I (the live session) built Phase 2 directly with full context, verifying via local build + Neon queries + Vercel preview, rather than spinning the untested mesh across the first real phase.
+Rationale: lower risk for the first autonomous phase; proves the build/verify/merge loop end-to-end before trusting the agent fan-out. Will reassess using subagents for larger phases (e.g. the recording stack).
+Iterability: high (per-phase choice).
+Trade-off flag: NO (process choice, easily changed).
+
 ---
 
 ## End-of-build summary

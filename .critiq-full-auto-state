@@ -8,29 +8,29 @@
 STOP=false
 
 # --- BUILD METADATA ---
-BUILD_START_ET=
-BUILD_LABEL=critiq-beta-foundation-test
+BUILD_START_ET=2026-06-05T02:25:00-04:00
+BUILD_LABEL=critiq-beta-foundation-live-supervised
 BUILD_TOTAL_TOKEN_BUDGET=4000000
 BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
-PHASE_CURRENT=
-PHASE_CURRENT_STATUS=
+PHASE_CURRENT=3/auth-resend
+PHASE_CURRENT_STATUS=building
 PHASE_CURRENT_PR=
-PHASE_NEXT=2/drizzle-neon
-PHASE_LAST_COMPLETED=1/foundation-rails
-PHASE_LAST_COMPLETED_AT=2026-06-05T02:10:00-04:00
+PHASE_NEXT=4/landing-sentry
+PHASE_LAST_COMPLETED=2/drizzle-neon
+PHASE_LAST_COMPLETED_AT=2026-06-05T02:38:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
-# Secrets pre-staged in .env.local: ANTHROPIC_API_KEY + RESEND_API_KEY (reused from
-# sibling projects, account-wide), AUTH_SECRET + CRON_SECRET (freshly generated).
-# MISSING: DATABASE_URL — must be a dedicated Critiq Neon DB (never a sibling's).
-ENV_READY=false
+# DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
+# Also in .env.local: ANTHROPIC_API_KEY + RESEND_API_KEY (reused), AUTH_SECRET + CRON_SECRET.
+# Still to provision later: DEEPGRAM_API_KEY (Phase 15), SENTRY_DSN (Phase 4).
+ENV_READY=true
 
 # --- SESSION HEARTBEAT ---
-SESSION_LAST_HEARTBEAT=
+SESSION_LAST_HEARTBEAT=2026-06-05T02:40:00-04:00
 SESSION_TOKEN_BUDGET_USED=0
-SESSION_ID=
+SESSION_ID=live-supervised-2026-06-05
 
 # --- CRON SCHEDULE ---
 # UNARMED. Path B chosen 2026-06-05 ~02:00 ET: build the rails, do NOT arm the cron.
@@ -40,10 +40,8 @@ NEXT_CRON_FIRE_ET=
 CRON_SCHEDULE_LABEL=UNARMED-path-b-rails-only
 
 # --- BLOCKERS ---
-# Precondition for Phase 2+. Auto-clears at runtime once DATABASE_URL is set
-# (the env-readiness gate re-checks live; this string is advisory for /critiq-status).
-BLOCKER_REASON=Phase 2 needs DATABASE_URL. Felix: create a dedicated Critiq Neon project (console.neon.tech), paste the POOLED connection string into .env.local + Vercel env. Do NOT reuse a sibling DB. Everything else is pre-staged.
-BLOCKER_SET_AT=2026-06-05T02:10:00-04:00
+BLOCKER_REASON=
+BLOCKER_SET_AT=
 
 # --- EMAIL CHANNEL ---
 EMAIL_SENDER=notifications@critiq.firstlap.dev
