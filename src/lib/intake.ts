@@ -74,3 +74,17 @@ export async function getIntakeProgress(
 export function isSession1Complete(p: IntakeProgress): boolean {
   return p.dimensions.identity && p.dimensions.relationships;
 }
+
+/**
+ * Session 2 is complete once the three contextual dimensions are done:
+ * sales psychology, operational habits, and market intelligence. Life context
+ * (the sixth dimension) is surfaced separately and later, so it is not part of
+ * Session 2.
+ */
+export function isSession2Complete(p: IntakeProgress): boolean {
+  return (
+    p.dimensions.sales_psychology &&
+    p.dimensions.operational_habits &&
+    p.dimensions.market_intelligence
+  );
+}
