@@ -2,17 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import AppHeader from "@/components/AppHeader";
-import { listAccountsForUser, stageLabel } from "@/lib/accounts";
+import StageBadge from "@/components/accounts/StageBadge";
+import { listAccountsForUser } from "@/lib/accounts";
 
 export const dynamic = "force-dynamic";
-
-const STAGE_BADGE: Record<string, string> = {
-  prospecting: "bg-slate-100 text-slate-700",
-  active: "bg-emerald-100 text-emerald-700",
-  at_risk: "bg-amber-100 text-amber-700",
-  won: "bg-blue-100 text-blue-700",
-  dormant: "bg-slate-100 text-slate-500",
-};
 
 export default async function AccountsPage() {
   const session = await auth();
@@ -63,26 +56,22 @@ export default async function AccountsPage() {
         ) : (
           <ul className="mt-8 space-y-3">
             {accounts.map((a) => (
-              <li
-                key={a.id}
-                className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-base font-semibold text-slate-900">
-                    {a.name}
-                  </p>
-                  <p className="mt-0.5 text-sm text-slate-500">
-                    {a.contactCount}{" "}
-                    {a.contactCount === 1 ? "contact" : "contacts"}
-                  </p>
-                </div>
-                <span
-                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
-                    STAGE_BADGE[a.stage] ?? "bg-slate-100 text-slate-700"
-                  }`}
+              <li key={a.id}>
+                <Link
+                  href={`/accounts/${a.id}`}
+                  className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md"
                 >
-                  {stageLabel(a.stage)}
-                </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-base font-semibold text-slate-900">
+                      {a.name}
+                    </p>
+                    <p className="mt-0.5 text-sm text-slate-500">
+                      {a.contactCount}{" "}
+                      {a.contactCount === 1 ? "contact" : "contacts"}
+                    </p>
+                  </div>
+                  <StageBadge stage={a.stage} />
+                </Link>
               </li>
             ))}
           </ul>
