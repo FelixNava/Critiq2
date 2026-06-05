@@ -71,6 +71,23 @@ export default async function DashboardPage() {
           sharper your coaching gets.
         </p>
 
+        <Link
+          href="/accounts"
+          className="mt-8 flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-slate-300"
+        >
+          <span>
+            <span className="block text-base font-semibold text-slate-900">
+              Your accounts
+            </span>
+            <span className="mt-1 block text-sm text-slate-500">
+              The companies you sell into — track each one and its contacts.
+            </span>
+          </span>
+          <span aria-hidden className="text-slate-400">
+            →
+          </span>
+        </Link>
+
         {!session2Done && (
           <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-base font-semibold text-slate-900">
