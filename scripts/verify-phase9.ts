@@ -16,12 +16,12 @@ if (existsSync(".env.local")) {
 }
 
 async function main() {
-  const { db } = await import("../src/db/index.ts");
+  const { db } = await import("../src/db/index");
   const { users, accountsTbl, accountRepJoins } = await import(
-    "../src/db/schema.ts"
+    "../src/db/schema"
   );
   const { createAccountForUser, listAccountsForUser } = await import(
-    "../src/lib/accounts.ts"
+    "../src/lib/accounts"
   );
 
   const email = `phase9-verify-${crypto.randomUUID()}@example.invalid`;

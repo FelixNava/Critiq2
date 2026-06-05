@@ -49,7 +49,8 @@ export async function POST(req: Request) {
   try {
     const id = await createAccountForUser(userId, { name, stage });
     return NextResponse.json({ ok: true, id });
-  } catch {
+  } catch (err) {
+    console.error("account create failed", err);
     return NextResponse.json(
       { error: "Something went wrong. Try again." },
       { status: 500 },

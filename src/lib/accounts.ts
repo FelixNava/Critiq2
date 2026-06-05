@@ -33,7 +33,6 @@ export type AccountListItem = {
   id: string;
   name: string;
   stage: string;
-  summary: string | null;
   updatedAt: Date;
   role: string;
   contactCount: number;
@@ -42,6 +41,8 @@ export type AccountListItem = {
 /**
  * List the (non-deleted) accounts a rep is assigned to, newest activity first.
  * Joined via `account_rep_joins`; `contactCount` counts non-deleted contacts.
+ * Deliberately omits the (potentially large) shared `summary` text — the list
+ * view doesn't render it; the per-account view (later phase) fetches it.
  */
 export async function listAccountsForUser(
   userId: string,
@@ -51,7 +52,6 @@ export async function listAccountsForUser(
       id: accountsTbl.id,
       name: accountsTbl.name,
       stage: accountsTbl.stage,
-      summary: accountsTbl.summary,
       updatedAt: accountsTbl.updatedAt,
       role: accountRepJoins.role,
       contactCount: sql<number>`(
@@ -74,26 +74,31 @@ export async function listAccountsForUser(
  * Create an account and assign the creating rep as its owner. Returns the new
  * account id. The account is shared (intelligence is account-scoped), but the
  * creator is linked as `owner` so it appears in their list immediately.
+ *
+ * Both writes run in a single `db.batch` so a failed join insert can never
+ * leave an orphan account that's invisible to every rep — neon-http runs a
+ * batch as one atomic transaction (the driver has no interactive `transaction`
+ * support). The id is generated up front so the two inserts don't depend on
+ * each other's results.
  */
 export async function createAccountForUser(
   userId: string,
   input: { name: string; stage: AccountStage },
 ): Promise<string> {
-  const [row] = await db
-    .insert(accountsTbl)
-    .values({
+  const accountId = crypto.randomUUID();
+
+  await db.batch([
+    db.insert(accountsTbl).values({
+      id: accountId,
       name: input.name,
       stage: input.stage,
       createdBy: userId,
-    })
-    .returning({ id: accountsTbl.id });
-
-  const accountId = row.id;
-
-  await db
-    .insert(accountRepJoins)
-    .values({ accountId, userId, role: "owner" })
-    .onConflictDoNothing();
+    }),
+    db
+      .insert(accountRepJoins)
+      .values({ accountId, userId, role: "owner" })
+      .onConflictDoNothing(),
+  ]);
 
   return accountId;
 }

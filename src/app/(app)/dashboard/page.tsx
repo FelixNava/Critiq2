@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth, signOut } from "@/auth";
+import { auth } from "@/auth";
+import AppHeader from "@/components/AppHeader";
 import {
   getIntakeProgress,
   getLifeContextGate,
@@ -39,24 +40,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-dvh bg-slate-50">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-        <span className="text-lg font-semibold tracking-tight text-slate-900">
-          Critiq
-        </span>
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/login" });
-          }}
-        >
-          <button
-            type="submit"
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-          >
-            Sign out
-          </button>
-        </form>
-      </header>
+      <AppHeader />
 
       <main className="mx-auto max-w-2xl px-6 py-16">
         <h1 className="text-2xl font-semibold text-slate-900">
