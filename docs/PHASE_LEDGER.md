@@ -27,11 +27,11 @@ Each phase has a status indicator:
 
 ## Status snapshot (auto-updated by Full Auto)
 
-- Last updated: 2026-06-05 ~6:30pm ET
-- Mode: Phases 2–5 **supervised (direct)**; Phase 6 **via /critiq-full-auto orchestrator (Gate-1 ✅)**; Phase 7 **autonomously via the scheduled-task cron (Gate-2 ✅)**; Phase 8 **live/supervised in-session (Felix-approved merge)**; Phase 9 **autonomously via the hourly cron (`critiq-fullauto-9-10-11`)**.
-- Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅, Phase 7 (intake S2) ✅, Phase 8 (intake Life Context, trust-gated) ✅, Phase 9 (account domain model) ✅
-- Current phase: none — Phase 9 merged to review-for-main (PR #9, squash eaa72e9). **`UI_VERIFY_PENDING=9`** — headless cron could not drive Chrome MCP; next interactive session must drive signup→/accounts→create→list, then clear the flag.
-- Next: Phase 10 — Account Intelligence Card UI. Hourly self-bounding cron continues: builds 10 → review-for-main and 11 → recording-staging, then stops (Phase 11 left for joint device verification).
+- Last updated: 2026-06-05 ~7:35pm ET
+- Mode: Phases 2–5 **supervised (direct)**; Phase 6 **via /critiq-full-auto orchestrator (Gate-1 ✅)**; Phase 7 **autonomously via the scheduled-task cron (Gate-2 ✅)**; Phase 8 **live/supervised in-session (Felix-approved merge)**; Phases 9 & 10 **autonomously via the hourly cron (`critiq-fullauto-9-10-11`)**.
+- Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅, Phase 7 (intake S2) ✅, Phase 8 (intake Life Context, trust-gated) ✅, Phase 9 (account domain model) ✅, Phase 10 (account intelligence card UI) ✅
+- Current phase: none — Phase 10 merged to review-for-main (PR #10, squash c3b7b6f). **`UI_VERIFY_PENDING=9,10`** — both built headless by the cron (no Chrome MCP); next interactive session must drive Phase 9 (signup→/accounts→create→list) AND Phase 10 (open account→/accounts/[id]→confirm card states + not-found), then clear the flag.
+- Next: Phase 11 — Recording Infrastructure Layers 1-3 (Wake Lock / Silent Audio / Media Session). The hourly cron builds Phase 11 into **`recording-staging`** (epic branch, NOT review-for-main), sets `UI_VERIFY_PENDING=11`, then self-stops — Phase 11 is browser-media a headless cron cannot truly verify, so it's left for **joint device verification**.
 
 ---
 
@@ -272,9 +272,22 @@ The Full Auto control plane.
 
 **Depends on:** Phase 8.
 
-## Phase 10 — Account Intelligence Card UI ☐ Planned (NEXT)
+## Phase 10 — Account Intelligence Card UI ✅ Done (PR #10, merged to review-for-main 2026-06-05, squash c3b7b6f)
+
+> Built autonomously via the hourly cron (`critiq-fullauto-9-10-11`). Additive — zero schema change, zero data-loss risk. **UI NOT driven via Chrome MCP (headless cron) → `UI_VERIFY_PENDING=9,10`**; verified at build/typecheck/data-layer/HTTP-boundary level only.
 
 Per-account view: behavioral profile, last interaction summary, current stage, cold-start learning indicator.
+
+**Built:**
+- `src/lib/accounts.ts`: `getAccountForUser(userId, accountId)` — fetches one account **only if the rep is assigned** to it (inner join on `account_rep_joins` is the access boundary; a guessed/foreign id → null). Excludes soft-deleted accounts; returns the shared `summary` + non-deleted contacts (primary first, then alphabetical). `getLearningProgress(loggedCalls)` cold-start model (~10-call target, clamped 0–100, NaN/negatives fail safe to 0); `loggedCalls` is `0` at this build stage (no interaction data until the recording/debrief phases) — taken as an argument so a later phase wires the real count without touching callers (DEC-018).
+- `src/app/(app)/accounts/[id]/page.tsx` — the intelligence card: title + `StageBadge`, learning progress bar (a11y `role=progressbar`), "What Critiq knows" (summary or cold-start), "Last interaction" + "How they buy" cold-start placeholders, contacts list (or empty state).
+- `src/app/(app)/accounts/[id]/not-found.tsx` — in-app empty state for missing/deleted/unassigned accounts (instead of Next's bare default 404).
+- `src/components/accounts/StageBadge.tsx` — shared stage pill extracted from the list page; color map `satisfies Record<AccountStage,string>` (a new stage without a color is a compile error). Accounts-list rows now `Link` into the detail view.
+- Code review (high effort, 2 finder agents + verify): **no P0/P1**. Applied 2 P2 hardenings (exhaustive badge map; styled not-found). Frozen-at-0% progress bar is the documented intentional cold-start state, not a regression.
+
+**Verified:** `pnpm build` + `tsc --noEmit` clean. `scripts/verify-phase10.ts` drives the REAL helpers vs Neon dev DB — **14/14**: detail fetch, **access boundary** (unassigned rep → null), unknown id → null, contact ordering, cold-start model (0/5/12/NaN), soft-delete exclusion. HTTP: unauth `GET /accounts/[id]` → 307 → /login. Vercel preview READY (anon 401 = expected auth gate). **NOT human/MCP UI-driven (headless) — `UI_VERIFY_PENDING=9,10`.**
+
+**Depends on:** Phase 9.
 
 ## Phase 11 — Recording Infrastructure: Layers 1-3 ☐ Planned
 

@@ -216,6 +216,29 @@ Rationale: minimal, honest beta stage set that's a one-line edit to change; `db.
 Iterability: high (stages: edit `ACCOUNT_STAGES`).
 Trade-off flag: LOW — confirm the stage set fits Alex's pipeline language; easy to adjust.
 
+## DEC-017 — Phase 10 built directly by the orchestrator (cron); 2 P2 hardenings applied
+Phase: 10/account-intelligence-card
+Date: 2026-06-05 19:30 ET
+Type: trade-off
+Context: Phase 10 is a small, additive, read-mostly UI phase (one detail page + one access-boundary fetch + a pure cold-start helper). Per the DEC-004/008/013 precedent, the autonomous cron firing chose between spinning the Planner→Architect→Builder→Verifier subagent mesh vs building directly with full context.
+Chosen: built directly with full context; ran `/code-review` (high effort, 2 independent finder agents + verify) at the review stage. No P0/P1 surfaced. Applied 2 of the 3 P2 findings: (a) `StageBadge`'s color map now `satisfies Record<AccountStage,string>` so adding a stage without a color is a compile error rather than a silent default pill; (b) added a styled `(app)/accounts/[id]/not-found.tsx` so the `notFound()` path shows an in-app empty state instead of Next's bare 404. The 3rd P2 (progress bar visually frozen at 0%) is the intentional, documented cold-start state — no change.
+Rationale: lowest token/flake cost for a small additive phase; independent verification (the load-bearing step per DEC-007) was done via the data-layer probe + code review. A headless cron also can't run the Chrome-MCP verifier subagent.
+Iterability: n/a (process).
+Trade-off flag: NO.
+
+## DEC-018 — Cold-start learning model anchors on a `loggedCalls` argument (always 0 today)
+Phase: 10/account-intelligence-card
+Date: 2026-06-05 19:30 ET
+Type: trade-off
+Context: Phase 10's spec names a "cold-start learning indicator," but no call/interaction data exists at this build stage (it arrives in the recording/debrief phases, 11–22). The indicator needs a number to render progress against.
+Chosen: `getLearningProgress(loggedCalls)` computes percent/`isWarm` against a `COLD_START_TARGET_CALLS = 10` target, taking the call count as an argument. `getAccountForUser` returns `loggedCalls: 0` for now (hardcoded with a comment), so the bar honestly shows the cold-start state. The seam is the argument: a later phase computes the real count and passes it in without changing the helper or its callers.
+Alternatives considered:
+  - Query a calls/interactions table now (rejected — no such table exists yet; would be premature schema).
+  - Omit the indicator until call data exists (rejected — the phase's spec explicitly calls for the cold-start learning indicator, and the cold-start state IS the point of the indicator pre-data).
+Rationale: ships the specified surface honestly with zero new schema; the argument seam makes the later real-count wire-in a one-line change.
+Iterability: high (wire the real count in one place).
+Trade-off flag: LOW — confirm the ~10-call target + "Still learning / Coaching is dialed in" framing fits Alex's language; trivially adjustable.
+
 ---
 
 ## End-of-build summary
