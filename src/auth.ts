@@ -8,6 +8,7 @@ import { authConfig } from "./auth.config";
 import { db, getDb } from "@/db";
 import { users, accounts, sessions, verificationTokens } from "@/db/schema";
 import { sendMagicLinkEmail } from "@/lib/email";
+import { authRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -26,7 +27,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      authorize: async (creds) => {
+      authorize: async (creds, request) => {
+        // Brute-force guard: 5 attempts / minute / IP. Exceeded → treat as a
+        // failed attempt (NextAuth surfaces a generic error to the client).
+        const ip = getClientIp(new Headers(request?.headers));
+        const rate = await authRateLimit(ip);
+        if (!rate.ok) {
+          console.warn(`[auth] rate-limited login from ${ip}`);
+          return null;
+        }
+
         const email = (creds?.email as string | undefined)
           ?.toLowerCase()
           .trim();
