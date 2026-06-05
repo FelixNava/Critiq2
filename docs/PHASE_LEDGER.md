@@ -27,10 +27,11 @@ Each phase has a status indicator:
 
 ## Status snapshot (auto-updated by Full Auto)
 
-- Last updated: 2026-06-05 ~02:40am ET
-- Mode: **live supervised build** in-session (not cron) — DB provisioned, building foundation phases directly with full MCP verification.
-- Last completed: **Phase 2 — Drizzle + Neon** ✅ (PR #2, merged to review-for-main)
-- Current phase: Phase 3 — NextAuth v5 + Resend (starting)
+- Last updated: 2026-06-05 ~03:10am ET
+- Mode: **live supervised build** in-session (not cron) — building foundation phases directly with full MCP + real-service verification.
+- Last completed: **Phase 3 — NextAuth v5 + Resend** ✅ (PR #3)
+- Done so far tonight: Phase 2 (DB) ✅, Phase 3 (auth) ✅
+- Current phase: Phase 4 — Marketing landing + footer + Sentry (starting)
 - Cron: still UNARMED (not needed while building live in-session).
 
 ---
@@ -96,7 +97,10 @@ The Full Auto control plane.
 
 ---
 
-## Phase 3 — NextAuth v5 + Resend + Auth Pages ☐ Planned
+## Phase 3 — NextAuth v5 + Resend + Auth Pages ✅ Done (PR #3, merged to review-for-main 2026-06-05)
+
+> Verified locally vs real Neon + real Resend: credentials signup→login→protected dashboard, magic-link send→callback→session, middleware redirect. Vercel build green. PR: https://github.com/FelixNava/Critiq2/pull/3
+> Note: NextAuth v5 runs on Next 16 via split edge/node config. `middleware.ts` → `proxy.ts` (Next 16). Preview deployments are Vercel-auth-protected (anon 401).
 
 **Goal:** Working auth flow. Email/password + magic link sign-in via Resend. `/login`, `/signup`, `/verify` pages. Sender from `notifications@critiq.firstlap.dev`.
 
