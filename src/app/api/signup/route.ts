@@ -3,12 +3,21 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
+import { getClientIp, signupRateLimit } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export async function POST(req: Request) {
+  const rate = await signupRateLimit(getClientIp(req.headers));
+  if (!rate.ok) {
+    return NextResponse.json(
+      { error: "Too many signups from this network. Try again shortly." },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfter) } },
+    );
+  }
+
   let body: { name?: unknown; email?: unknown; password?: unknown };
   try {
     body = await req.json();

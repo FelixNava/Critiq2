@@ -78,5 +78,23 @@ export const verificationTokens = pgTable(
   (t) => [primaryKey({ columns: [t.identifier, t.token] })],
 );
 
+/**
+ * Postgres-based fixed-window rate limiting (no Upstash). One row per bucket key
+ * (e.g. `auth:1.2.3.4`); `expires_at` marks the window end and the counter resets
+ * atomically on the next hit after expiry. See src/lib/rateLimit.ts.
+ */
+export const rateLimitCounters = pgTable(
+  "rate_limit_counters",
+  {
+    bucketKey: text("bucket_key").primaryKey(),
+    count: integer("count").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("rate_limit_counters_expires_at_idx").on(t.expiresAt)],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
