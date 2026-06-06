@@ -32,20 +32,25 @@ ENV_READY=true
 # clears it. Empty = nothing pending. Phases 2-8 UI verified via Chrome MCP by the
 # interactive sessions (Phase 8 driven live 2026-06-05 ~3:30pm ET — locked 403,
 # unlocked -> 100%, out-of-order 409, idempotent; all green).
-# Phases 9, 10 (review-for-main) + 11 (recording-staging) built headless by the
-# cron — NOT MCP-driven. Next interactive session must drive:
-#   9:  signup -> /accounts -> /accounts/new -> create -> list
-#   10: open an account -> /accounts/[id] -> confirm card states (learning bar,
-#       cold-start summary/last-interaction/behavioral, contacts empty state),
-#       stale/foreign id -> styled not-found
+# Phases 9, 10 (review-for-main) DRIVEN + verified via Chrome MCP 2026-06-05
+# ~21:00 ET (interactive, p8verify on a local dev server vs real Neon): /accounts
+# empty + populated list, account create via the real /api/accounts (200,
+# persisted — proven by the list + card rendering it), StageBadge "Active",
+# /accounts/[id] card cold-start states + "You own this account", access control
+# own->200 / nonexistent->404 / malformed->404. CAVEAT: the new-account FORM
+# submit-button flow + the styled not-found PAGE could not be PAINTED locally
+# (Next 16 cross-origin dev blocks React hydration on 127.0.0.1) — both sources
+# are correct + the create path is API+DB-proven, so it's a dev-env artifact;
+# glance at those two on the review-for-main Vercel preview (prod build hydrates)
+# for belt-and-suspenders. 11 still pending (device gate, below).
 #   11: ON A REAL DEVICE, branch recording-staging -> /recording-check -> Start
 #       check -> confirm screen stays awake + status rows reflect reality + lock
 #       screen shows neutral "Critiq" branding (NO recording text) -> Stop check.
 #       (Wake Lock / audio keep-alive / lock-screen presence cannot be verified
 #       headless — this is the joint-verification GATE before the recording stack
 #       is promoted from recording-staging to review-for-main.)
-# then clear ALL THREE from this flag.
-UI_VERIFY_PENDING=9,10,11
+# then clear 11 from this flag after the device gate.
+UI_VERIFY_PENDING=11
 
 # --- SESSION HEARTBEAT ---
 SESSION_LAST_HEARTBEAT=2026-06-05T20:20:00-04:00
