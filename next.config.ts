@@ -24,10 +24,11 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // Microphone allowed for same-origin (call recording, later phases); others off.
+  // Microphone + screen-wake-lock allowed for same-origin (call recording +
+  // session keep-alive); others off.
   {
     key: "Permissions-Policy",
-    value: "camera=(), geolocation=(), microphone=(self)",
+    value: "camera=(), geolocation=(), microphone=(self), screen-wake-lock=(self)",
   },
   { key: "Content-Security-Policy", value: csp },
 ];
