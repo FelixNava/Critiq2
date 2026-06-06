@@ -30,7 +30,18 @@ export interface KeepAliveLayers {
   mediaSession: MediaSessionStatus;
 }
 
-export type KeepAliveListener = (layers: KeepAliveLayers) => void;
+export interface KeepAliveState {
+  /** Whether a session is intended to be alive (start() called, stop() not yet). */
+  active: boolean;
+  layers: KeepAliveLayers;
+}
+
+/**
+ * Single push channel for ALL state — both the active intent and per-layer
+ * health flow through here, so a consumer never has to poll isActive() after a
+ * call or re-sync a second source of truth when the manager stops itself.
+ */
+export type KeepAliveListener = (state: KeepAliveState) => void;
 
 export class SessionKeepAlive {
   private readonly wakeLock: WakeLockController;
@@ -64,14 +75,23 @@ export class SessionKeepAlive {
     return { ...this.layers };
   }
 
+  getState(): KeepAliveState {
+    return { active: this.active, layers: this.getLayers() };
+  }
+
   private patch(partial: Partial<KeepAliveLayers>): void {
     this.layers = { ...this.layers, ...partial };
-    this.listener?.(this.getLayers());
+    this.notify();
+  }
+
+  private notify(): void {
+    this.listener?.(this.getState());
   }
 
   async start(): Promise<void> {
     if (this.active) return;
     this.active = true;
+    this.notify();
     // Media session is synchronous; the other two are async + independent.
     this.mediaSession.start();
     await Promise.all([this.wakeLock.start(), this.silentAudio.start()]);
@@ -80,6 +100,7 @@ export class SessionKeepAlive {
   async stop(): Promise<void> {
     if (!this.active) return;
     this.active = false;
+    this.notify();
     this.mediaSession.clear();
     await Promise.all([this.wakeLock.stop(), this.silentAudio.stop()]);
   }

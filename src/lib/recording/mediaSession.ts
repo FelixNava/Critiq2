@@ -10,7 +10,7 @@
  * clear() resets everything. Feature-detected.
  */
 
-export type MediaSessionStatus = "idle" | "active" | "unsupported";
+export type MediaSessionStatus = "idle" | "active" | "unsupported" | "error";
 
 export function isMediaSessionSupported(): boolean {
   return typeof navigator !== "undefined" && "mediaSession" in navigator;
@@ -64,8 +64,10 @@ export class MediaSessionController {
       }
       this.setStatus("active");
     } catch {
-      // Presence is best-effort; never let it break a session.
-      this.setStatus("active");
+      // Presence is best-effort and never throws into the caller — but report
+      // the failure honestly so the device check doesn't show green branding
+      // that never actually applied to the lock screen.
+      this.setStatus("error");
     }
   }
 

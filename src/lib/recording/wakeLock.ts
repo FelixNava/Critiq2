@@ -57,7 +57,10 @@ export class WakeLockController {
     this.wantActive = false;
     document.removeEventListener("visibilitychange", this.handleVisibility);
     await this.release();
-    if (this.status !== "unsupported") this.setStatus("released");
+    // Only a lock we were actually holding becomes "released". An "error" (the
+    // device couldn't hold one) or "idle"/"unsupported" must survive teardown —
+    // the device-check surface exists precisely to reveal those.
+    if (this.status === "active") this.setStatus("released");
   }
 
   private acquire = async (): Promise<void> => {
@@ -68,7 +71,19 @@ export class WakeLockController {
       return;
     }
     try {
-      this.sentinel = await navigator.wakeLock.request("screen");
+      const sentinel = await navigator.wakeLock.request("screen");
+      // stop() may have run while the request was in flight. If we no longer
+      // want the lock, release this just-acquired sentinel immediately rather
+      // than holding one nothing will ever release (battery drain).
+      if (!this.wantActive) {
+        try {
+          await sentinel.release();
+        } catch {
+          // Already released — fine.
+        }
+        return;
+      }
+      this.sentinel = sentinel;
       this.sentinel.addEventListener("release", this.handleRelease);
       this.setStatus("active");
     } catch {

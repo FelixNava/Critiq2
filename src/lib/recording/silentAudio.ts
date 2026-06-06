@@ -65,26 +65,42 @@ export class SilentAudioController {
     }
     try {
       if (!this.ctx) {
-        const ctx = new Ctor();
-        const gain = ctx.createGain();
+        const fresh = new Ctor();
+        const gain = fresh.createGain();
         gain.gain.value = 0; // silent — the rep hears nothing
-        const osc = ctx.createOscillator();
+        const osc = fresh.createOscillator();
         osc.frequency.value = 440;
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(fresh.destination);
         osc.start();
-        this.ctx = ctx;
+        // Reflect OS-driven suspend/resume of a backgrounded tab so the status
+        // doesn't go stale. (Active recovery — re-resume, heartbeat — is a later
+        // recording phase; here we just report the truth honestly.)
+        fresh.onstatechange = this.handleStateChange;
+        this.ctx = fresh;
         this.gain = gain;
         this.osc = osc;
       }
-      await this.ctx.resume();
-      this.setStatus(this.ctx.state === "running" ? "active" : "suspended");
+      const ctx = this.ctx;
+      await ctx.resume();
+      // stop() may have closed/cleared the context during the await — guard.
+      if (this.ctx !== ctx) return;
+      this.setStatus(ctx.state === "running" ? "active" : "suspended");
     } catch {
       this.setStatus("error");
     }
   }
 
+  private handleStateChange = (): void => {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    if (ctx.state === "running") this.setStatus("active");
+    else if (ctx.state === "suspended") this.setStatus("suspended");
+    // "closed" is driven by stop(), which sets the terminal status itself.
+  };
+
   async stop(): Promise<void> {
+    if (this.ctx) this.ctx.onstatechange = null;
     try {
       this.osc?.stop();
     } catch {

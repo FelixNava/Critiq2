@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   SessionKeepAlive,
   type KeepAliveLayers,
+  type KeepAliveState,
 } from "@/lib/recording/sessionKeepAlive";
 
 /**
@@ -20,23 +21,23 @@ export interface UseSessionKeepAlive {
   stop: () => Promise<void>;
 }
 
-const INITIAL_LAYERS: KeepAliveLayers = {
-  wakeLock: "idle",
-  silentAudio: "idle",
-  mediaSession: "idle",
+const INITIAL_STATE: KeepAliveState = {
+  active: false,
+  layers: { wakeLock: "idle", silentAudio: "idle", mediaSession: "idle" },
 };
 
 export function useSessionKeepAlive(): UseSessionKeepAlive {
   const ref = useRef<SessionKeepAlive | null>(null);
-  const [layers, setLayers] = useState<KeepAliveLayers>(INITIAL_LAYERS);
-  const [active, setActive] = useState(false);
+  const [state, setState] = useState<KeepAliveState>(INITIAL_STATE);
 
   useEffect(() => {
     // Construct on the client only — feature detection touches navigator/window.
-    const manager = new SessionKeepAlive(setLayers);
+    // active + layers both arrive through this one listener, so there's no
+    // second source of truth to keep in sync.
+    const manager = new SessionKeepAlive(setState);
     ref.current = manager;
     // Pick up any "unsupported" the constructor detected up front.
-    setLayers(manager.getLayers());
+    setState(manager.getState());
     return () => {
       void manager.stop();
       ref.current = null;
@@ -44,18 +45,12 @@ export function useSessionKeepAlive(): UseSessionKeepAlive {
   }, []);
 
   const start = useCallback(async () => {
-    const manager = ref.current;
-    if (!manager) return;
-    await manager.start();
-    setActive(manager.isActive());
+    await ref.current?.start();
   }, []);
 
   const stop = useCallback(async () => {
-    const manager = ref.current;
-    if (!manager) return;
-    await manager.stop();
-    setActive(manager.isActive());
+    await ref.current?.stop();
   }, []);
 
-  return { active, layers, start, stop };
+  return { active: state.active, layers: state.layers, start, stop };
 }
