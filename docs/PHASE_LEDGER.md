@@ -27,11 +27,11 @@ Each phase has a status indicator:
 
 ## Status snapshot (auto-updated by Full Auto)
 
-- Last updated: 2026-06-05 ~7:35pm ET
-- Mode: Phases 2–5 **supervised (direct)**; Phase 6 **via /critiq-full-auto orchestrator (Gate-1 ✅)**; Phase 7 **autonomously via the scheduled-task cron (Gate-2 ✅)**; Phase 8 **live/supervised in-session (Felix-approved merge)**; Phases 9 & 10 **autonomously via the hourly cron (`critiq-fullauto-9-10-11`)**.
-- Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅, Phase 7 (intake S2) ✅, Phase 8 (intake Life Context, trust-gated) ✅, Phase 9 (account domain model) ✅, Phase 10 (account intelligence card UI) ✅
-- Current phase: none — Phase 10 merged to review-for-main (PR #10, squash c3b7b6f). **`UI_VERIFY_PENDING=9,10`** — both built headless by the cron (no Chrome MCP); next interactive session must drive Phase 9 (signup→/accounts→create→list) AND Phase 10 (open account→/accounts/[id]→confirm card states + not-found), then clear the flag.
-- Next: Phase 11 — Recording Infrastructure Layers 1-3 (Wake Lock / Silent Audio / Media Session). The hourly cron builds Phase 11 into **`recording-staging`** (epic branch, NOT review-for-main), sets `UI_VERIFY_PENDING=11`, then self-stops — Phase 11 is browser-media a headless cron cannot truly verify, so it's left for **joint device verification**.
+- Last updated: 2026-06-05 ~8:25pm ET
+- Mode: Phases 2–5 **supervised (direct)**; Phase 6 **via /critiq-full-auto orchestrator (Gate-1 ✅)**; Phase 7 **autonomously via the scheduled-task cron (Gate-2 ✅)**; Phase 8 **live/supervised in-session (Felix-approved merge)**; Phases 9, 10 & 11 **autonomously via the hourly cron (`critiq-fullauto-9-10-11`)**.
+- Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅, Phase 7 (intake S2) ✅, Phase 8 (intake Life Context, trust-gated) ✅, Phase 9 (account domain model) ✅, Phase 10 (account intelligence card UI) ✅, Phase 11 (recording layers 1-3, → **`recording-staging`**) ✅
+- Current phase: none — the hourly cron reached its scope bound (Phase 11) and self-stops. Phase 11 merged to **`recording-staging`** (PR #11, squash b7689e3), NOT review-for-main. **`UI_VERIFY_PENDING=9,10,11`** — all three built headless (no Chrome MCP); the next interactive session must drive Phase 9 (signup→/accounts→create→list) + Phase 10 (open account→/accounts/[id]→card states + not-found) on `review-for-main`, AND Phase 11 (`/recording-check` on `recording-staging`, **on a real device**), then clear the flag.
+- Next: Phase 12 — Recording Infrastructure Layers 4-6 (chunked MediaRecorder + presigned Vercel Blob upload + IndexedDB triple persistence). **BLOCKED on two gates:** (1) `BLOB_READ_WRITE_TOKEN` must be provisioned (Phase 12 is the first Blob phase); (2) joint on-device verification of Phase 11 on `recording-staging`. Also targets `recording-staging`, NOT review-for-main. Do not auto-build — Felix gates the recording stack phase-by-phase.
 
 ---
 
@@ -289,9 +289,25 @@ Per-account view: behavioral profile, last interaction summary, current stage, c
 
 **Depends on:** Phase 9.
 
-## Phase 11 — Recording Infrastructure: Layers 1-3 ☐ Planned
+## Phase 11 — Recording Infrastructure: Layers 1-3 ✅ Done (PR #11, squash b7689e3 → **`recording-staging`**, 2026-06-05)
+
+> Built autonomously via the hourly cron (`critiq-fullauto-9-10-11`) — its terminal phase. **Merged to the `recording-staging` epic branch, NOT `review-for-main`** (recording stack is promoted to review-for-main later as ONE human-reviewed PR after on-device verification). Client-side only — no DB, no Blob, no new env; additive, zero data-loss risk. **UI NOT driven (headless cron, browser-media) → `UI_VERIFY_PENDING=11`** — Wake Lock / audio keep-alive / lock-screen branding only manifest on a real device.
 
 Wake Lock + Silent Audio + Media Session (branding-only metadata, NO "recording" text).
+
+**Built:**
+- Session keep-alive seam over three independent, feature-detected layers a later recorder phase (12) turns on/off around capture. **No audio capture here** — only keeps the page/session alive around it.
+  - **L1 `WakeLockController`** (`src/lib/recording/wakeLock.ts`) — screen wake lock; re-acquires on `visibilitychange` (platform auto-releases when hidden). Releases an orphaned sentinel if `stop()` races an in-flight `request()` (no unreleasable lock / battery drain); `stop()` preserves an `error` status so the device check can reveal a device that can't hold a lock.
+  - **L2 `SilentAudioController`** (`src/lib/recording/silentAudio.ts`) — zero-gain oscillator through an `AudioContext` to resist background-tab throttling; `onstatechange` reflects OS suspend/resume so status can't go stale. (Active re-resume + heartbeat recovery is Phase 13.)
+  - **L3 `MediaSessionController`** (`src/lib/recording/mediaSession.ts`) — **BRANDING ONLY** lock-screen presence; deliberately no "recording"/"call"/"capture" language (locked privacy decision); reports `error` honestly if metadata never applied.
+  - **`SessionKeepAlive`** unifies them behind one `start()`/`stop()`; `active` + per-layer health flow through a single push channel (no second source of truth). `useSessionKeepAlive()` hook mirrors it + tears down on unmount.
+- `/recording-check` — gated device-check surface for supervised on-device verification (not wired into the main flow yet; reachable by URL).
+- `Permissions-Policy` gains `screen-wake-lock=(self)`; `/recording-check` added to middleware `PROTECTED_PREFIXES`.
+- Code review (high effort, 2 finder agents + verify): fixed wake-lock start/stop leak, `stop()` erasing `error`, MediaSession false-`active`-on-failure, silent-audio stale-status + null-deref race, `active` folded into the single state channel. No outstanding P0/P1 (DEC-019/020).
+
+**Verified (headless — honest scope):** `pnpm build` + `tsc --noEmit` clean (`/recording-check` registered dynamic `ƒ`). HTTP boundary: unauth `GET /recording-check` → 307 → /login. `Permissions-Policy: … screen-wake-lock=(self)` present; `/` still 200. **NOT driven via Chrome/Preview MCP (headless) — `UI_VERIFY_PENDING=11`; the on-device drive is the joint-verification gate before the recording stack is promoted to review-for-main.**
+
+**Depends on:** Phase 10.
 
 ## Phase 12 — Recording Infrastructure: Layers 4-6 ☐ Planned
 

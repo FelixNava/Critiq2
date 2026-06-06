@@ -239,6 +239,32 @@ Rationale: ships the specified surface honestly with zero new schema; the argume
 Iterability: high (wire the real count in one place).
 Trade-off flag: LOW — confirm the ~10-call target + "Still learning / Coaching is dialed in" framing fits Alex's language; trivially adjustable.
 
+## DEC-019 — Phase 11 built directly by the orchestrator (cron); added a `/recording-check` device surface
+Phase: 11/recording-layers-1-3
+Date: 2026-06-05 20:15 ET
+Type: trade-off
+Context: Phase 11 is the three keep-alive layers (Wake Lock / Silent Audio / Media Session). It's fully-specified, client-side, and additive. Per the DEC-004/008/013/017 precedent the cron firing chose between the Planner→Architect→Builder→Verifier mesh vs building directly with full context. Separately, the ledger named only "the three layers" — but with no recorder yet (Phase 12), there is nothing to start/stop them, so the layers would be unverifiable and dead.
+Chosen: (a) built directly with full context; ran `/code-review` (high effort, 2 finder agents + verify) at the review stage — independent review is the load-bearing step and a headless cron can't run the Chrome-MCP verifier subagent anyway. (b) Added a gated `/recording-check` surface + `useSessionKeepAlive()` hook so the layers can be exercised (and so Felix can drive them on a real device for the joint verification). This mirrors DEC-014 (adding the create flow so Phase 9's list was actually usable/verifiable). (c) Added `screen-wake-lock=(self)` to the Permissions-Policy (it defaults to `self`, but making it explicit documents intent and survives a future tighten) and added `/recording-check` to middleware `PROTECTED_PREFIXES`.
+Alternatives considered:
+  - Full subagent mesh (rejected — higher token/flake cost for a small additive phase; review is what catches defects, and that was done).
+  - Ship the layers as library code with no surface (rejected — nothing would exercise them; the phase's whole point is on-device behavior, which needs a surface to drive).
+Rationale: lowest-risk path to a correct, additive, verifiable phase; keeps the recorder (Phase 12) as the real consumer while giving a verification handle now.
+Iterability: high (the device-check surface can be reworked/removed once the recorder UI exists).
+Trade-off flag: LOW — confirm the `/recording-check` surface + copy is acceptable as the interim verification handle.
+
+## DEC-020 — Layer implementation choices: zero-gain oscillator, "Critiq"-only media metadata, honest failure status
+Phase: 11/recording-layers-1-3
+Date: 2026-06-05 20:15 ET
+Type: trade-off (silent-audio mechanism) + obvious (branding-only metadata)
+Context: The spec fixes the intent of each layer but not the mechanism. (a) "Silent audio to resist background throttling" — several mechanisms exist. (b) Media Session is "BRANDING ONLY, no 'recording' text" but the exact strings were unspecified. (c) Code review surfaced that best-effort layers were masking real failures as success.
+Chosen: (a) a 0-gain `OscillatorNode` through an `AudioContext` (no asset to ship/host vs a silent audio file; trivially silent; `onstatechange` reflects OS suspend/resume). (b) media metadata title/artist/album all = "Critiq", `playbackState='playing'`, inert play/pause/stop handlers to own the OS slot — deliberately nothing about recording/calls/capture (locked lock-screen privacy decision). (c) failures now report `error` (not a false `active`), and wake-lock `stop()` preserves an `error` so the device check honestly reveals a device that can't hold a session — surfacing capability is the surface's whole purpose.
+Alternatives considered:
+  - Silent: a hosted silent .wav looped via `<audio>` (rejected — an asset to ship + autoplay quirks; the oscillator is self-contained). Active background-recovery (re-resume on visibility, heartbeat) deferred to Phase 13 per the recording-reliability spec — Phase 11 only reports the truth, doesn't yet self-heal.
+  - Media metadata with session-y text (rejected hard — violates the privacy invariant).
+Rationale: minimal, self-contained, honest; matches the zero-failures spec's layering (recovery is a later layer).
+Iterability: high (strings + mechanism are one-line edits).
+Trade-off flag: LOW — confirm the "Critiq"-only lock-screen branding reads right on a real device during the joint verification; revisit if a richer (still recording-free) presence is wanted.
+
 ---
 
 ## End-of-build summary
