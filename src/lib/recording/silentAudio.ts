@@ -12,20 +12,28 @@
  * to exist. So this layer does double duty: sturdier locked-screen background
  * audio AND the anchor for the lock-screen branding.
  *
+ * The element is appended to the document while live: iOS surfaces the
+ * Now-Playing / lock-screen widget (and associates the MediaSession with it)
+ * far more reliably for an in-document media element than a detached one. It has
+ * no `controls`, so it renders nothing. start() attaches it; stop() removes it.
+ *
  * The element is deliberately NOT muted — the silence lives in zero-PCM content,
  * not in muting. iOS treats a muted element as non-media and would surface no
  * lock-screen widget (defeating Layer 3). The rep still hears nothing.
  *
  * HONEST LIMIT: even with this, long screen-locked recording on iOS is
  * inherently constrained (see the capability chart — "60+ min mobile, screen
- * locked → ❌"). This maximizes the best-effort and gets the branding; it is not
- * a guarantee. Positioning stays: desktop/foreground excellent, phone-locked
- * best-effort.
+ * locked → ❌"), and iOS can suspend background output without dispatching a
+ * `pause` event, so a stale "active" is possible. This maximizes the
+ * best-effort and gets the branding; it is not a guarantee. Positioning stays:
+ * desktop/foreground excellent, phone-locked best-effort. Active recovery
+ * (re-play on resume, heartbeat) is a later recording phase.
  *
  * Autoplay policy: the first start() must happen inside a user gesture (the
  * session's Start control provides it); a play() the autoplay policy rejects
- * reports "suspended" so the device check prompts another tap. Feature-detected;
- * a graceful no-op where <audio> / Blob object URLs are unavailable.
+ * (NotAllowedError) reports "suspended" so the device check prompts another tap,
+ * while any other failure reports the terminal "error". Feature-detected; a
+ * graceful no-op where <audio> / Blob object URLs are unavailable.
  */
 
 export type SilentAudioStatus =
@@ -35,7 +43,7 @@ export type SilentAudioStatus =
   | "unsupported"
   | "error";
 
-function canUseSilentAudio(): boolean {
+export function isSilentAudioSupported(): boolean {
   return (
     typeof window !== "undefined" &&
     typeof Audio !== "undefined" &&
@@ -43,10 +51,6 @@ function canUseSilentAudio(): boolean {
     typeof URL !== "undefined" &&
     typeof URL.createObjectURL === "function"
   );
-}
-
-export function isSilentAudioSupported(): boolean {
-  return canUseSilentAudio();
 }
 
 const SAMPLE_RATE = 8000;
@@ -98,7 +102,7 @@ export class SilentAudioController {
 
   constructor(onChange?: (status: SilentAudioStatus) => void) {
     this.onChange = onChange;
-    if (!canUseSilentAudio()) this.setStatus("unsupported");
+    if (!isSilentAudioSupported()) this.setStatus("unsupported");
   }
 
   getStatus(): SilentAudioStatus {
@@ -111,7 +115,7 @@ export class SilentAudioController {
   }
 
   async start(): Promise<void> {
-    if (!canUseSilentAudio()) {
+    if (!isSilentAudioSupported()) {
       this.setStatus("unsupported");
       return;
     }
@@ -127,6 +131,11 @@ export class SilentAudioController {
         audio.addEventListener("playing", this.handlePlaying);
         audio.addEventListener("pause", this.handlePause);
         audio.addEventListener("error", this.handleError);
+        // In-document so iOS reliably elects it as the session's media element
+        // and surfaces the lock-screen widget. No controls → renders nothing.
+        if (typeof document !== "undefined" && document.body) {
+          document.body.appendChild(audio);
+        }
         this.url = url;
         this.audio = audio;
       }
@@ -134,11 +143,18 @@ export class SilentAudioController {
       await audio.play();
       // stop() may have torn down the element during the await — guard.
       if (this.audio !== audio) return;
-      this.setStatus(audio.paused ? "suspended" : "active");
-    } catch {
-      // Usually the autoplay policy rejected play() outside a gesture — that's
-      // recoverable with another tap, so report "suspended", not a hard error.
-      if (this.audio) this.setStatus("suspended");
+      // Only promote to "active" when truly playing. iOS can leave paused===true
+      // for a beat after play() resolves; don't flash a false "suspended" — the
+      // "playing" event is authoritative and will set "active" momentarily.
+      if (!audio.paused) this.setStatus("active");
+    } catch (err) {
+      // stop() niled the element mid-await — nothing to report.
+      if (!this.audio) return;
+      // The autoplay policy rejecting play() outside a gesture is recoverable
+      // with another tap ("suspended"); anything else (unsupported/decodable
+      // source, etc.) is a terminal "error" so the check doesn't loop forever.
+      const recoverable = err instanceof DOMException && err.name === "NotAllowedError";
+      this.setStatus(recoverable ? "suspended" : "error");
     }
   }
 
@@ -174,6 +190,7 @@ export class SilentAudioController {
       } catch {
         // Element already torn down — ignore.
       }
+      audio.remove(); // detach from the document (no-op if never attached)
     }
     if (url) {
       try {
