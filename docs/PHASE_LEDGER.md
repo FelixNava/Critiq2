@@ -324,9 +324,59 @@ Wake Lock + Silent Audio + Media Session (branding-only metadata, NO "recording"
 
 **Depends on:** Phase 11.
 
-## Phase 12 — Recording Infrastructure: Layers 4-6 ☐ Planned
+## Phase 12 — Recording Infrastructure: Layers 4-6 ☐ Planned (scope LOCKED + env-unblocked 2026-06-06 — ready for a fresh-session build)
 
-Chunked MediaRecorder + presigned Vercel Blob upload + IndexedDB triple persistence + page visibility.
+> Plan aligned with Felix 2026-06-06: D1–D7 below all approved, permissions approved, `.claude/settings.json` already covers it. Env-unblocked — `BLOB_READ_WRITE_TOKEN` provisioned (store `critiq2-blob`, Preview/all-branches + Sensitive). **Build in a fresh session via `/critiq-full-auto`.** Targets the `recording-staging` epic branch (NOT review-for-main, NOT master); promoted later after an on-device gate, like 11/11a.
+
+**Goal:** Turn the Phase 11 keep-alive seam into an actual recorder — capture audio, chunk it, triple-persist each chunk (IndexedDB + Vercel Blob + retry queue) with metadata. This is the episodic-memory raw-capture layer (locked memory architecture: raw interactions stored forever in Postgres + Vercel Blob).
+
+**Scope — IN (Layers 4-6):**
+- L4: chunked `MediaRecorder` (getUserMedia(audio) → timeslice ≈ 5s chunks).
+- L5: presigned **Vercel Blob** upload — `@vercel/blob` client `upload()` + a server `handleUpload` route (presigned client upload, NOT server-proxied `put()` — bypasses the Vercel ~4.5MB function-body limit + the function hop).
+- L6: **IndexedDB triple-persistence** + retry queue (chunk → IndexedDB first → Blob upload → confirm/evict; failures retry from IndexedDB).
+- Page-visibility handling; tie the recorder lifetime to the Phase 11 `SessionKeepAlive`.
+- A **dev surface** (`/recording-lab`) to exercise it (Start/Stop, live chunk count + per-chunk status).
+
+**Scope — EXPLICITLY DEFERRED (do NOT build here):** 10-min rotation + 2s overlap + heartbeat + Tier 1-4 recovery → **Phase 13**. Interruption detection + chime/tab-flash/Web Push/banner → **Phase 14**. Real rep call UX → **Phases 18-22**. NY/NJ consent attestation → **Phase 28** (so Phase 12 is a dev/test surface ONLY — never wired into a real rep call flow before 28).
+
+**Locked decisions (Felix-approved 2026-06-06):**
+- D1 — single continuous segment, 5s chunks (timeslice); rotation/overlap is Phase 13.
+- D2 — add the two metadata tables now (episodic model + FKs-from-day-one).
+- D3 — new `/recording-lab` dev page; keep `/recording-check` as the pure keep-alive device check.
+- D4 — use the `idb` wrapper for IndexedDB.
+- D5 — dev surface only, no real reps (consent is Phase 28).
+- D6 — keep a chunk in IndexedDB until its Blob upload is confirmed, then evict; retry queue = the un-confirmed set.
+- D7 — `account_id` nullable for now (standalone dev recordings); real linkage in the call-flow phases.
+
+**Schema (migration 0004, additive, direct SQL via `@neondatabase/serverless` — NEVER `drizzle-kit push`):**
+- `recordings`: id, user_id FK→users, account_id FK→account_records (nullable, SET NULL), status (recording|completed|failed|aborted), started_at, ended_at (null), duration_ms (null), chunk_count (int default 0), deleted_at (soft-delete), created_at, updated_at. Index on user_id.
+- `recording_chunks`: id, recording_id FK→recordings (cascade), chunk_index (int), blob_pathname (text), blob_url (text), size_bytes (int), duration_ms (int null), status (pending|uploaded|failed), uploaded_at (null), created_at. UNIQUE (recording_id, chunk_index); index on recording_id.
+
+**API routes (auth-gated, `force-dynamic`):**
+- `POST /api/recording/start` → create a `recordings` row (status=recording) → `{ recordingId }`.
+- `POST /api/recording/blob-upload` → `@vercel/blob` `handleUpload`: auth-gate; scope the client token to `recordings/{userId}/{recordingId}/`; `onUploadCompleted` → upsert the `recording_chunks` row (status=uploaded). (NOTE: `onUploadCompleted` fires only on a deployed preview, not localhost.)
+- `POST /api/recording/complete` → mark `recordings` completed (+ ended_at, duration_ms, chunk_count).
+
+**Client modules (`src/lib/recording/`):** `recorder.ts` (MediaRecorder wrapper; codec feature-detect — webm/opus Chrome, mp4/aac Safari), `chunkStore.ts` (IndexedDB via `idb`: put / mark-uploaded / evict-on-confirm / list-pending), `uploader.ts` (persist→`upload()`→confirm/evict; retry pending on failure/reconnect). Reuse `SessionKeepAlive` (start on record-start, stop on record-stop).
+
+**UI:** `src/app/(app)/recording-lab/page.tsx` + a client panel — gated like `/recording-check`; mic-permission prompt; Start/Stop; live chunk count + per-chunk upload status; clear "test surface, not a real call" framing (no dev jargon in copy).
+
+**Deps:** `pnpm add @vercel/blob idb`.
+
+**Acceptance criteria:**
+1. `pnpm build` + `tsc --noEmit` clean; new deps install.
+2. Migration 0004 applied to Neon (additive; zero data-loss risk).
+3. Unit tests for `chunkStore` + `uploader` retry logic using SYNTHETIC blobs — import the REAL functions, never re-implement.
+4. **On the preview** (token present): record a short clip → chunks appear in the blob store (verify via the Blob API) + `recording_chunks` rows in Neon (status=uploaded) + IndexedDB holds-then-evicts + a forced-upload-failure retries and recovers. Unauth routes → 401/redirect.
+5. Client interactions verified on the **preview** (not `127.0.0.1`).
+
+**Verification caveats (honest):** actual mic capture can't be fully automated via Chrome MCP (needs real mic input + a permission grant) → real-capture verification is an **on-device gate (Felix)**, like Phase 11; the assistant verifies the upload/persistence/retry plumbing + DB/Blob/IndexedDB results. `onUploadCompleted` only fires on deployed previews.
+
+**Pre-launch reminders (NOT this phase):** add **Production** scope to `BLOB_READ_WRITE_TOKEN` + a **separate preview blob store** (or strict path prefix) before beta launch, so test recordings don't mix with real prod audio.
+
+**Branch/target:** `phase-12/recording-layers-4-6` OFF `recording-staging` → PR `--base recording-staging`. Promotion to review-for-main later (after the device gate).
+
+**Depends on:** Phase 11 + 11a (keep-alive) + `BLOB_READ_WRITE_TOKEN` (provisioned ✅).
 
 ## Phase 13 — Auto-Segmentation + Heartbeat + Tiered Recovery ☐ Planned
 
