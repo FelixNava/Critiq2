@@ -20,6 +20,7 @@ import {
   confirmChunk,
   recordAttempt,
   listPendingChunks,
+  pendingCount,
   type StoredChunk,
 } from "./chunkStore";
 import { extensionForMimeType } from "./recorder";
@@ -99,6 +100,9 @@ export class ChunkUploader {
   private readonly uploadFn: ChunkUploadFn;
   private readonly callbacks: UploaderCallbacks;
   private flushing = false;
+  // Chunk indices currently uploading — prevents handleChunk and a concurrent
+  // flushPending from uploading the same chunk twice.
+  private readonly inFlight = new Set<number>();
 
   constructor(
     recordingId: string,
@@ -140,9 +144,13 @@ export class ChunkUploader {
       "recordingId" | "chunkIndex" | "blob" | "mimeType"
     >,
   ): Promise<boolean> {
+    // Already uploading this exact chunk (handleChunk vs a concurrent flush)?
+    // Skip — the in-flight attempt owns it; don't duplicate the upload/attempt.
+    if (this.inFlight.has(chunk.chunkIndex)) return false;
+    this.inFlight.add(chunk.chunkIndex);
     this.callbacks.onChunkState?.(chunk.chunkIndex, "uploading");
-    await recordAttempt(chunk.recordingId, chunk.chunkIndex);
     try {
+      await recordAttempt(chunk.recordingId, chunk.chunkIndex);
       const pathname = chunkPathname(
         chunk.recordingId,
         chunk.chunkIndex,
@@ -159,6 +167,8 @@ export class ChunkUploader {
       // Stays in IndexedDB — flushPending() retries it later.
       this.callbacks.onChunkState?.(chunk.chunkIndex, "failed");
       return false;
+    } finally {
+      this.inFlight.delete(chunk.chunkIndex);
     }
   }
 
@@ -187,6 +197,7 @@ export class ChunkUploader {
   }
 
   async remaining(): Promise<number> {
-    return (await listPendingChunks(this.recordingId)).length;
+    // Count-only (countFromIndex) — don't load every pending blob just to size it.
+    return pendingCount(this.recordingId);
   }
 }

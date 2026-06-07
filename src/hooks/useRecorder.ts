@@ -91,6 +91,9 @@ export function useRecorder(): UseRecorder {
   const recordingIdRef = useRef<string | null>(null);
   const startedAtRef = useRef<number>(0);
   const chunkTotalRef = useRef<number>(0);
+  // In-flight per-chunk handleChunk promises, so stop() can wait for the tail
+  // chunk to persist+upload before it flushes + reports the durable count.
+  const opsRef = useRef<Promise<unknown>[]>([]);
 
   const [status, setStatus] = useState<RecorderStatus>("idle");
   const [recordingId, setRecordingId] = useState<string | null>(null);
@@ -160,6 +163,7 @@ export function useRecorder(): UseRecorder {
     setChunks([]);
     setPending(0);
     chunkTotalRef.current = 0;
+    opsRef.current = [];
     try {
       const id = await apiStart();
       recordingIdRef.current = id;
@@ -178,15 +182,19 @@ export function useRecorder(): UseRecorder {
           onChunk: (c) => {
             chunkTotalRef.current += 1;
             upsertChunk(c.index, { sizeBytes: c.blob.size, state: "pending" });
-            void uploader
+            const op = uploader
               .handleChunk({
                 chunkIndex: c.index,
                 blob: c.blob,
                 mimeType: c.mimeType,
               })
               .then((ok) => {
-                if (!ok) void uploader.flushPending().then(refreshPending);
+                if (!ok) return uploader.flushPending().then(refreshPending);
+              })
+              .catch(() => {
+                // Failure is surfaced via onChunkState; don't leave a rejection.
               });
+            opsRef.current.push(op);
           },
           onStatus: setStatus,
           onError: (err) =>
@@ -203,8 +211,9 @@ export function useRecorder(): UseRecorder {
 
       const st = recorder.getStatus();
       if (st === "error" || st === "unsupported") {
-        // Capture never began (permission denied / unsupported) — don't leave the
-        // keep-alive running or the session row open.
+        // Capture never began (permission denied / unsupported) — release the mic
+        // and don't leave the keep-alive running or the session row open.
+        await recorder.stop();
         await keepAlive.stop();
         keepAliveRef.current = null;
         recorderRef.current = null;
@@ -231,9 +240,17 @@ export function useRecorder(): UseRecorder {
       recorderRef.current = null;
 
       const uploader = uploaderRef.current;
+      let chunkCount = chunkTotalRef.current;
       if (uploader) {
+        // Wait for every captured chunk (including the tail) to finish
+        // persist+upload before flushing, so the durable count is accurate.
+        await Promise.allSettled(opsRef.current);
+        opsRef.current = [];
         await uploader.flushPending();
+        const remaining = await uploader.remaining();
         await refreshPending();
+        // chunk_count = chunks durably stored (captured minus still-unconfirmed).
+        chunkCount = Math.max(0, chunkTotalRef.current - remaining);
       }
 
       await keepAliveRef.current?.stop();
@@ -243,7 +260,7 @@ export function useRecorder(): UseRecorder {
       if (id) {
         await apiComplete(id, {
           durationMs: Date.now() - startedAtRef.current,
-          chunkCount: chunkTotalRef.current,
+          chunkCount,
         });
       }
     } catch (err) {
@@ -259,6 +276,7 @@ export function useRecorder(): UseRecorder {
     setError(null);
     setChunks([]);
     setPending(0);
+    opsRef.current = [];
     try {
       const id = await apiStart();
       recordingIdRef.current = id;

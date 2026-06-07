@@ -1,22 +1,21 @@
 import { NextResponse } from "next/server";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { auth } from "@/auth";
-import { getRecordingForUser, recordChunkUploaded } from "@/lib/recordings";
+import {
+  getRecordingForUser,
+  recordChunkUploaded,
+  MAX_CHUNK_BYTES,
+  MAX_CHUNK_INDEX,
+} from "@/lib/recordings";
 
 export const dynamic = "force-dynamic";
 
-// Audio containers MediaRecorder produces, plus wav (synthetic self-test chunks)
-// and a generic fallback. application/octet-stream covers blobs with no type.
-const ALLOWED_CONTENT_TYPES = [
-  "audio/webm",
-  "audio/ogg",
-  "audio/mp4",
-  "audio/mpeg",
-  "audio/wav",
-  "audio/x-wav",
-  "application/octet-stream",
-];
-const MAX_CHUNK_BYTES = 25 * 1024 * 1024; // generous per-chunk ceiling
+// audio/* covers every container+codec MediaRecorder emits — e.g.
+// "audio/webm;codecs=opus", which Vercel matches via the "audio/*" wildcard but
+// NOT against a bare "audio/webm" entry (it does exact-or-"type/*"). The bare
+// list would silently reject real Chrome/Android chunks. application/octet-stream
+// covers a blob with no type.
+const ALLOWED_CONTENT_TYPES = ["audio/*", "application/octet-stream"];
 
 interface ChunkClientPayload {
   recordingId: string;
@@ -63,10 +62,21 @@ export async function POST(req: Request): Promise<NextResponse> {
         if (typeof recordingId !== "string" || typeof chunkIndex !== "number") {
           throw new Error("Missing recording reference");
         }
+        if (
+          !Number.isInteger(chunkIndex) ||
+          chunkIndex < 0 ||
+          chunkIndex >= MAX_CHUNK_INDEX
+        ) {
+          throw new Error("Invalid chunk index");
+        }
 
         const recording = await getRecordingForUser(userId, recordingId);
         if (!recording) throw new Error("Recording not found");
-        if (!pathname.startsWith(`recordings/${recordingId}/`)) {
+        // Reject `..` so a scoped prefix can't be escaped via path traversal.
+        if (
+          pathname.includes("..") ||
+          !pathname.startsWith(`recordings/${recordingId}/`)
+        ) {
           throw new Error("Pathname outside the recording scope");
         }
 

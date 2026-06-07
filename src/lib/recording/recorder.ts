@@ -162,7 +162,16 @@ export class AudioRecorder {
         (e as unknown as { error?: unknown }).error ?? e,
       );
     };
-    this.recorder.start(this.timesliceMs);
+    try {
+      this.recorder.start(this.timesliceMs);
+    } catch (err) {
+      // start() can throw (e.g. invalid state) — release the mic, don't leak it.
+      this.setStatus("error");
+      this.callbacks.onError?.(err);
+      this.teardownStream();
+      this.recorder = null;
+      return;
+    }
     this.setStatus("recording");
   }
 
@@ -171,8 +180,17 @@ export class AudioRecorder {
     if (rec && rec.state !== "inactive") {
       // stop() flushes one final ondataavailable then fires "stop" — wait for it
       // so the caller can upload the tail chunk before tearing the stream down.
+      // Guard with a timeout so a missing "stop" event (rare engine quirk) can't
+      // wedge the caller forever.
       const flushed = new Promise<void>((resolve) => {
-        rec.addEventListener("stop", () => resolve(), { once: true });
+        let settled = false;
+        const done = () => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
+        rec.addEventListener("stop", done, { once: true });
+        setTimeout(done, 2000);
       });
       try {
         rec.stop();

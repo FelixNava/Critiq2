@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { getRecordingForUser, recordChunkUploaded } from "@/lib/recordings";
+import {
+  getRecordingForUser,
+  recordChunkUploaded,
+  isVercelBlobUrl,
+  MAX_CHUNK_BYTES,
+  MAX_CHUNK_INDEX,
+} from "@/lib/recordings";
 
 export const dynamic = "force-dynamic";
 
@@ -43,22 +49,33 @@ export async function POST(req: Request) {
 
   if (
     !recordingId ||
-    Number.isNaN(chunkIndex) ||
+    !Number.isInteger(chunkIndex) ||
     chunkIndex < 0 ||
+    chunkIndex >= MAX_CHUNK_INDEX ||
+    sizeBytes < 0 ||
+    sizeBytes > MAX_CHUNK_BYTES ||
     !blobPathname ||
     !blobUrl
   ) {
     return NextResponse.json(
-      { error: "Missing chunk details." },
+      { error: "Missing or invalid chunk details." },
       { status: 400 },
     );
+  }
+  // The blob URL is client-supplied (from the upload() result); only trust a real
+  // Vercel Blob host so a later transcribe/playback step can't be pointed elsewhere.
+  if (!isVercelBlobUrl(blobUrl)) {
+    return NextResponse.json({ error: "Invalid blob URL." }, { status: 400 });
   }
 
   const recording = await getRecordingForUser(userId, recordingId);
   if (!recording) {
     return NextResponse.json({ error: "Recording not found." }, { status: 404 });
   }
-  if (!blobPathname.startsWith(`recordings/${recordingId}/`)) {
+  if (
+    blobPathname.includes("..") ||
+    !blobPathname.startsWith(`recordings/${recordingId}/`)
+  ) {
     return NextResponse.json(
       { error: "Chunk outside the recording scope." },
       { status: 400 },

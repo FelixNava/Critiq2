@@ -60,8 +60,11 @@ export async function saveChunk(input: {
   mimeType: string;
 }): Promise<void> {
   const db = await getDb();
-  const existing = await db.get(STORE, [input.recordingId, input.chunkIndex]);
-  await db.put(STORE, {
+  // get + put in ONE transaction so a concurrent writer can't clobber
+  // createdAt/attempts (read-modify-write atomicity).
+  const tx = db.transaction(STORE, "readwrite");
+  const existing = await tx.store.get([input.recordingId, input.chunkIndex]);
+  await tx.store.put({
     recordingId: input.recordingId,
     chunkIndex: input.chunkIndex,
     blob: input.blob,
@@ -70,6 +73,7 @@ export async function saveChunk(input: {
     createdAt: existing?.createdAt ?? Date.now(),
     attempts: existing?.attempts ?? 0,
   });
+  await tx.done;
 }
 
 /** Bump the retry counter for a chunk (one upload attempt). No-op if evicted. */
@@ -78,9 +82,12 @@ export async function recordAttempt(
   chunkIndex: number,
 ): Promise<void> {
   const db = await getDb();
-  const existing = await db.get(STORE, [recordingId, chunkIndex]);
-  if (!existing) return;
-  await db.put(STORE, { ...existing, attempts: existing.attempts + 1 });
+  const tx = db.transaction(STORE, "readwrite");
+  const existing = await tx.store.get([recordingId, chunkIndex]);
+  if (existing) {
+    await tx.store.put({ ...existing, attempts: existing.attempts + 1 });
+  }
+  await tx.done;
 }
 
 /** Confirm a chunk's upload → evict it from IndexedDB (D6). */

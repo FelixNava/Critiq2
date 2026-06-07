@@ -20,6 +20,21 @@ export const RECORDING_STATUSES = [
 ] as const;
 export type RecordingStatus = (typeof RECORDING_STATUSES)[number];
 
+// Input guards shared by the recording routes: cap chunk_index well under the
+// INT4 ceiling (a million 5s chunks is ~57 days) and bound a single chunk's size.
+export const MAX_CHUNK_INDEX = 1_000_000;
+export const MAX_CHUNK_BYTES = 25 * 1024 * 1024;
+
+/** A blob URL we'll trust: https on a Vercel Blob host (mirrors the SDK check). */
+export function isVercelBlobUrl(value: string): boolean {
+  try {
+    const u = new URL(value);
+    return u.protocol === "https:" && u.hostname.endsWith(".blob.vercel-storage.com");
+  } catch {
+    return false;
+  }
+}
+
 /** Create a capture session for a rep. accountId is optional (standalone dev). */
 export async function createRecording(
   userId: string,
