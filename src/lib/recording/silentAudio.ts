@@ -163,11 +163,13 @@ export class SilentAudioController {
   };
 
   private handlePause = (): void => {
-    // A live element was paused by the OS/browser (an interrupting call, a
-    // background-throttle). stop() detaches this handler before it pauses, so
-    // this only fires for a real, recoverable suspension — surface it so the
-    // device check prompts a retry rather than showing a misleading "Active".
-    if (this.audio) this.setStatus("suspended");
+    if (!this.audio) return;
+    // A failed load (e.g. the source rejected by CSP) fires `error` AND a trailing
+    // `pause` — don't let that pause downgrade a terminal "error" to a recoverable
+    // "suspended" (which would loop the device check forever). Only a clean pause
+    // (OS interruption of a live element) is the recoverable case stop() guards by
+    // detaching this handler before it pauses.
+    this.setStatus(this.audio.error ? "error" : "suspended");
   };
 
   private handleError = (): void => {
