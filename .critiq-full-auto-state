@@ -14,9 +14,9 @@ BUILD_TOTAL_TOKEN_BUDGET=4000000
 BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
-PHASE_CURRENT=
-PHASE_CURRENT_STATUS=
-PHASE_CURRENT_PR=
+PHASE_CURRENT=12/recording-layers-4-6
+PHASE_CURRENT_STATUS=blocked
+PHASE_CURRENT_PR=https://github.com/FelixNava/Critiq2/pull/14
 PHASE_NEXT=12/recording-layers-4-6
 PHASE_LAST_COMPLETED=11a/lock-screen-audio
 PHASE_LAST_COMPLETED_AT=2026-06-06T20:35:00-04:00
@@ -46,12 +46,12 @@ ENV_READY=true
 #     (Chrome media throttle, same artifact as Wake Lock "Off") -> the device gate
 #     is the real proof.
 #   Recording stack (11 + 11a) promoted recording-staging -> review-for-main (PR #13).
-UI_VERIFY_PENDING=
+UI_VERIFY_PENDING=12
 
 # --- SESSION HEARTBEAT ---
-SESSION_LAST_HEARTBEAT=2026-06-06T20:35:00-04:00
-SESSION_TOKEN_BUDGET_USED=1450000
-SESSION_ID=interactive-phase-11a-lockscreen-2026-06-06
+SESSION_LAST_HEARTBEAT=2026-06-07T11:20:00-04:00
+SESSION_TOKEN_BUDGET_USED=1750000
+SESSION_ID=interactive-phase-12-recording-layers-2026-06-07
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL
@@ -72,8 +72,24 @@ NEXT_CRON_FIRE_ET=disabled-scope-bound-reached
 CRON_SCHEDULE_LABEL=critiq-fullauto-9-10-11-COMPLETE-self-disabling
 
 # --- BLOCKERS ---
-BLOCKER_REASON=
-BLOCKER_SET_AT=
+# Phase 12 (recording layers 4-6) is BUILT + code-reviewed + on PR #14, and preview-
+# verified UP TO the Blob store boundary (routes 200, auth gates 401, CSP fix live +
+# correct, token-gen 200, build/types/17 unit tests green). It is NOT merged.
+# BLOCKER: the Vercel Blob store PUT (https://vercel.com/api/blob) returns 503 on every
+# chunk upload (SDK retries 3x, x2 runs) -> the synthetic self-test sticks at "Saving"
+# and no recording_chunks rows are written. Vercel status = all operational / Blob
+# operational / no incidents, AND token GENERATION succeeds (200), so this is the
+# critiq2-blob store/token, NOT Critiq code and NOT a platform outage.
+# RESUME (Felix dashboard, then a fresh session): (1) confirm critiq2-blob
+# (store_LgqOObB7jYpcT6x8) is active + connected to the critiq2 project; (2) re-mint
+# BLOB_READ_WRITE_TOKEN from that store into the Preview env; (3) redeploy the phase-12
+# preview; (4) re-run the /recording-lab "Run upload self-test" (no mic needed) ->
+# expect blob objects + recording_chunks rows (status uploaded); (5) /critiq-merge into
+# recording-staging; (6) iPhone mic-capture gate; (7) promote recording-staging ->
+# review-for-main. Log DEC-023+ (client-confirm route; access=public dev-surface flag)
+# at merge. Full diagnosis: PR #14 comment.
+BLOCKER_REASON=Vercel Blob store 503 on chunk PUT (preview) — critiq2-blob store/token needs re-provision; Phase 12 code done on PR #14, not merged. See PR #14.
+BLOCKER_SET_AT=2026-06-07T11:20:00-04:00
 
 # --- EMAIL CHANNEL ---
 EMAIL_SENDER=notifications@critiq.firstlap.dev
