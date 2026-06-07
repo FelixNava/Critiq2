@@ -265,6 +265,29 @@ Rationale: minimal, self-contained, honest; matches the zero-failures spec's lay
 Iterability: high (strings + mechanism are one-line edits).
 Trade-off flag: LOW — confirm the "Critiq"-only lock-screen branding reads right on a real device during the joint verification; revisit if a richer (still recording-free) presence is wanted.
 
+## DEC-021 — L2 keep-alive switched from a Web Audio oscillator to a looping silent `<audio>` element
+Phase: 11a/lock-screen-audio
+Date: 2026-06-06 ~20:30 ET
+Type: trade-off
+Context: Phase 11's on-device gate (2/3) found L3's neutral "Critiq" lock-screen branding never appeared on iPhone. Root cause: L2's zero-gain Web Audio oscillator (DEC-020) — iOS never treats Web Audio as *media*, so it surfaces no Now-Playing widget for L3 to attach to and is suspended on screen-lock (exactly where field recording happens). DEC-020 had flagged the oscillator-vs-`<audio>` choice as revisitable.
+Chosen: Rewrote L2 to drive a looping, non-muted, fully-silent `<audio>` element (runtime-built 16-bit PCM WAV via DataView → Blob → createObjectURL). SAME public interface (`SilentAudioStatus` / `isSilentAudioSupported` / `SilentAudioController.start/stop/getStatus`) → `sessionKeepAlive` / `useSessionKeepAlive` / `DeviceCheckPanel` untouched. Element attached to the DOM while live (iOS elects in-document media for the widget) + removed on stop(); status mapped from media events; `play()` failures classified `NotAllowedError`→`suspended` (autoplay, recoverable) vs everything else→`error` (terminal), and a paused element that has an `error` reports `error` not `suspended`. `mediaSession.ts` (L3) unchanged — it now has a real media element to attach to.
+Alternatives considered:
+  - Keep the oscillator (REJECTED — the proven device-gate failure: no widget + suspends on lock).
+  - A hosted/bundled silent .wav asset looped via `<audio>` (rejected — the runtime blob is self-contained, no asset to ship/host).
+Rationale: the real driver is recording reliability while *locked*, not branding; the neutral widget is the unavoidable cost of proper iOS background audio, made privacy-safe (no recording text). Maximizes the best-effort AND delivers the branding.
+Iterability: high (single file, same interface).
+Trade-off flag: NO — Felix-picked + **device-verified** (the neutral "Critiq" lock-screen widget was confirmed present on his iPhone 2026-06-06, keep-alive held across app switches). HONEST CAVEAT retained in product copy: long screen-locked iOS recording is still best-effort (capability chart "60+ min mobile, locked → ❌").
+
+## DEC-022 — CSP `media-src 'self' blob:` so the keep-alive audio can load
+Phase: 11a/lock-screen-audio
+Date: 2026-06-06 ~20:35 ET
+Type: obvious
+Context: Driving `/recording-check` on the ACTUAL preview (Chrome MCP) surfaced that the `<audio>` `blob:` source was rejected by CSP — MediaError 4, "Media load rejected by URL safety check" — because `next.config.ts` had no `media-src` directive, so it fell back to `default-src 'self'` (which excludes `blob:`). The audio never loaded → the lock-screen widget could never appear (would have failed on-device too). Local verification is structurally blind to this: CSP response headers don't apply to the dev server.
+Chosen: Added `"media-src 'self' blob:"` to the CSP (mirrors `img-src`, which already allowed `blob:`).
+Rationale: minimal, exactly the token the runtime blob WAV needs; no broader relaxation.
+Iterability: high (one CSP line).
+Trade-off flag: NO. Reinforces the standing rule — every UI phase MUST be exercised on the real preview, not just local; this bug was preview-only and only caught by the Chrome MCP drive.
+
 ---
 
 ## End-of-build summary

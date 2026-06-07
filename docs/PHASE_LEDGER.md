@@ -27,11 +27,11 @@ Each phase has a status indicator:
 
 ## Status snapshot (auto-updated by Full Auto)
 
-- Last updated: 2026-06-05 ~8:25pm ET
-- Mode: Phases 2–5 **supervised (direct)**; Phase 6 **via /critiq-full-auto orchestrator (Gate-1 ✅)**; Phase 7 **autonomously via the scheduled-task cron (Gate-2 ✅)**; Phase 8 **live/supervised in-session (Felix-approved merge)**; Phases 9, 10 & 11 **autonomously via the hourly cron (`critiq-fullauto-9-10-11`)**.
-- Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅, Phase 7 (intake S2) ✅, Phase 8 (intake Life Context, trust-gated) ✅, Phase 9 (account domain model) ✅, Phase 10 (account intelligence card UI) ✅, Phase 11 (recording layers 1-3, → **`recording-staging`**) ✅
-- Current phase: none — the hourly cron reached its scope bound (Phase 11) and self-stops. Phase 11 merged to **`recording-staging`** (PR #11, squash b7689e3), NOT review-for-main. **`UI_VERIFY_PENDING=9,10,11`** — all three built headless (no Chrome MCP); the next interactive session must drive Phase 9 (signup→/accounts→create→list) + Phase 10 (open account→/accounts/[id]→card states + not-found) on `review-for-main`, AND Phase 11 (`/recording-check` on `recording-staging`, **on a real device**), then clear the flag.
-- Next: Phase 12 — Recording Infrastructure Layers 4-6 (chunked MediaRecorder + presigned Vercel Blob upload + IndexedDB triple persistence). **BLOCKED on two gates:** (1) `BLOB_READ_WRITE_TOKEN` must be provisioned (Phase 12 is the first Blob phase); (2) joint on-device verification of Phase 11 on `recording-staging`. Also targets `recording-staging`, NOT review-for-main. Do not auto-build — Felix gates the recording stack phase-by-phase.
+- Last updated: 2026-06-06 ~20:35 ET
+- Mode: Phases 2–5 **supervised (direct)**; Phase 6 **via /critiq-full-auto orchestrator (Gate-1 ✅)**; Phase 7 **autonomously via the scheduled-task cron (Gate-2 ✅)**; Phase 8 **live/supervised in-session**; Phases 9, 10 & 11 **autonomously via the hourly cron (`critiq-fullauto-9-10-11`)**; Phase 11a **interactive/supervised via /critiq-full-auto (Felix ran the device gate)**.
+- Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅, Phase 7 (intake S2) ✅, Phase 8 (Life Context) ✅, Phase 9 (account domain) ✅, Phase 10 (account intelligence card) ✅, Phase 11 (recording layers 1-3) ✅, **Phase 11a (lock-screen audio fix) ✅** — recording stack **promoted `recording-staging` → `review-for-main`** (PR #13, merge d3060e5), **device-verified** (neutral "Critiq" lock-screen widget confirmed on iPhone 2026-06-06).
+- Current phase: none. **`UI_VERIFY_PENDING` cleared** — Phase 9/10 driven (Chrome MCP) + the Phase 11 **on-device gate PASSED** (widget present; keep-alive held across app switches). The recording stack (11 + 11a) is now on `review-for-main`.
+- Next: Phase 12 — Recording Infrastructure Layers 4-6 (chunked MediaRecorder + presigned Vercel Blob upload + IndexedDB triple persistence). **BLOCKED on `BLOB_READ_WRITE_TOKEN`** (Phase 12 is the first Blob phase; the Phase 11 on-device gate is now cleared, so the Blob token is the remaining gate). Targets `recording-staging`. Do not auto-build — Felix gates the recording stack phase-by-phase.
 
 ---
 
@@ -289,7 +289,7 @@ Per-account view: behavioral profile, last interaction summary, current stage, c
 
 **Depends on:** Phase 9.
 
-## Phase 11 — Recording Infrastructure: Layers 1-3 ✅ Done (PR #11, squash b7689e3 → **`recording-staging`**, 2026-06-05)
+## Phase 11 — Recording Infrastructure: Layers 1-3 ✅ Done + device-verified, promoted to `review-for-main` (PR #11 → recording-staging; promoted via PR #13, merge d3060e5, 2026-06-06)
 
 > Built autonomously via the hourly cron (`critiq-fullauto-9-10-11`) — its terminal phase. **Merged to the `recording-staging` epic branch, NOT `review-for-main`** (recording stack is promoted to review-for-main later as ONE human-reviewed PR after on-device verification). Client-side only — no DB, no Blob, no new env; additive, zero data-loss risk. **UI NOT driven (headless cron, browser-media) → `UI_VERIFY_PENDING=11`** — Wake Lock / audio keep-alive / lock-screen branding only manifest on a real device.
 
@@ -298,7 +298,7 @@ Wake Lock + Silent Audio + Media Session (branding-only metadata, NO "recording"
 **Built:**
 - Session keep-alive seam over three independent, feature-detected layers a later recorder phase (12) turns on/off around capture. **No audio capture here** — only keeps the page/session alive around it.
   - **L1 `WakeLockController`** (`src/lib/recording/wakeLock.ts`) — screen wake lock; re-acquires on `visibilitychange` (platform auto-releases when hidden). Releases an orphaned sentinel if `stop()` races an in-flight `request()` (no unreleasable lock / battery drain); `stop()` preserves an `error` status so the device check can reveal a device that can't hold a lock.
-  - **L2 `SilentAudioController`** (`src/lib/recording/silentAudio.ts`) — zero-gain oscillator through an `AudioContext` to resist background-tab throttling; `onstatechange` reflects OS suspend/resume so status can't go stale. (Active re-resume + heartbeat recovery is Phase 13.)
+  - **L2 `SilentAudioController`** (`src/lib/recording/silentAudio.ts`) — zero-gain oscillator through an `AudioContext` to resist background-tab throttling; `onstatechange` reflects OS suspend/resume so status can't go stale. (Active re-resume + heartbeat recovery is Phase 13.) **→ SUPERSEDED by Phase 11a:** the oscillator surfaced no iOS lock-screen widget and suspended on lock; L2 was rebuilt as a looping silent `<audio>` element (see Phase 11a below).
   - **L3 `MediaSessionController`** (`src/lib/recording/mediaSession.ts`) — **BRANDING ONLY** lock-screen presence; deliberately no "recording"/"call"/"capture" language (locked privacy decision); reports `error` honestly if metadata never applied.
   - **`SessionKeepAlive`** unifies them behind one `start()`/`stop()`; `active` + per-layer health flow through a single push channel (no second source of truth). `useSessionKeepAlive()` hook mirrors it + tears down on unmount.
 - `/recording-check` — gated device-check surface for supervised on-device verification (not wired into the main flow yet; reachable by URL).
@@ -308,6 +308,21 @@ Wake Lock + Silent Audio + Media Session (branding-only metadata, NO "recording"
 **Verified (headless — honest scope):** `pnpm build` + `tsc --noEmit` clean (`/recording-check` registered dynamic `ƒ`). HTTP boundary: unauth `GET /recording-check` → 307 → /login. `Permissions-Policy: … screen-wake-lock=(self)` present; `/` still 200. **NOT driven via Chrome/Preview MCP (headless) — `UI_VERIFY_PENDING=11`; the on-device drive is the joint-verification gate before the recording stack is promoted to review-for-main.**
 
 **Depends on:** Phase 10.
+
+## Phase 11a — Lock-screen audio fix (L2 → looping `<audio>`) ✅ Done + device-verified (promoted to `review-for-main` via PR #13, 2026-06-06)
+
+> The Phase 11 on-device gate (2/3) found L3's neutral "Critiq" lock-screen branding never appeared on iPhone. Root cause: L2's Web Audio oscillator — iOS doesn't treat Web Audio as media, so it surfaces no Now-Playing widget and suspends on lock. L2 rebuilt + a preview-only CSP blocker fixed. PR #12 → `recording-staging` (squash 596b6ac), then `recording-staging` promoted → `review-for-main` (PR #13, merge d3060e5). **Device-verified on iPhone — the neutral "Critiq" widget is present.** DEC-021/022.
+
+**Built:**
+- `src/lib/recording/silentAudio.ts` rewritten: L2 now drives a looping, **non-muted**, fully-silent `<audio>` element (runtime 16-bit PCM WAV via `DataView` → `Blob` → `createObjectURL`) instead of the zero-gain oscillator. A real media element → iOS surfaces the neutral "Critiq" lock-screen widget (L3 attaches to it) AND a sturdier locked-screen background audio session. **SAME public interface** (`SilentAudioStatus` / `isSilentAudioSupported` / `SilentAudioController.start/stop/getStatus`) → `sessionKeepAlive` / `useSessionKeepAlive` / `DeviceCheckPanel` untouched. Element attached to the DOM while live (iOS elects in-document media for the widget) + removed on `stop()`; status mapped from media events; `play()` failures classified `NotAllowedError`→`suspended` (recoverable) vs everything else→`error` (terminal), and a paused element that has an `error` reports `error` not `suspended`. `mediaSession.ts` (L3) unchanged.
+- `next.config.ts`: added `media-src 'self' blob:` to the CSP. The blob audio was rejected by the `default-src 'self'` fallback (MediaError 4, "Media load rejected by URL safety check") — a **preview-only** bug invisible to local verification (CSP response headers don't apply to the dev server), caught by driving `/recording-check` on the real preview via Chrome MCP.
+- Code review (high effort, 3 finder agents): DOM-attach for iOS reliability, terminal-vs-recoverable status classification, single-predicate cleanup — all applied; `playsInline` (video-only) and the pre-existing inert-retry correctly scoped out.
+
+**Verified:** `pnpm typecheck` + `pnpm build` clean (re-confirmed on `review-for-main` post-promotion). Desktop drive (Chrome MCP, real preview, signed in): `<audio>` created/in-DOM/non-muted/`loop`/blob, `play()` accepted (user-activation OK), **CSP error gone (`errorCode` 4 → null)**, media session "Critiq"/playing, clean teardown (element removed, session cleared), no app-origin console errors. (Sustained playback itself is unobservable in the hidden MCP tab — Chrome throttles media when `visibilityState: hidden`, the same artifact that makes Wake Lock read "Off".) **🎉 iPhone device gate PASSED:** neutral "Critiq" lock-screen widget present; keep-alive held green across app switches.
+
+**Known follow-up (pre-existing, NOT introduced here):** on `/recording-check`, a `suspended` status shows "Tap start again" while the panel is in its `Stop check` state — the retry is inert until Stop→Start (`SessionKeepAlive.start()` early-returns while active). Pre-existing Phase 11 `DeviceCheckPanel` behavior; low priority, flagged for whoever touches that panel next.
+
+**Depends on:** Phase 11.
 
 ## Phase 12 — Recording Infrastructure: Layers 4-6 ☐ Planned
 
