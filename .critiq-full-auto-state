@@ -25,7 +25,12 @@ PHASE_LAST_COMPLETED_AT=2026-06-06T20:35:00-04:00
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
 # Also in .env.local: ANTHROPIC_API_KEY + RESEND_API_KEY (reused), AUTH_SECRET + CRON_SECRET.
 # Still to provision later: DEEPGRAM_API_KEY (Phase 15), SENTRY_DSN (Phase 4).
-# Phase 11 + 11a (recording layers 1-3 + lock-screen audio fix) done + device-verified + promoted to review-for-main; client-side only, no env. Phase 12+ needs BLOB_READ_WRITE_TOKEN (still to provision).
+# Phase 11 + 11a done + device-verified + promoted to review-for-main; client-side only, no env.
+# BLOB_READ_WRITE_TOKEN PROVISIONED 2026-06-06 (Felix, dashboard) — store critiq2-blob (store_LgqOObB7jYpcT6x8),
+#   scoped Preview/all-branches + Sensitive. Sensitive => NOT pullable to .env.local; verify Phase 12 on the PREVIEW.
+#   Pre-launch blob TODOs (decided "later" with Felix 2026-06-06): (1) add Production scope to the token before prod
+#   launch; (2) stand up a SEPARATE preview blob store (or strict path prefix) so beta test recordings don't mix with
+#   real prod audio (same lesson as the preview/prod env-sharing note). Not blocking Phase 12 (which runs on previews).
 ENV_READY=true
 # UI_VERIFY_PENDING: a headless cron sets this when it ships a UI phase it could
 # not drive via MCP; the next interactive session drives it via Chrome MCP, then
