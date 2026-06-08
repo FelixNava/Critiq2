@@ -27,11 +27,11 @@ Each phase has a status indicator:
 
 ## Status snapshot (auto-updated by Full Auto)
 
-- Last updated: 2026-06-06 ~20:35 ET
+- Last updated: 2026-06-07 ~11:40 ET
 - Mode: Phases 2–5 **supervised (direct)**; Phase 6 **via /critiq-full-auto orchestrator (Gate-1 ✅)**; Phase 7 **autonomously via the scheduled-task cron (Gate-2 ✅)**; Phase 8 **live/supervised in-session**; Phases 9, 10 & 11 **autonomously via the hourly cron (`critiq-fullauto-9-10-11`)**; Phase 11a **interactive/supervised via /critiq-full-auto (Felix ran the device gate)**.
 - Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅, Phase 7 (intake S2) ✅, Phase 8 (Life Context) ✅, Phase 9 (account domain) ✅, Phase 10 (account intelligence card) ✅, Phase 11 (recording layers 1-3) ✅, **Phase 11a (lock-screen audio fix) ✅** — recording stack **promoted `recording-staging` → `review-for-main`** (PR #13, merge d3060e5), **device-verified** (neutral "Critiq" lock-screen widget confirmed on iPhone 2026-06-06).
-- Current phase: none. **`UI_VERIFY_PENDING` cleared** — Phase 9/10 driven (Chrome MCP) + the Phase 11 **on-device gate PASSED** (widget present; keep-alive held across app switches). The recording stack (11 + 11a) is now on `review-for-main`.
-- Next: Phase 12 — Recording Infrastructure Layers 4-6 (chunked MediaRecorder + presigned Vercel Blob upload + IndexedDB triple persistence). **BLOCKED on `BLOB_READ_WRITE_TOKEN`** (Phase 12 is the first Blob phase; the Phase 11 on-device gate is now cleared, so the Blob token is the remaining gate). Targets `recording-staging`. Do not auto-build — Felix gates the recording stack phase-by-phase.
+- Current phase: none. **Phase 12 device-gate PASSED** (iPhone capture + keep-alive across app switches + offline-capture-then-recover-on-reconnect) and **merged to `recording-staging`** (PR #14, squash c7cb620). The promotion PR (`recording-staging` → `review-for-main`) is OPEN for Felix to review + merge, like PR #13 for 11/11a. `UI_VERIFY_PENDING` cleared.
+- Next: Phase 13 — Auto-Segmentation + Heartbeat + Tiered Recovery (10-min rotation + 2s overlap, heartbeat verify every 5s, Tier 1-4 recovery; also folds in the resume-after-tab-kill recovery deferred out of Phase 12). Targets `recording-staging`. Felix gates the recording stack phase-by-phase — do not auto-build.
 
 ---
 
@@ -324,9 +324,9 @@ Wake Lock + Silent Audio + Media Session (branding-only metadata, NO "recording"
 
 **Depends on:** Phase 11.
 
-## Phase 12 — Recording Infrastructure: Layers 4-6 ☐ Planned (scope LOCKED + env-unblocked 2026-06-06 — ready for a fresh-session build)
+## Phase 12 — Recording Infrastructure: Layers 4-6 ✅ Done — built + DEVICE-VERIFIED + merged to `recording-staging` (PR #14, squash c7cb620, 2026-06-07)
 
-> Plan aligned with Felix 2026-06-06: D1–D7 below all approved, permissions approved, `.claude/settings.json` already covers it. Env-unblocked — `BLOB_READ_WRITE_TOKEN` provisioned (store `critiq2-blob`, Preview/all-branches + Sensitive). **Build in a fresh session via `/critiq-full-auto`.** Targets the `recording-staging` epic branch (NOT review-for-main, NOT master); promoted later after an on-device gate, like 11/11a.
+> **✅ SHIPPED 2026-06-07 (interactive `/critiq-full-auto` + `/critiq-merge`).** Built per the spec below; migration 0004 applied to dev Neon. High-effort 5-finder review — two preview-only blockers fixed + verified against the installed `@vercel/blob` source: CSP upload host `https://vercel.com` (the client uploads to `vercel.com/api/blob`, NOT `*.vercel-storage.com`) and `audio/*` content-type (Vercel rejects `audio/webm;codecs=opus` vs a bare `audio/webm`). **Device gate PASSED on iPhone** — capture, keep-alive across app switches, and offline-capture-then-recover-on-reconnect (no stranded clips). Two device-gate fixes: **`access:private`** (`critiq2-blob` is a Private store — DEC-024) and **iOS offline recovery** (drain on every chunk + visibilitychange — DEC-025); plus the authenticated **client-confirm** chunk-row writer (DEC-023). **Merged to `recording-staging`; promotion to `review-for-main` is the open follow-up PR (Felix-reviewed, like PR #13 for 11/11a).** Original plan (still the spec of record) below.
 
 **Goal:** Turn the Phase 11 keep-alive seam into an actual recorder — capture audio, chunk it, triple-persist each chunk (IndexedDB + Vercel Blob + retry queue) with metadata. This is the episodic-memory raw-capture layer (locked memory architecture: raw interactions stored forever in Postgres + Vercel Blob).
 

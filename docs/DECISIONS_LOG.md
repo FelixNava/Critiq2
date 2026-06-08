@@ -288,6 +288,37 @@ Rationale: minimal, exactly the token the runtime blob WAV needs; no broader rel
 Iterability: high (one CSP line).
 Trade-off flag: NO. Reinforces the standing rule — every UI phase MUST be exercised on the real preview, not just local; this bug was preview-only and only caught by the Chrome MCP drive.
 
+## DEC-023 — Authenticated client-confirm route writes the chunk row (not Vercel's onUploadCompleted)
+Phase: 12/recording-layers-4-6
+Date: 2026-06-07 ~11:30 ET
+Type: trade-off
+Context: The ledger spec had `blob-upload`'s `onUploadCompleted` callback write the `recording_chunks` row. But Vercel calls `onUploadCompleted` server-to-server, which (a) never fires on localhost and (b) can't reach an SSO-protected preview — so relying on it alone would leave the rows unwritten/unverifiable, defeating the phase.
+Chosen: added `POST /api/recording/chunk` — an authenticated, ownership-checked, pathname-scoped client confirm the uploader calls after `upload()` resolves; it's the reliable row writer on preview AND localhost. `onUploadCompleted` is retained as an idempotent best-effort backup (same `recordChunkUploaded`, UNIQUE-keyed on recording_id+chunk_index).
+Alternatives: rely on `onUploadCompleted` only (rejected — unreachable on protected preview/localhost → unverifiable); disable preview protection (rejected — security/config change).
+Rationale: makes the chunk row land reliably + verifiably in every environment; idempotent so the backup callback can't double-write.
+Iterability: high.
+Trade-off flag: LOW — confirm the client-confirm pattern is acceptable; revisit if/when previews are unprotected or a signed webhook is wired.
+
+## DEC-024 — Audio uploaded with access:private (the critiq2-blob store is Private)
+Phase: 12/recording-layers-4-6
+Date: 2026-06-07 ~11:32 ET
+Type: obvious (corrected at the device gate)
+Context: The build initially uploaded chunks with `access:"public"` (flagged "dev surface; move to private before real audio"). The device-gate verification surfaced a persistent 503 on every Blob PUT; inspecting the actual store (Vercel dashboard) showed `critiq2-blob` is a PRIVATE store — Vercel's own quickstart snippet for it uses `access:'private'`, and a public-access write to a Private store is rejected.
+Chosen: upload with `access:"private"`. This matches the store AND is the correct privacy posture for sales-call audio (locked privacy model: rep+admin only, not publicly fetchable) — so the earlier "move to private later" flag is resolved now, not deferred. Reading a chunk back later goes through a token, not a public URL.
+Rationale: matches the store, fixes the 503, and is the right privacy default for recordings.
+Iterability: high (one option flag).
+Trade-off flag: NO. Note for later: a future playback/transcription read of private blobs needs the private blob host in CSP `connect-src` + token-based reads (designed when playback is built).
+
+## DEC-025 — iOS offline retry recovery: drain on every chunk + on visibilitychange
+Phase: 12/recording-layers-4-6
+Date: 2026-06-07 ~11:35 ET
+Type: obvious (device-gate bug fix)
+Context: The on-device gate (Felix, iPhone airplane-mode) found offline-captured chunks stranded at "will retry" while desktop recovered. Root cause: the retry queue drained only on an upload failure or the browser `online` event, and iOS Safari fires `online` unreliably (esp. after airplane mode / backgrounding).
+Chosen: drain the backlog after EVERY chunk completes (so the first successful post-reconnect upload clears the offline queue too) and on `visibilitychange` (which iOS fires reliably on app-resume) — recovery no longer depends on the `online` event.
+Rationale: makes offline-capture-then-recover work on iOS (and hardens desktop, which had been silently relying on the same event). Re-verified on-device: no clip stranded.
+Iterability: high.
+Trade-off flag: NO. Scope line: covers reconnect-while-active + return-to-app; full resume-after-tab-kill + the periodic 5s heartbeat are Phase 13.
+
 ---
 
 ## End-of-build summary
