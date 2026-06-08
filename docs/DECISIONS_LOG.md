@@ -319,6 +319,19 @@ Rationale: makes offline-capture-then-recover work on iOS (and hardens desktop, 
 Iterability: high.
 Trade-off flag: NO. Scope line: covers reconnect-while-active + return-to-app; full resume-after-tab-kill + the periodic 5s heartbeat are Phase 13.
 
+## DEC-026 — Master merge (PR #1) PAUSED despite Felix's explicit command: production not provisioned
+Phase: post-12 / master-promotion
+Date: 2026-06-08 03:21 ET
+Type: conflict-resolution (explicit instruction-to-merge vs the verify-before-master + no-merge-on-friction hard rules)
+Context: Felix explicitly commanded this session: "merge PR #15 into review-for-main, then merge PR #1 review-for-main into master, then build Phase 13." PR #15 merged cleanly. Before the master merge, the standing rules require verifying the target on its real environment, and the hard rule says "hit friction in the verification path -> STOP and ask, do NOT degrade to merge-anyway." Verification found master is still the bare scaffold (the only production-target deployment is a redeploy of commit 0bc1b60), so promoting review-for-main -> master = the FIRST real production deploy. `vercel env ls` showed production is NOT provisioned: AUTH_SECRET, RESEND_API_KEY, AUTH_RESEND_KEY, EMAIL_FROM, BLOB_READ_WRITE_TOKEN are all Preview-only (no Production); DATABASE_URL/_UNPOOLED have SEPARATE Production entries (distinct from Preview) -> likely a different Neon branch that is UNMIGRATED (migrations 0001-0004 were applied to the dev Neon only).
+Chosen: PAUSE the master merge; leave PR #1 open for Felix. Merging now would deploy a production build that is READY but functionally broken (NextAuth has no AUTH_SECRET -> auth 500s; no Resend key -> signup/magic-link fails; no Blob token -> recording fails; DB routes may hit an unmigrated/wrong prod DB). Did NOT auto-provision prod secrets or migrate the prod DB: production-DB migration is in the forbidden-autonomous set, and the prod AUTH_SECRET choice (new vs reuse) is a security decision open since DEC-002.
+Alternatives considered:
+  - Merge anyway per the literal instruction (REJECTED — violates verify-before-master + no-merge-on-friction; ships a broken prod; the exact "degrade to merge-anyway" anti-pattern the hard rule forbids).
+  - Auto-provision prod env + migrate the prod Neon, then merge (REJECTED — migrating a production DB is forbidden autonomously; the prod AUTH_SECRET new-vs-reuse choice is Felix's; acting blind to the prod DB's identity is risky).
+Rationale: the explicit command authorizes the master merge but does not waive verification; the responsible reading of "merge to master" is "merge once the target is verified safe," and it isn't. Felix's own hard rule prefers a paused, documented master merge over a broken production.
+Iterability: high (PR #1 stays open; lands in minutes once prod is provisioned).
+Trade-off flag: YES — Felix's review queue. Unblock checklist in the state-file BLOCKERS + the PR #1 comment. Subsumes the pre-launch blob TODOs (Production token scope + separate preview store).
+
 ---
 
 ## End-of-build summary

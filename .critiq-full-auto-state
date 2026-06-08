@@ -51,9 +51,9 @@ ENV_READY=true
 UI_VERIFY_PENDING=
 
 # --- SESSION HEARTBEAT ---
-SESSION_LAST_HEARTBEAT=2026-06-07T11:40:00-04:00
-SESSION_TOKEN_BUDGET_USED=1900000
-SESSION_ID=interactive-phase-12-recording-layers-2026-06-07
+SESSION_LAST_HEARTBEAT=2026-06-08T03:21:00-04:00
+SESSION_TOKEN_BUDGET_USED=300000
+SESSION_ID=interactive-promote12-masterpause-phase13-2026-06-08
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL
@@ -74,14 +74,25 @@ NEXT_CRON_FIRE_ET=disabled-scope-bound-reached
 CRON_SCHEDULE_LABEL=critiq-fullauto-9-10-11-COMPLETE-self-disabling
 
 # --- BLOCKERS ---
-# RESOLVED 2026-06-07: the Phase 12 Blob 503 was an ACCESS-MODE MISMATCH, not a token
-# issue — critiq2-blob is a PRIVATE store and the code uploaded access:"public". Fixed
-# to access:"private" (DEC-024). Device gate then PASSED on iPhone, incl. iOS offline
-# recovery (DEC-025). Phase 12 MERGED to recording-staging (PR #14, squash c7cb620).
-# OPEN FOLLOW-UP (NOT a blocker): the promotion PR recording-staging -> review-for-main
-# is open for Felix to review + merge (like PR #13 for 11/11a). Next build phase = 13.
-BLOCKER_REASON=
-BLOCKER_SET_AT=
+# 2026-06-08: Phase 12 PROMOTED recording-staging -> review-for-main (PR #15, merge
+# 1503a6f) by Felix's explicit command. review-for-main now holds Phases 2-12.
+# 🚦 MASTER MERGE (PR #1 review-for-main -> master) PAUSED — Felix explicitly commanded it
+# this session, but verification found PRODUCTION IS NOT PROVISIONED, so merging now would
+# ship a broken prod (master is still the bare scaffold; the only production-target deploy is
+# a redeploy of the scaffold commit 0bc1b60 -> promoting = the FIRST real prod deploy). Per
+# the hard rule (friction in the verification path -> STOP, do NOT degrade to merge-anyway),
+# the merge was left for Felix (DEC-026). Production is MISSING (Preview-only): AUTH_SECRET
+# (NextAuth REQUIRES it -> auth dead), RESEND_API_KEY, AUTH_RESEND_KEY, EMAIL_FROM,
+# BLOB_READ_WRITE_TOKEN. DATABASE_URL/_UNPOOLED have SEPARATE Production entries (distinct
+# from Preview) -> likely a different Neon branch that is UNMIGRATED (0001-0004 applied to the
+# dev Neon only). UNBLOCK CHECKLIST (Felix): (1) add prod AUTH_SECRET (new recommended);
+# (2) add prod Resend keys + EMAIL_FROM (reuse preview ok, same domain); (3) add Production
+# scope to BLOB token (+ decide separate prod store); (4) confirm the prod DATABASE_URL Neon
+# branch + apply migrations 0001-0004 to it (additive = zero data-loss; a deliberate prod-DB
+# action, NOT done autonomously). Then say "merge master" -> land PR #1 -> verify prod runtime
+# (200 not 500). Full checklist also in the PR #1 comment.
+BLOCKER_REASON=master-merge-paused: production env not provisioned (auth/email/blob keys Preview-only; prod DB likely unmigrated). See checklist above + PR #1 comment + DEC-026.
+BLOCKER_SET_AT=2026-06-08T03:21:00-04:00
 
 # --- EMAIL CHANNEL ---
 EMAIL_SENDER=notifications@critiq.firstlap.dev
