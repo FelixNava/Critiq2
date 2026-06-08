@@ -67,7 +67,12 @@ export function chunkPathname(
 export const blobUpload: ChunkUploadFn = async (blob, pathname, ctx) => {
   const { upload } = await import("@vercel/blob/client");
   const result = await upload(pathname, blob, {
-    access: "public",
+    // Private: critiq2-blob is a Private store, and call audio must never be
+    // publicly fetchable (locked privacy model) — a chunk is read back later via a
+    // token, not a public URL. A public-access write to the Private store is
+    // rejected (503); access=private is both what the store accepts AND the
+    // correct privacy posture for recordings.
+    access: "private",
     handleUploadUrl: HANDLE_UPLOAD_URL,
     contentType: blob.type || undefined,
     clientPayload: JSON.stringify({
