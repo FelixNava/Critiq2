@@ -69,16 +69,19 @@ export async function getRecordingForUser(
 export async function recordChunkUploaded(input: {
   recordingId: string;
   chunkIndex: number;
+  segmentIndex?: number;
   blobPathname: string;
   blobUrl: string;
   sizeBytes: number;
   durationMs?: number | null;
 }): Promise<void> {
+  const segmentIndex = input.segmentIndex ?? 0;
   await db
     .insert(recordingChunks)
     .values({
       recordingId: input.recordingId,
       chunkIndex: input.chunkIndex,
+      segmentIndex,
       blobPathname: input.blobPathname,
       blobUrl: input.blobUrl,
       sizeBytes: input.sizeBytes,
@@ -89,6 +92,7 @@ export async function recordChunkUploaded(input: {
     .onConflictDoUpdate({
       target: [recordingChunks.recordingId, recordingChunks.chunkIndex],
       set: {
+        segmentIndex,
         blobPathname: input.blobPathname,
         blobUrl: input.blobUrl,
         sizeBytes: input.sizeBytes,

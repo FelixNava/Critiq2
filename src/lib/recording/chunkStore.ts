@@ -17,6 +17,8 @@ import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 export interface StoredChunk {
   recordingId: string;
   chunkIndex: number;
+  /** Which ~10-min segment this chunk belongs to (Phase 13). 0 for legacy rows. */
+  segmentIndex: number;
   blob: Blob;
   sizeBytes: number;
   mimeType: string;
@@ -56,6 +58,7 @@ function getDb(): Promise<IDBPDatabase<ChunkDBSchema>> {
 export async function saveChunk(input: {
   recordingId: string;
   chunkIndex: number;
+  segmentIndex?: number;
   blob: Blob;
   mimeType: string;
 }): Promise<void> {
@@ -67,6 +70,7 @@ export async function saveChunk(input: {
   await tx.store.put({
     recordingId: input.recordingId,
     chunkIndex: input.chunkIndex,
+    segmentIndex: input.segmentIndex ?? existing?.segmentIndex ?? 0,
     blob: input.blob,
     sizeBytes: input.blob.size,
     mimeType: input.mimeType,
@@ -99,6 +103,19 @@ export async function confirmChunk(
   await db.delete(STORE, [recordingId, chunkIndex]);
 }
 
+/**
+ * Give up on a chunk that has failed to upload too many times (e.g. the recording
+ * is no longer owned / auth was lost) — drop it from the queue so it can't be
+ * re-uploaded on every load forever. Same delete as confirmChunk, distinct intent.
+ */
+export async function dropChunk(
+  recordingId: string,
+  chunkIndex: number,
+): Promise<void> {
+  const db = await getDb();
+  await db.delete(STORE, [recordingId, chunkIndex]);
+}
+
 /** The retry queue = every chunk still stored (un-confirmed) for a recording. */
 export async function listPendingChunks(
   recordingId: string,
@@ -111,6 +128,22 @@ export async function listPendingChunks(
 export async function pendingCount(recordingId: string): Promise<number> {
   const db = await getDb();
   return db.countFromIndex(STORE, "by-recording", recordingId);
+}
+
+/**
+ * Distinct recording IDs that still have un-confirmed chunks stored locally.
+ * After a tab kill / crash mid-recording, these are the "orphaned" recordings
+ * whose tail never finished uploading — resume-after-tab-kill recovery drains
+ * them on the next load (see recovery.ts). The store only ever holds the small
+ * set of un-confirmed chunks (D6: confirmed chunks are evicted), so a full scan
+ * is cheap.
+ */
+export async function listRecordingIdsWithPending(): Promise<string[]> {
+  const db = await getDb();
+  const keys = (await db.getAllKeys(STORE)) as [string, number][];
+  const ids = new Set<string>();
+  for (const [recordingId] of keys) ids.add(recordingId);
+  return [...ids];
 }
 
 /** Drop all chunks for a recording (cleanup once the session is fully uploaded). */

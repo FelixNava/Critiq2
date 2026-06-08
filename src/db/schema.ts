@@ -306,10 +306,12 @@ export const recordings = pgTable(
 
 /**
  * Recording chunks — one row per uploaded audio chunk (Layer 6 persistence
- * metadata; the bytes live in Vercel Blob, this is the index over them). The row
- * is written server-side only after the Blob upload is confirmed
- * (`onUploadCompleted`), so a row means "this chunk is durably stored". UNIQUE
- * (recording_id, chunk_index) makes that confirmation idempotent.
+ * metadata; the bytes live in Vercel Blob, this is the index over them). A row is
+ * written when the upload is confirmed — by the authenticated client confirm
+ * (POST /api/recording/chunk, the reliable writer) and, in production, also by
+ * Vercel's best-effort `onUploadCompleted` backup — so a row means "this chunk is
+ * durably stored". UNIQUE (recording_id, chunk_index) makes both writers
+ * idempotent. `segment_index` groups chunks into ~10-min capture segments.
  */
 export const recordingChunks = pgTable(
   "recording_chunks",
@@ -321,6 +323,10 @@ export const recordingChunks = pgTable(
       .notNull()
       .references(() => recordings.id, { onDelete: "cascade" }),
     chunkIndex: integer("chunk_index").notNull(),
+    // Which ~10-min segment this chunk belongs to (Phase 13 auto-segmentation).
+    // Lets a later transcription phase group + parallel-process per segment and
+    // trim the 2s cutover overlap. Default 0 (single segment / legacy rows).
+    segmentIndex: integer("segment_index").notNull().default(0),
     blobPathname: text("blob_pathname").notNull(),
     blobUrl: text("blob_url").notNull(),
     sizeBytes: integer("size_bytes").notNull(),

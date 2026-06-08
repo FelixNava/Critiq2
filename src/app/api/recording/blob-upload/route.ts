@@ -20,6 +20,7 @@ const ALLOWED_CONTENT_TYPES = ["audio/*", "application/octet-stream"];
 interface ChunkClientPayload {
   recordingId: string;
   chunkIndex: number;
+  segmentIndex?: number;
   sizeBytes?: number;
 }
 
@@ -59,13 +60,18 @@ export async function POST(req: Request): Promise<NextResponse> {
           throw new Error("Invalid client payload");
         }
         const { recordingId, chunkIndex } = payload;
+        const segmentIndex =
+          typeof payload.segmentIndex === "number" ? payload.segmentIndex : 0;
         if (typeof recordingId !== "string" || typeof chunkIndex !== "number") {
           throw new Error("Missing recording reference");
         }
         if (
           !Number.isInteger(chunkIndex) ||
           chunkIndex < 0 ||
-          chunkIndex >= MAX_CHUNK_INDEX
+          chunkIndex >= MAX_CHUNK_INDEX ||
+          !Number.isInteger(segmentIndex) ||
+          segmentIndex < 0 ||
+          segmentIndex >= MAX_CHUNK_INDEX
         ) {
           throw new Error("Invalid chunk index");
         }
@@ -89,6 +95,7 @@ export async function POST(req: Request): Promise<NextResponse> {
           tokenPayload: JSON.stringify({
             recordingId,
             chunkIndex,
+            segmentIndex,
             userId,
             sizeBytes: payload.sizeBytes ?? 0,
           }),
@@ -96,17 +103,22 @@ export async function POST(req: Request): Promise<NextResponse> {
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => {
         if (!tokenPayload) return;
-        const { recordingId, chunkIndex, sizeBytes } = JSON.parse(
+        const { recordingId, chunkIndex, segmentIndex, sizeBytes } = JSON.parse(
           tokenPayload,
         ) as {
           recordingId: string;
           chunkIndex: number;
+          segmentIndex?: number;
           userId: string;
           sizeBytes: number;
         };
+        // Carry segmentIndex through so this best-effort backup writer can't
+        // clobber the correct segment tag (written by the client confirm) back
+        // to 0 via the onConflictDoUpdate.
         await recordChunkUploaded({
           recordingId,
           chunkIndex,
+          segmentIndex: segmentIndex ?? 0,
           blobPathname: blob.pathname,
           blobUrl: blob.url,
           sizeBytes: sizeBytes ?? 0,
