@@ -1,0 +1,1 @@
+ALTER TABLE "recording_chunks" ADD COLUMN "segment_index" integer DEFAULT 0 NOT NULL;

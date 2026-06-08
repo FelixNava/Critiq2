@@ -7,6 +7,7 @@ import {
   secondaryButtonClass,
 } from "@/components/onboarding/ui";
 import type { KeepAliveLayers } from "@/lib/recording/sessionKeepAlive";
+import type { HeartbeatState } from "@/lib/recording/segmentedRecorder";
 
 type Tone = "on" | "off" | "warn" | "error";
 
@@ -21,6 +22,8 @@ function statusLabel(status: string): { label: string; tone: Tone } {
   switch (status) {
     case "recording":
       return { label: "Recording", tone: "on" };
+    case "recovering":
+      return { label: "Recovering", tone: "warn" };
     case "requesting":
       return { label: "Asking for the microphone", tone: "warn" };
     case "stopped":
@@ -67,6 +70,47 @@ function keepAliveLabel(status: string): string {
   return status;
 }
 
+function heartbeatTone(hb: HeartbeatState | null): Tone {
+  if (!hb) return "off";
+  return hb.healthy ? "on" : "warn";
+}
+
+function heartbeatLabel(hb: HeartbeatState | null): string {
+  if (!hb) return "Starting…";
+  if (hb.healthy) return "Healthy";
+  if (!hb.trackLive) return "Microphone dropped";
+  if (hb.recorderState !== "recording") return "Recorder stalled";
+  return "No audio coming in";
+}
+
+function fmtAge(ms: number | null): string {
+  if (ms == null) return "just now";
+  const s = Math.max(0, Math.round(ms / 1000));
+  return s <= 1 ? "just now" : `${s}s ago`;
+}
+
+function recoveryTone(tier: number): Tone {
+  if (tier <= 0) return "off";
+  return tier >= 4 ? "error" : "warn";
+}
+
+function recoveryLabel(tier: number): string {
+  switch (tier) {
+    case 0:
+      return "Stable";
+    case 1:
+      return "Restarting the recorder";
+    case 2:
+      return "Reconnecting the microphone";
+    case 3:
+      return "Asking for the microphone again";
+    case 4:
+      return "Needs attention";
+    default:
+      return "Recovering";
+  }
+}
+
 function fmtBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
@@ -79,6 +123,27 @@ const KEEPALIVE_ROWS: { key: keyof KeepAliveLayers; title: string }[] = [
   { key: "mediaSession", title: "Lock-screen presence" },
 ];
 
+function Row({
+  title,
+  value,
+  tone,
+}: {
+  title: string;
+  value: string;
+  tone: Tone;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 px-4 py-2.5">
+      <span className="text-sm text-slate-700">{title}</span>
+      <span
+        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${toneClass[tone]}`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
 export default function RecordingLabPanel() {
   const {
     status,
@@ -86,6 +151,11 @@ export default function RecordingLabPanel() {
     chunks,
     pending,
     keepAlive,
+    segment,
+    heartbeat,
+    recoveryTier,
+    recoveryEvents,
+    recoveredNote,
     error,
     busy,
     start,
@@ -93,9 +163,10 @@ export default function RecordingLabPanel() {
     runSelfTest,
   } = useRecorder();
 
-  const isRecording = status === "recording";
+  const isRecording = status === "recording" || status === "recovering";
   const s = statusLabel(status);
   const uploaded = chunks.filter((c) => c.state === "uploaded").length;
+  const showHealth = segment.count > 0 || isRecording;
 
   return (
     <div className={cardClass}>
@@ -111,6 +182,12 @@ export default function RecordingLabPanel() {
         Confirm this device can capture audio and save it reliably. Nothing here
         is part of a live call; it is only a check.
       </p>
+
+      {recoveredNote && (
+        <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 ring-1 ring-emerald-200">
+          {recoveredNote}
+        </p>
+      )}
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
         {isRecording ? (
@@ -144,13 +221,54 @@ export default function RecordingLabPanel() {
       <p className="mt-2 text-xs text-slate-400">
         Start recording asks for your microphone. The self-test saves a couple of
         placeholder clips instead, so you can check that uploading works without a
-        mic.
+        mic. Long sessions are saved in ~10-minute parts so nothing is lost.
       </p>
 
       {error && (
         <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
           {error}
         </p>
+      )}
+
+      {showHealth && (
+        <div className="mt-6">
+          <p className="text-sm font-semibold text-slate-900">Recording health</p>
+          <div className="mt-2 space-y-2">
+            <Row
+              title="Current part"
+              value={`Part ${segment.index + 1}${segment.count > 1 ? ` of ${segment.count}` : ""}`}
+              tone="off"
+            />
+            <Row
+              title="Capture heartbeat"
+              value={
+                heartbeat && heartbeat.healthy
+                  ? `Healthy · last clip ${fmtAge(heartbeat.lastChunkAgeMs)}`
+                  : heartbeatLabel(heartbeat)
+              }
+              tone={heartbeatTone(heartbeat)}
+            />
+            {recoveryTier > 0 && (
+              <Row
+                title="Recovery"
+                value={recoveryLabel(recoveryTier)}
+                tone={recoveryTone(recoveryTier)}
+              />
+            )}
+          </div>
+          {recoveryEvents.length > 0 && (
+            <ul className="mt-2 space-y-1 text-xs text-slate-500">
+              {recoveryEvents.slice(-3).map((ev, i) => (
+                <li key={`${ev.at}-${i}`} className="flex items-center gap-2">
+                  <span
+                    className={`inline-block h-1.5 w-1.5 rounded-full ${ev.ok ? "bg-emerald-400" : "bg-amber-400"}`}
+                  />
+                  {ev.action}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       <div className="mt-6">
@@ -197,19 +315,7 @@ export default function RecordingLabPanel() {
           {KEEPALIVE_ROWS.map((row) => {
             const value = keepAlive[row.key];
             const tone = keepAliveTone(value);
-            return (
-              <div
-                key={row.key}
-                className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 px-4 py-2.5"
-              >
-                <span className="text-sm text-slate-700">{row.title}</span>
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${toneClass[tone]}`}
-                >
-                  {keepAliveLabel(value)}
-                </span>
-              </div>
-            );
+            return <Row key={row.key} title={row.title} value={keepAliveLabel(value)} tone={tone} />;
           })}
         </div>
       </div>

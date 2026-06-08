@@ -26,6 +26,7 @@ export async function POST(req: Request) {
   let body: {
     recordingId?: unknown;
     chunkIndex?: unknown;
+    segmentIndex?: unknown;
     blobPathname?: unknown;
     blobUrl?: unknown;
     sizeBytes?: unknown;
@@ -41,6 +42,8 @@ export async function POST(req: Request) {
     typeof body.recordingId === "string" ? body.recordingId : "";
   const chunkIndex =
     typeof body.chunkIndex === "number" ? body.chunkIndex : Number.NaN;
+  const segmentIndex =
+    typeof body.segmentIndex === "number" ? body.segmentIndex : 0;
   const blobPathname =
     typeof body.blobPathname === "string" ? body.blobPathname : "";
   const blobUrl = typeof body.blobUrl === "string" ? body.blobUrl : "";
@@ -52,6 +55,9 @@ export async function POST(req: Request) {
     !Number.isInteger(chunkIndex) ||
     chunkIndex < 0 ||
     chunkIndex >= MAX_CHUNK_INDEX ||
+    !Number.isInteger(segmentIndex) ||
+    segmentIndex < 0 ||
+    segmentIndex >= MAX_CHUNK_INDEX ||
     sizeBytes < 0 ||
     sizeBytes > MAX_CHUNK_BYTES ||
     !blobPathname ||
@@ -86,6 +92,7 @@ export async function POST(req: Request) {
     await recordChunkUploaded({
       recordingId,
       chunkIndex,
+      segmentIndex,
       blobPathname,
       blobUrl,
       sizeBytes,
