@@ -262,6 +262,84 @@ export const contacts = pgTable(
   ],
 );
 
+/**
+ * Recordings — the episodic raw-capture layer (locked memory architecture: raw
+ * interactions stored forever in Postgres + Vercel Blob). One row per capture
+ * session. `accountId` is nullable for now: this is a standalone dev/test surface
+ * with no real call flow yet, so a recording need not belong to an account (the
+ * linkage arrives with the call-flow phases). SET NULL so deleting an account
+ * never erases the capture audit trail. Soft-deleted via `deletedAt`.
+ */
+export const recordings = pgTable(
+  "recordings",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    accountId: text("account_id").references(() => accountsTbl.id, {
+      onDelete: "set null",
+    }),
+    status: text("status").notNull().default("recording"), // recording | completed | failed | aborted
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    durationMs: integer("duration_ms"),
+    chunkCount: integer("chunk_count").notNull().default(0),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("recordings_user_id_idx").on(t.userId),
+    index("recordings_account_id_idx").on(t.accountId),
+    index("recordings_deleted_at_idx").on(t.deletedAt),
+  ],
+);
+
+/**
+ * Recording chunks — one row per uploaded audio chunk (Layer 6 persistence
+ * metadata; the bytes live in Vercel Blob, this is the index over them). The row
+ * is written server-side only after the Blob upload is confirmed
+ * (`onUploadCompleted`), so a row means "this chunk is durably stored". UNIQUE
+ * (recording_id, chunk_index) makes that confirmation idempotent.
+ */
+export const recordingChunks = pgTable(
+  "recording_chunks",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    recordingId: text("recording_id")
+      .notNull()
+      .references(() => recordings.id, { onDelete: "cascade" }),
+    chunkIndex: integer("chunk_index").notNull(),
+    blobPathname: text("blob_pathname").notNull(),
+    blobUrl: text("blob_url").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    durationMs: integer("duration_ms"),
+    status: text("status").notNull().default("uploaded"), // pending | uploaded | failed
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("recording_chunks_recording_chunk_key").on(
+      t.recordingId,
+      t.chunkIndex,
+    ),
+    index("recording_chunks_recording_id_idx").on(t.recordingId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type RepIntakeResponse = typeof repIntakeResponses.$inferSelect;
@@ -274,3 +352,7 @@ export type AccountRepJoin = typeof accountRepJoins.$inferSelect;
 export type NewAccountRepJoin = typeof accountRepJoins.$inferInsert;
 export type Contact = typeof contacts.$inferSelect;
 export type NewContact = typeof contacts.$inferInsert;
+export type Recording = typeof recordings.$inferSelect;
+export type NewRecording = typeof recordings.$inferInsert;
+export type RecordingChunk = typeof recordingChunks.$inferSelect;
+export type NewRecordingChunk = typeof recordingChunks.$inferInsert;
