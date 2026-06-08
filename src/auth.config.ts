@@ -6,7 +6,12 @@ import type { NextAuthConfig } from "next-auth";
  * Drizzle adapter are added in `auth.ts` (Node runtime).
  */
 const PUBLIC_PATHS = ["/", "/login", "/signup", "/verify", "/terms", "/privacy"];
-const PROTECTED_PREFIXES = ["/dashboard", "/onboarding", "/recording-check"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/onboarding",
+  "/recording-check",
+  "/recording-lab",
+];
 
 export const authConfig = {
   trustHost: true,
