@@ -14,12 +14,12 @@ BUILD_TOTAL_TOKEN_BUDGET=4000000
 BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
-PHASE_CURRENT=13/auto-segmentation-heartbeat-recovery
-PHASE_CURRENT_STATUS=built-awaiting-device-gate
-PHASE_CURRENT_PR=16
+PHASE_CURRENT=
+PHASE_CURRENT_STATUS=
+PHASE_CURRENT_PR=
 PHASE_NEXT=14/interruption-detection-notification
-PHASE_LAST_COMPLETED=12/recording-layers-4-6
-PHASE_LAST_COMPLETED_AT=2026-06-07T11:40:00-04:00
+PHASE_LAST_COMPLETED=13/auto-segmentation-heartbeat-recovery
+PHASE_LAST_COMPLETED_AT=2026-06-08T04:15:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -51,14 +51,15 @@ ENV_READY=true
 UI_VERIFY_PENDING=
 
 # --- SESSION HEARTBEAT ---
-# Phase 13 BUILT interactively (segmentation + heartbeat + Tier 1-4 recovery +
-# resume-after-tab-kill). PR #16 (phase-13 -> recording-staging) OPEN. Verified:
-# build+types clean, verify-phase13.ts 31/31 + verify-phase12.ts 17/17, preview
-# deploy READY, high-effort code review + 7 fixes. NOT merged — recording phase
-# awaits Felix's iPhone DEVICE GATE (capture / mid-session interruption / offline
-# recovery / long-session rotation). Preview: critiq2-git-phase-13-auto-se-017a76-fnavarro9289-4367s-projects.vercel.app
-SESSION_LAST_HEARTBEAT=2026-06-08T03:55:00-04:00
-SESSION_TOKEN_BUDGET_USED=700000
+# Phase 13 DONE + DEVICE-VERIFIED (segmentation + heartbeat + Tier 1-4 recovery +
+# resume-after-tab-kill). Device gate PASSED on desktop + iPhone (session 8eb5e643:
+# 112/112 chunks uploaded, contiguous 0-111, segment_index {0:111,1:1} = a real
+# ~10-min rotation with zero audio loss). Merged to recording-staging (PR #16, squash
+# 905d35f) THEN promoted to review-for-main (PR #17, merge 0fa2d78) by Felix's command.
+# review-for-main now holds Phases 2-13; build clean on the merged result. DEC-027.
+# NEXT (Block 1): Phase 14 (interruption detection + Web Push) off recording-staging.
+SESSION_LAST_HEARTBEAT=2026-06-08T04:15:00-04:00
+SESSION_TOKEN_BUDGET_USED=900000
 SESSION_ID=interactive-promote12-masterpause-phase13-2026-06-08
 
 # --- CRON SCHEDULE ---

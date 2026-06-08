@@ -27,10 +27,10 @@ Each phase has a status indicator:
 
 ## Status snapshot (auto-updated by Full Auto)
 
-- Last updated: 2026-06-08 ~03:25 ET
+- Last updated: 2026-06-08 ~04:15 ET
 - Mode: Phases 2–5 **supervised (direct)**; Phase 6 **via /critiq-full-auto orchestrator (Gate-1 ✅)**; Phase 7 **autonomously via the scheduled-task cron (Gate-2 ✅)**; Phase 8 **live/supervised in-session**; Phases 9, 10 & 11 **autonomously via the hourly cron (`critiq-fullauto-9-10-11`)**; Phase 11a **interactive/supervised via /critiq-full-auto (Felix ran the device gate)**.
 - Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅, Phase 7 (intake S2) ✅, Phase 8 (Life Context) ✅, Phase 9 (account domain) ✅, Phase 10 (account intelligence card) ✅, Phase 11 (recording layers 1-3) ✅, **Phase 11a (lock-screen audio fix) ✅** — recording stack **promoted `recording-staging` → `review-for-main`** (PR #13, merge d3060e5), **device-verified** (neutral "Critiq" lock-screen widget confirmed on iPhone 2026-06-06).
-- Current phase: Phase 13 (BUILT — PR #16 open, awaiting Felix's iPhone device gate; see below). **Phase 12 PROMOTED `recording-staging` → `review-for-main`** (PR #15, merge `1503a6f`, 2026-06-08, by Felix's explicit command) — `review-for-main` now holds Phases 2–12. 🚦 **Master merge (PR #1 → `master`) PAUSED**: Felix also commanded it, but verification found production is NOT provisioned (master is still the bare scaffold; promoting = the first real prod deploy → AUTH_SECRET/Resend/Blob keys are Preview-only, prod DB likely unmigrated), so per the hard rule the merge was left for Felix — unblock checklist in `.critiq-full-auto-state` BLOCKERS + the PR #1 comment (DEC-026).
+- Current phase: none. **Phase 13 ✅ DONE + device-verified** — PR #16 (squash 905d35f) → `recording-staging`, then PR #17 (merge 0fa2d78) → `review-for-main`; gate PASSED desktop + iPhone (session 8eb5e643 = a real ~10-min rotation, 112/112 chunks, zero loss). **`review-for-main` now holds Phases 2–13.** **Phase 12 PROMOTED `recording-staging` → `review-for-main`** (PR #15, merge `1503a6f`, 2026-06-08, by Felix's explicit command) — `review-for-main` now holds Phases 2–12. 🚦 **Master merge (PR #1 → `master`) PAUSED**: Felix also commanded it, but verification found production is NOT provisioned (master is still the bare scaffold; promoting = the first real prod deploy → AUTH_SECRET/Resend/Blob keys are Preview-only, prod DB likely unmigrated), so per the hard rule the merge was left for Felix — unblock checklist in `.critiq-full-auto-state` BLOCKERS + the PR #1 comment (DEC-026).
 - Next: Phase 13 — Auto-Segmentation + Heartbeat + Tiered Recovery (10-min rotation + 2s overlap, heartbeat verify every 5s, Tier 1-4 recovery; also folds in the resume-after-tab-kill recovery deferred out of Phase 12). Targets `recording-staging`; interactive build, ends at an iPhone device gate (Felix) — recording phases are NEVER unattended.
 
 ---
@@ -378,11 +378,11 @@ Wake Lock + Silent Audio + Media Session (branding-only metadata, NO "recording"
 
 **Depends on:** Phase 11 + 11a (keep-alive) + `BLOB_READ_WRITE_TOKEN` (provisioned ✅).
 
-## Phase 13 — Auto-Segmentation + Heartbeat + Tiered Recovery 🔬 Built — PR #16 open, awaiting iPhone device gate (2026-06-08)
+## Phase 13 — Auto-Segmentation + Heartbeat + Tiered Recovery ✅ Done — device-verified + merged to `recording-staging` (PR #16) + promoted to `review-for-main` (PR #17, merge 0fa2d78), 2026-06-08
 
 10-min rotation, 2s overlap, 5s chunks, heartbeat verification, tier 1-4 recovery.
 
-> **BUILT 2026-06-08 (interactive `/critiq-full-auto`).** Branch `phase-13/auto-segmentation-heartbeat-recovery` → PR #16 `--base recording-staging` (NOT merged — recording phases end at Felix's iPhone device gate, like 11/12). Preview deploy READY.
+> **DONE + DEVICE-VERIFIED 2026-06-08 (interactive `/critiq-full-auto`).** Built on `phase-13/...` → PR #16 (squash 905d35f) into `recording-staging`, then promoted to `review-for-main` via PR #17 (merge 0fa2d78). `review-for-main` now holds Phases 2–13. `master` untouched (paused on prod provisioning).
 >
 > **What shipped:**
 > - `src/lib/recording/segmentedRecorder.ts` — `SegmentedRecorder`: ONE shared mic stream + rotating MediaRecorders; a new segment starts `OVERLAP_MS` (2s) before the previous stops → zero audio gap; 5s heartbeat; Tier 1-4 recovery (restart recorder → re-acquire stream → re-prompt mic → notify+save+stop); 75-min hard cap. Timers + media engine injectable.
@@ -392,7 +392,7 @@ Wake Lock + Silent Audio + Media Session (branding-only metadata, NO "recording"
 >
 > **Verified (no device):** `pnpm build` + `tsc` clean · `pnpm tsx scripts/verify-phase13.ts` **31/31** (fake clock + fake media: rotation/overlap/tagging, hard cap, heartbeat fault detection, full Tier 1→4 escalation + recovery, orphan recovery) · verify-phase12 17/17 · preview READY · high-effort code review (4 finder angles) → 7 correctness fixes (recovery races, prod-only segment_index clobber, orphan loop) + 2 trivial. DEC-027.
 >
-> **⚠️ Device gate (Felix):** capture saves clips (heartbeat Healthy); a mid-session audio-app interruption is detected + recovered/saved-stopped; airplane-mode/background then return recovers offline clips; a long session rolls into new ~10-min parts. THEN merge PR #16 → recording-staging.
+> **✅ Device gate PASSED (Felix, desktop + iPhone) 2026-06-08.** Session `8eb5e643` DB-verified: 112/112 chunks `uploaded`, contiguous 0–111, **`segment_index` {0:111, 1:1}** = a real ~10-min recording that crossed the rotation boundary into Part 2 with zero audio loss; `recordings.status=completed`, `chunk_count` (112) matches the rows. Segmentation proven end-to-end (not just in the UI).
 >
 > **Deferred (logged):** panel↔DeviceCheckPanel badge dedup (next panel phase); a late chunk from a stopped recorder can mask a stall one beat; stop-during-start no-op; per-chunk IndexedDB scan micro-opt.
 
