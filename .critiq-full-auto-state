@@ -92,13 +92,15 @@ CRON_SCHEDULE_LABEL=critiq-fullauto-9-10-11-COMPLETE-self-disabling
 # (NextAuth REQUIRES it -> auth dead), RESEND_API_KEY, AUTH_RESEND_KEY, EMAIL_FROM,
 # BLOB_READ_WRITE_TOKEN. DATABASE_URL/_UNPOOLED have SEPARATE Production entries (distinct
 # from Preview) -> likely a different Neon branch that is UNMIGRATED (0001-0004 applied to the
-# dev Neon only). UNBLOCK CHECKLIST (Felix): (1) add prod AUTH_SECRET (new recommended);
-# (2) add prod Resend keys + EMAIL_FROM (reuse preview ok, same domain); (3) add Production
-# scope to BLOB token (+ decide separate prod store); (4) confirm the prod DATABASE_URL Neon
-# branch + apply migrations 0001-0004 to it (additive = zero data-loss; a deliberate prod-DB
-# action, NOT done autonomously). Then say "merge master" -> land PR #1 -> verify prod runtime
-# (200 not 500). Full checklist also in the PR #1 comment.
-BLOCKER_REASON=master-merge-paused: production env not provisioned (auth/email/blob keys Preview-only; prod DB likely unmigrated). See checklist above + PR #1 comment + DEC-026.
+# dev Neon only). UNBLOCK CHECKLIST: (1) ✅ DONE 2026-06-08 — Claude added a FRESH prod AUTH_SECRET
+# via `vercel env add`. (2) ✅ DONE — added prod RESEND_API_KEY + AUTH_RESEND_KEY + EMAIL_FROM (reused
+# the preview values) + ANTHROPIC_API_KEY + CRON_SECRET. So prod now has all runtime vars EXCEPT the
+# Blob token. REMAINING (Felix): (3) add a Production scope to BLOB_READ_WRITE_TOKEN — it's Sensitive →
+# dashboard-only, Claude can't read/mint it (+ decide separate prod store). (4) apply migrations
+# 0001-0005 to the prod Neon DB (the prod DATABASE_URL entries exist; additive = zero data-loss; a
+# deliberate prod-DB action — Claude will run scripts/migrate.ts if given the prod DATABASE_URL_UNPOOLED,
+# else Felix runs it). Then say "merge master" -> land PR #1 -> verify prod (200 not 500). Also in the PR #1 comment.
+BLOCKER_REASON=master-merge-paused: prod PARTIALLY provisioned 2026-06-08 (Claude added AUTH_SECRET/RESEND/AUTH_RESEND/EMAIL_FROM/ANTHROPIC/CRON to Production). REMAINING: BLOB_READ_WRITE_TOKEN prod scope (Felix dashboard) + prod Neon migration 0001-0005. Then "merge master". See checklist above + PR #1 comment + DEC-026.
 BLOCKER_SET_AT=2026-06-08T03:21:00-04:00
 
 # --- EMAIL CHANNEL ---
