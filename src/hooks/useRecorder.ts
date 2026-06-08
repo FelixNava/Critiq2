@@ -126,13 +126,24 @@ export function useRecorder(): UseRecorder {
     if (u) setPending(await u.remaining());
   }, []);
 
-  // Retry the queue whenever connectivity returns.
+  // Drain the retry queue on reconnect AND when the tab/app becomes visible
+  // again. iOS Safari fires the `online` event unreliably (often not at all
+  // after airplane mode / backgrounding), so recovery must not depend on it —
+  // returning to the app (visibilitychange) reliably fires on iOS and drains
+  // any offline-queued chunks.
   useEffect(() => {
-    const onOnline = () => {
+    const drain = () => {
       void uploaderRef.current?.flushPending().then(refreshPending);
     };
-    window.addEventListener("online", onOnline);
-    return () => window.removeEventListener("online", onOnline);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") drain();
+    };
+    window.addEventListener("online", drain);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("online", drain);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [refreshPending]);
 
   // Tear capture + keep-alive down on unmount.
@@ -188,8 +199,15 @@ export function useRecorder(): UseRecorder {
                 blob: c.blob,
                 mimeType: c.mimeType,
               })
-              .then((ok) => {
-                if (!ok) return uploader.flushPending().then(refreshPending);
+              .then(async () => {
+                // Drain any backlog after EVERY chunk (success or failure) — do
+                // not depend on the `online` event (iOS fires it unreliably). The
+                // moment one chunk uploads after a reconnect, the offline-queued
+                // chunks ride along and clear.
+                if ((await uploader.remaining()) > 0) {
+                  await uploader.flushPending();
+                }
+                await refreshPending();
               })
               .catch(() => {
                 // Failure is surfaced via onChunkState; don't leave a rejection.
