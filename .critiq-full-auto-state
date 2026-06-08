@@ -15,8 +15,8 @@ BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
 PHASE_CURRENT=13/auto-segmentation-heartbeat-recovery
-PHASE_CURRENT_STATUS=building
-PHASE_CURRENT_PR=
+PHASE_CURRENT_STATUS=built-awaiting-device-gate
+PHASE_CURRENT_PR=16
 PHASE_NEXT=14/interruption-detection-notification
 PHASE_LAST_COMPLETED=12/recording-layers-4-6
 PHASE_LAST_COMPLETED_AT=2026-06-07T11:40:00-04:00
@@ -51,8 +51,14 @@ ENV_READY=true
 UI_VERIFY_PENDING=
 
 # --- SESSION HEARTBEAT ---
-SESSION_LAST_HEARTBEAT=2026-06-08T03:21:00-04:00
-SESSION_TOKEN_BUDGET_USED=300000
+# Phase 13 BUILT interactively (segmentation + heartbeat + Tier 1-4 recovery +
+# resume-after-tab-kill). PR #16 (phase-13 -> recording-staging) OPEN. Verified:
+# build+types clean, verify-phase13.ts 31/31 + verify-phase12.ts 17/17, preview
+# deploy READY, high-effort code review + 7 fixes. NOT merged — recording phase
+# awaits Felix's iPhone DEVICE GATE (capture / mid-session interruption / offline
+# recovery / long-session rotation). Preview: critiq2-git-phase-13-auto-se-017a76-fnavarro9289-4367s-projects.vercel.app
+SESSION_LAST_HEARTBEAT=2026-06-08T03:55:00-04:00
+SESSION_TOKEN_BUDGET_USED=700000
 SESSION_ID=interactive-promote12-masterpause-phase13-2026-06-08
 
 # --- CRON SCHEDULE ---

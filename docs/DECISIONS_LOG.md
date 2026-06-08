@@ -332,6 +332,22 @@ Rationale: the explicit command authorizes the master merge but does not waive v
 Iterability: high (PR #1 stays open; lands in minutes once prod is provisioned).
 Trade-off flag: YES — Felix's review queue. Unblock checklist in the state-file BLOCKERS + the PR #1 comment. Subsumes the pre-launch blob TODOs (Production token scope + separate preview store).
 
+## DEC-027 — Phase 13 design (segmentation, tiered recovery, segment_index persistence, Tier-4 finalize)
+Phase: 13/auto-segmentation-heartbeat-recovery
+Date: 2026-06-08 03:55 ET
+Type: trade-off (the ledger gave parameters; the implementation shape was mine)
+Context: The plan specified the parameters (10-min rotation, 2s overlap, 5s chunks, 5s heartbeat, Tier 1-4) but not the implementation. Built interactively; logging the shape for review. PR #16 (NOT merged — device gate pending).
+Chosen:
+  - SegmentedRecorder shares ONE mic stream across rotating MediaRecorders; the next segment starts 2s before the previous stops (overlap = redundant seam audio → zero gap). chunkIndex stays globally monotonic; each chunk carries its segmentIndex.
+  - PERSIST segment_index (migration 0005, additive, dev Neon) threaded chunk → IndexedDB → confirm route → DB AND through the Blob token to onUploadCompleted, so a later transcription phase can group/parallelize per segment + trim the overlap, and the prod backup writer can't clobber it to 0. (Minimal extension to make segmentation durable/observable — DEC-014 precedent.)
+  - Heartbeat-driven recovery: diagnose picks the start tier (live track → restart recorder T1; dead track → re-acquire T2); escalate one tier per still-unhealthy beat; T3 re-prompts; T4 notifies + saves + STOPS (autoStop 'fatal' → finalize) rather than holding the keep-alive/open row forever. (Spec said "notify"; the indefinite-hold was a resource leak, so auto-stop is the honest beta choice; the chime/banner/Web-Push notify UX is Phase 14.)
+  - Injectable timers + media engine → deterministic unit tests (verify-phase13.ts 31/31) for the time/recovery logic a device can't make repeatable.
+  - Resume-after-tab-kill: drain orphans on mount; only finalize on full drain (no false 'failed'/oscillation); MAX_UPLOAD_ATTEMPTS=10 cap so a permanently-failing chunk can't loop forever.
+  - Removed the superseded single-segment AudioRecorder (kept the shared helpers).
+Review: high-effort /code-review (4 finder angles) before PR → 7 correctness fixes (recovery async races vs stop()/overlapping recoveries; PROD-ONLY onUploadCompleted segment_index clobber; orphan infinite-retry + status oscillation; Tier-1 false-stall over-escalation) + 2 trivial.
+Iterability: high (params in DEFAULT_CONFIG; tier behavior localized).
+Trade-off flag: YES — (1) Tier-4 auto-stop vs keep-trying — revisit with Phase 14's notify UX; (2) segment_index is forward-looking for Phase 15; (3) MAX_UPLOAD_ATTEMPTS drops a chunk after 10 fails (bounded loss vs infinite loop). DEVICE GATE (Felix, iPhone) is the real proof.
+
 ---
 
 ## End-of-build summary
