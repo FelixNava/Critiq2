@@ -314,9 +314,11 @@ export function useRecorder(): UseRecorder {
         onRecovery: (event) =>
           setRecoveryEvents((prev) => [...prev.slice(-9), event]),
         onAutoStop: (reason) => {
-          if (reason === "hard-cap") {
-            setRecoveredNote("Reached the 75-minute limit — saved and stopped.");
-          }
+          setRecoveredNote(
+            reason === "hard-cap"
+              ? "Reached the 75-minute limit — saved and stopped."
+              : "Lost the microphone and couldn't reconnect — saved what we had and stopped.",
+          );
           void finalize(reason === "hard-cap" ? "completed" : "failed");
         },
       });

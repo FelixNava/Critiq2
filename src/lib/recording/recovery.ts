@@ -26,23 +26,17 @@ export interface OrphanRecoveryResult {
 export interface RecoverOrphansDeps {
   listIds?: () => Promise<string[]>;
   makeUploader?: (recordingId: string) => ChunkUploader;
-  complete?: (recordingId: string, allUploaded: boolean) => Promise<void>;
+  complete?: (recordingId: string) => Promise<void>;
 }
 
-/** Best-effort POST to mark a recovered recording finished (rep-owned server-side). */
-async function defaultComplete(
-  recordingId: string,
-  allUploaded: boolean,
-): Promise<void> {
+/** Best-effort POST to mark a fully-drained recording complete (rep-owned server-side). */
+async function defaultComplete(recordingId: string): Promise<void> {
   await fetch("/api/recording/complete", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      recordingId,
-      status: allUploaded ? "completed" : "failed",
-    }),
+    body: JSON.stringify({ recordingId, status: "completed" }),
   }).catch(() => {
-    // The row simply stays open; a later load retries.
+    // Best-effort; the row stays open and a later load retries.
   });
 }
 
@@ -67,7 +61,11 @@ export async function recoverOrphanedRecordings(
   for (const id of ids) {
     const uploader = makeUploader(id);
     const { uploaded, remaining } = await uploader.flushPending();
-    await complete(id, remaining === 0);
+    // Only finalize once the queue is fully drained. A still-pending orphan is
+    // left open (status 'recording') for the next load to finish — never flip a
+    // recording to 'failed' on a transient offline blip (which would also let the
+    // status oscillate across loads).
+    if (remaining === 0) await complete(id);
     results.push({ recordingId: id, recovered: uploaded, remaining });
   }
   return results;

@@ -258,10 +258,14 @@ async function main() {
     const timers = new FakeTimers();
     const fe = makeFakeEngine();
     const events: { tier: number; ok: boolean }[] = [];
+    let autoStop: AutoStopReason | null = null;
     const rec = new SegmentedRecorder(
       {
         onChunk: () => {},
         onRecovery: (e) => events.push({ tier: e.tier, ok: e.ok }),
+        onAutoStop: (r) => {
+          autoStop = r;
+        },
       },
       {
         engine: fe.engine,
@@ -304,22 +308,26 @@ async function main() {
     ok(rec.getState().recoveryTier === 2, "recovery: dead track → Tier 2 (re-acquire stream)");
     await timers.advance(1000); // still dead → Tier 3
     ok(rec.getState().recoveryTier === 3, "recovery: still down → Tier 3 (re-prompt mic)");
-    await timers.advance(1000); // still dead → Tier 4 (notify)
+    await timers.advance(1000); // still dead → Tier 4 → notify + autoStop('fatal')
     ok(rec.getState().recoveryTier === 4, "recovery: still down → Tier 4 (notify)");
     ok(
       events.some((e) => e.tier === 4 && e.ok === false),
       "recovery: Tier 4 fires an 'exhausted' recovery event",
     );
-    await timers.advance(1000); // stays at Tier 4 — no infinite escalation
-    ok(rec.getState().recoveryTier === 4, "recovery: caps at Tier 4 (no runaway escalation)");
-
-    // Manual fix: track returns + a chunk flows → full recovery from Tier 4.
-    fe.setTrackLive(true);
-    fe.current().emit();
-    await timers.advance(1000);
     ok(
-      rec.getState().recoveryTier === 0 && rec.getStatus() === "recording",
-      "recovery: a manual fix after Tier 4 still recovers on a later beat",
+      autoStop === "fatal",
+      "recovery: Tier 4 finalizes via onAutoStop('fatal') — no leaked session/keep-alive",
+    );
+    ok(
+      rec.getStatus() === "error",
+      "recovery: Tier 4 leaves a terminal 'error' status (not a clean 'stopped')",
+    );
+    // Session is stopped after Tier 4: further beats do nothing (no runaway).
+    fe.setTrackLive(true);
+    await timers.advance(5000);
+    ok(
+      rec.getState().recoveryTier === 4,
+      "recovery: caps at Tier 4 — stopped, no runaway escalation",
     );
     await rec.stop();
   }
@@ -349,7 +357,7 @@ async function main() {
       "orphan: listRecordingIdsWithPending finds all recordings with pending chunks",
     );
 
-    const completed: { id: string; allUploaded: boolean }[] = [];
+    const completed: string[] = [];
     const good = async (_b: Blob, pathname: string) => ({
       url: `https://x.blob.vercel-storage.com/${pathname}`,
       pathname,
@@ -359,8 +367,8 @@ async function main() {
       excludeRecordingId: "active-1",
       deps: {
         makeUploader: (id) => new ChunkUploader(id, { uploadFn: good }),
-        complete: async (id, allUploaded) => {
-          completed.push({ id, allUploaded });
+        complete: async (id) => {
+          completed.push(id);
         },
       },
     });
@@ -379,13 +387,15 @@ async function main() {
       "orphan: the excluded active recording is left untouched",
     );
     ok(
-      completed.length === 2 && completed.every((c) => c.allUploaded),
-      "orphan: each fully-drained orphan is marked complete (allUploaded=true)",
+      completed.length === 2 &&
+        completed.includes("orphan-A") &&
+        completed.includes("orphan-B"),
+      "orphan: each fully-drained orphan is marked complete",
     );
 
     // A still-offline orphan stays queued + is marked not-fully-uploaded.
     await store.saveChunk({ recordingId: "orphan-C", chunkIndex: 0, segmentIndex: 0, blob: mkBlob(90), mimeType: "audio/webm" });
-    const completedC: boolean[] = [];
+    const completedC: string[] = [];
     const bad = async () => {
       throw new Error("still offline");
     };
@@ -393,8 +403,8 @@ async function main() {
       excludeRecordingId: "active-1",
       deps: {
         makeUploader: (id) => new ChunkUploader(id, { uploadFn: bad }),
-        complete: async (_id, allUploaded) => {
-          completedC.push(allUploaded);
+        complete: async (id) => {
+          completedC.push(id);
         },
       },
     });
@@ -404,8 +414,8 @@ async function main() {
       "orphan: an offline orphan stays queued (remaining=1) for the next load",
     );
     ok(
-      completedC.includes(false),
-      "orphan: an un-drained orphan is reported not-fully-uploaded",
+      !completedC.includes("orphan-C"),
+      "orphan: an un-drained orphan is NOT completed — left open for the next load",
     );
   }
 

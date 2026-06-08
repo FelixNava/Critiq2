@@ -265,6 +265,7 @@ export class SegmentedRecorder {
   private heartbeatTimer: TimerHandle | null = null;
 
   private recovering = false;
+  private recoveryInFlight = false; // a recovery action is mid-await
   private recoveryTier: RecoveryTier = 0;
   private heartbeat: HeartbeatState | null = null;
   private stopped = false;
@@ -337,7 +338,7 @@ export class SegmentedRecorder {
     this.current.start();
 
     this.hardCapTimer = this.timers.setTimeout(
-      () => this.autoStop("hard-cap"),
+      () => void this.autoStop("hard-cap"),
       this.config.hardCapMs,
     );
     this.scheduleRotation();
@@ -446,18 +447,22 @@ export class SegmentedRecorder {
         return;
       }
     } else if (!this.recovering) {
-      void this.beginRecovery(this.diagnose(trackLive, recorderState), now);
-    } else {
+      void this.beginRecovery(this.diagnose(trackLive), now);
+    } else if (!this.recoveryInFlight) {
+      // Only escalate once the prior recovery action has settled — a slow
+      // acquireStream must not let successive beats launch overlapping recoveries
+      // that race on this.stream / this.current.
       void this.escalateRecovery(now);
     }
     this.notify();
   }
 
   // ---- recovery ----
-  private diagnose(trackLive: boolean, recorderState: string): RecoveryTier {
-    if (!trackLive) return 2; // stream/track ended → re-acquire
-    if (recorderState !== "recording") return 1; // recorder died, stream ok → restart
-    return 1; // stalled while "recording" → the recorder is wedged → restart
+  private diagnose(trackLive: boolean): RecoveryTier {
+    // A dead/ended track needs a fresh stream (Tier 2). A live track with a dead
+    // OR wedged recorder just needs the recorder restarted on the same stream
+    // (Tier 1) — both recorder faults share the same first remedy.
+    return trackLive ? 1 : 2;
   }
 
   private async beginRecovery(tier: RecoveryTier, at: number): Promise<void> {
@@ -479,39 +484,76 @@ export class SegmentedRecorder {
     this.notify();
   }
 
+  /**
+   * Give a freshly-(re)started recorder a full stall window to emit its first
+   * chunk before the heartbeat judges it. Without this, the beat right after a
+   * restart still sees the OLD chunk age and falsely escalates a recovery that
+   * actually worked.
+   */
+  private resetStallClock(): void {
+    this.lastChunkAtMs = null;
+    this.segmentStartMs = this.timers.now();
+  }
+
   private async performRecovery(tier: RecoveryTier, at: number): Promise<void> {
+    this.recoveryInFlight = true;
     try {
+      if (this.stopped) return;
       if (tier === 1) {
         // Tier 1 — restart the MediaRecorder on the SAME stream.
         await this.current?.stop();
+        if (this.stopped) return;
+        this.resetStallClock();
         this.current = this.makeSegmentRecorder(this.segmentIndex);
         this.current.start();
         this.report(tier, "Restarting the recorder", true, at);
       } else if (tier === 2 || tier === 3) {
         // Tier 2 — re-acquire the stream. Tier 3 — re-prompt the mic (same
         // getUserMedia call; it re-prompts if permission was revoked).
+        let nextStream: MicStream;
+        try {
+          nextStream = await this.engine.acquireStream();
+        } catch (err) {
+          // Re-acquire denied/failed — the next beat escalates a tier.
+          this.report(tier, "Recovery attempt failed", false, at);
+          this.callbacks.onError?.(err);
+          return;
+        }
+        // The session may have been stopped while we awaited the prompt — never
+        // leave a freshly-opened mic running past stop().
+        if (this.stopped) {
+          nextStream.stop();
+          return;
+        }
         this.stream?.stop();
-        this.stream = await this.engine.acquireStream();
         await this.current?.stop();
+        if (this.stopped) {
+          nextStream.stop();
+          return;
+        }
+        this.stream = nextStream;
+        this.resetStallClock();
         this.current = this.makeSegmentRecorder(this.segmentIndex);
         this.current.start();
         this.report(
           tier,
-          tier === 2 ? "Reconnecting the microphone" : "Asking for the microphone again",
+          tier === 2
+            ? "Reconnecting the microphone"
+            : "Asking for the microphone again",
           true,
           at,
         );
       } else {
-        // Tier 4 — auto-recovery exhausted. Notify (chime/banner/Web Push is
-        // Phase 14); keep the session so a manual fix can still recover.
-        this.report(tier, "Couldn't recover automatically — needs attention", false, at);
+        // Tier 4 — auto-recovery exhausted. Notify, then save what we have and
+        // stop (release the keep-alive + close the session row) rather than leak
+        // resources on a session that can't continue. The chime/banner/Web-Push
+        // notification UX is Phase 14.
+        this.report(tier, "Couldn't recover — saved and stopped", false, at);
         this.setStatus("error");
+        await this.autoStop("fatal");
       }
-    } catch (err) {
-      // The recovery action itself failed (e.g. re-acquire was denied) — the
-      // next heartbeat escalates to the next tier.
-      this.report(tier, "Recovery attempt failed", false, at);
-      this.callbacks.onError?.(err);
+    } finally {
+      this.recoveryInFlight = false;
     }
   }
 
@@ -539,9 +581,11 @@ export class SegmentedRecorder {
     }
   }
 
-  private autoStop(reason: AutoStopReason): void {
+  private async autoStop(reason: AutoStopReason): Promise<void> {
     if (this.stopped) return;
-    void this.teardown();
+    // Await teardown so the stopping recorder's final flushed chunk is emitted
+    // (its onChunk runs during stop()) BEFORE the caller finalizes the count.
+    await this.teardown();
     this.callbacks.onAutoStop?.(reason);
   }
 
@@ -556,7 +600,11 @@ export class SegmentedRecorder {
     await Promise.allSettled([a?.stop(), b?.stop()]);
     this.stream?.stop();
     this.stream = null;
-    if (this.status !== "unsupported") this.setStatus("stopped");
+    // Preserve a terminal 'error' (Tier-4 exhaustion) — don't downgrade it to a
+    // clean 'stopped'.
+    if (this.status !== "unsupported" && this.status !== "error") {
+      this.setStatus("stopped");
+    }
   }
 
   /** Stop everything and release the mic. Idempotent. */

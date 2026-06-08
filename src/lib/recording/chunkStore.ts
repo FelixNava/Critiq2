@@ -103,6 +103,19 @@ export async function confirmChunk(
   await db.delete(STORE, [recordingId, chunkIndex]);
 }
 
+/**
+ * Give up on a chunk that has failed to upload too many times (e.g. the recording
+ * is no longer owned / auth was lost) — drop it from the queue so it can't be
+ * re-uploaded on every load forever. Same delete as confirmChunk, distinct intent.
+ */
+export async function dropChunk(
+  recordingId: string,
+  chunkIndex: number,
+): Promise<void> {
+  const db = await getDb();
+  await db.delete(STORE, [recordingId, chunkIndex]);
+}
+
 /** The retry queue = every chunk still stored (un-confirmed) for a recording. */
 export async function listPendingChunks(
   recordingId: string,

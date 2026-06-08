@@ -18,12 +18,18 @@
 import {
   saveChunk,
   confirmChunk,
+  dropChunk,
   recordAttempt,
   listPendingChunks,
   pendingCount,
   type StoredChunk,
 } from "./chunkStore";
 import { extensionForMimeType } from "./recorder";
+
+// After this many failed attempts a chunk is dropped from the retry queue rather
+// than re-uploaded on every load forever (the recording is no longer owned, auth
+// was lost, etc.). Generous so a real outage of many minutes still recovers.
+export const MAX_UPLOAD_ATTEMPTS = 10;
 
 export interface UploadedBlobInfo {
   url: string;
@@ -158,6 +164,14 @@ export class ChunkUploader {
     // Already uploading this exact chunk (handleChunk vs a concurrent flush)?
     // Skip — the in-flight attempt owns it; don't duplicate the upload/attempt.
     if (this.inFlight.has(chunk.chunkIndex)) return false;
+    // Give up on a chunk that has failed too many times so it can't loop forever
+    // (only the flush path carries `attempts`; a fresh handleChunk is attempt 0).
+    const priorAttempts = (chunk as { attempts?: number }).attempts ?? 0;
+    if (priorAttempts >= MAX_UPLOAD_ATTEMPTS) {
+      await dropChunk(chunk.recordingId, chunk.chunkIndex);
+      this.callbacks.onChunkState?.(chunk.chunkIndex, "failed");
+      return false;
+    }
     this.inFlight.add(chunk.chunkIndex);
     this.callbacks.onChunkState?.(chunk.chunkIndex, "uploading");
     try {
