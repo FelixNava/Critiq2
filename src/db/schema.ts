@@ -321,6 +321,10 @@ export const recordingChunks = pgTable(
       .notNull()
       .references(() => recordings.id, { onDelete: "cascade" }),
     chunkIndex: integer("chunk_index").notNull(),
+    // Which ~10-min segment this chunk belongs to (Phase 13 auto-segmentation).
+    // Lets a later transcription phase group + parallel-process per segment and
+    // trim the 2s cutover overlap. Default 0 (single segment / legacy rows).
+    segmentIndex: integer("segment_index").notNull().default(0),
     blobPathname: text("blob_pathname").notNull(),
     blobUrl: text("blob_url").notNull(),
     sizeBytes: integer("size_bytes").notNull(),

@@ -34,7 +34,7 @@ export interface UploadedBlobInfo {
 export type ChunkUploadFn = (
   blob: Blob,
   pathname: string,
-  ctx: { recordingId: string; chunkIndex: number },
+  ctx: { recordingId: string; chunkIndex: number; segmentIndex: number },
 ) => Promise<UploadedBlobInfo>;
 
 export type ChunkUploadState = "pending" | "uploading" | "uploaded" | "failed";
@@ -78,6 +78,7 @@ export const blobUpload: ChunkUploadFn = async (blob, pathname, ctx) => {
     clientPayload: JSON.stringify({
       recordingId: ctx.recordingId,
       chunkIndex: ctx.chunkIndex,
+      segmentIndex: ctx.segmentIndex,
       sizeBytes: blob.size,
     }),
   });
@@ -90,6 +91,7 @@ export const blobUpload: ChunkUploadFn = async (blob, pathname, ctx) => {
     body: JSON.stringify({
       recordingId: ctx.recordingId,
       chunkIndex: ctx.chunkIndex,
+      segmentIndex: ctx.segmentIndex,
       blobPathname: result.pathname,
       blobUrl: result.url,
       sizeBytes: blob.size,
@@ -125,12 +127,15 @@ export class ChunkUploader {
    */
   async handleChunk(input: {
     chunkIndex: number;
+    segmentIndex?: number;
     blob: Blob;
     mimeType: string;
   }): Promise<boolean> {
+    const segmentIndex = input.segmentIndex ?? 0;
     await saveChunk({
       recordingId: this.recordingId,
       chunkIndex: input.chunkIndex,
+      segmentIndex,
       blob: input.blob,
       mimeType: input.mimeType,
     });
@@ -138,6 +143,7 @@ export class ChunkUploader {
     return this.uploadStored({
       recordingId: this.recordingId,
       chunkIndex: input.chunkIndex,
+      segmentIndex,
       blob: input.blob,
       mimeType: input.mimeType,
     });
@@ -147,7 +153,7 @@ export class ChunkUploader {
     chunk: Pick<
       StoredChunk,
       "recordingId" | "chunkIndex" | "blob" | "mimeType"
-    >,
+    > & { segmentIndex?: number },
   ): Promise<boolean> {
     // Already uploading this exact chunk (handleChunk vs a concurrent flush)?
     // Skip — the in-flight attempt owns it; don't duplicate the upload/attempt.
@@ -164,6 +170,7 @@ export class ChunkUploader {
       await this.uploadFn(chunk.blob, pathname, {
         recordingId: chunk.recordingId,
         chunkIndex: chunk.chunkIndex,
+        segmentIndex: chunk.segmentIndex ?? 0,
       });
       await confirmChunk(chunk.recordingId, chunk.chunkIndex);
       this.callbacks.onChunkState?.(chunk.chunkIndex, "uploaded");
