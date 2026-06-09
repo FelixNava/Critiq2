@@ -348,6 +348,17 @@ Review: high-effort /code-review (4 finder angles) before PR → 7 correctness f
 Iterability: high (params in DEFAULT_CONFIG; tier behavior localized).
 Trade-off flag: YES — (1) Tier-4 auto-stop vs keep-trying — revisit with Phase 14's notify UX; (2) segment_index is forward-looking for Phase 15; (3) MAX_UPLOAD_ATTEMPTS drops a chunk after 10 fails (bounded loss vs infinite loop). DEVICE GATE (Felix, iPhone) is the real proof.
 
+## DEC-029 — Master merge done (Phases 2-13 → master) + prod provisioned + verified; prod shares one DB (separate prod DB logged for before-real-reps)
+Phase: post-13 / master-promotion
+Date: 2026-06-09 00:35 ET
+Type: obvious (Felix's explicit in-session command, executed after full verification)
+Context: DEC-026 paused the master merge for missing prod env. This session (2026-06-09) Felix provisioned prod + commanded the merge (path A). Prod env completed: Claude added a FRESH prod AUTH_SECRET + RESEND_API_KEY/AUTH_RESEND_KEY/EMAIL_FROM/ANTHROPIC_API_KEY/CRON_SECRET (reused) via `vercel env add`; Felix added BLOB_READ_WRITE_TOKEN to Production (dashboard). Migration check vs the prod DB (Claude, `vercel env pull --environment=production` + scripts/migrate.ts): all 0000-0005 already applied -> prod schema ready.
+Chosen: merged PR #1 (review-for-main -> master) via `gh pr merge 1 --merge` on Felix's explicit "merge master". Phases 2-13 SHIPPED to master = first real production deploy. VERIFIED prod healthy: critiq2.vercel.app returns 200 on / /login /signup and 307 on /dashboard (auth middleware runs = AUTH_SECRET works), ZERO errors/warnings in the production runtime logs. (The live signup-WRITE smoke was blocked by the sandbox's credential-POST heuristic -> verified instead via page-loads + auth-redirect + clean runtime logs + the known-good shared DB; honest caveat.)
+FINDING (flagged, not a blocker): prod DATABASE_URL points to the SAME Neon DB as dev/preview (endpoint ep-restless-field-apvp3l79; prod = direct, dev = -pooler of the same DB) -> ALL environments share ONE database (+ one Blob store). Fine pre-launch. BEFORE REAL BETA REPS: separate prod Neon DB + separate prod Blob store so real rep data never mixes with test/preview (path B). Logged to memory project_critiq_prelaunch_checks at Felix's explicit request; ApexTrust lesson (feedback_apex_branch_preview_db).
+Iterability: high (revert the merge commit if needed; separate prod DB is a deliberate later step).
+Trade-off flag: YES — path B (separate prod DB/store) before real reps. Still open: dedicated Anthropic/Resend keys (DEC-002); SENTRY_DSN; consent (28) + privacy/ToS (30) before any real recording.
+Note: Phase 14's DEC-028 lives on the phase-14 branch / PR #18 (not yet on review-for-main); it lands when PR #18 promotes.
+
 ---
 
 ## DEC-028 — Phase 14 design (interruption detection model + 4 channels + the immediate track.onended seam + privacy contract)
