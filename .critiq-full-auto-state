@@ -102,15 +102,19 @@ CRON_SCHEDULE_LABEL=critiq-fullauto-9-10-11-COMPLETE-self-disabling
 # (NextAuth REQUIRES it -> auth dead), RESEND_API_KEY, AUTH_RESEND_KEY, EMAIL_FROM,
 # BLOB_READ_WRITE_TOKEN. DATABASE_URL/_UNPOOLED have SEPARATE Production entries (distinct
 # from Preview) -> likely a different Neon branch that is UNMIGRATED (0001-0004 applied to the
-# dev Neon only). UNBLOCK CHECKLIST: (1) ✅ DONE 2026-06-08 — Claude added a FRESH prod AUTH_SECRET
-# via `vercel env add`. (2) ✅ DONE — added prod RESEND_API_KEY + AUTH_RESEND_KEY + EMAIL_FROM (reused
-# the preview values) + ANTHROPIC_API_KEY + CRON_SECRET. So prod now has all runtime vars EXCEPT the
-# Blob token. REMAINING (Felix): (3) add a Production scope to BLOB_READ_WRITE_TOKEN — it's Sensitive →
-# dashboard-only, Claude can't read/mint it (+ decide separate prod store). (4) apply migrations
-# 0001-0005 to the prod Neon DB (the prod DATABASE_URL entries exist; additive = zero data-loss; a
-# deliberate prod-DB action — Claude will run scripts/migrate.ts if given the prod DATABASE_URL_UNPOOLED,
-# else Felix runs it). Then say "merge master" -> land PR #1 -> verify prod (200 not 500). Also in the PR #1 comment.
-BLOCKER_REASON=master-merge-paused: prod PARTIALLY provisioned 2026-06-08 (Claude added AUTH_SECRET/RESEND/AUTH_RESEND/EMAIL_FROM/ANTHROPIC/CRON to Production). REMAINING: BLOB_READ_WRITE_TOKEN prod scope (Felix dashboard) + prod Neon migration 0001-0005. Then "merge master". See checklist above + PR #1 comment + DEC-026.
+# dev Neon only). [RESOLVED 2026-06-08] PROD ENV FULLY PROVISIONED + PROD DB SCHEMA PRESENT:
+# (1) ✅ Claude added a FRESH prod AUTH_SECRET. (2) ✅ Claude added prod RESEND_API_KEY + AUTH_RESEND_KEY
+# + EMAIL_FROM + ANTHROPIC_API_KEY + CRON_SECRET (reused preview values). (3) ✅ Felix added
+# BLOB_READ_WRITE_TOKEN to Production. (4) ✅ Migration vs the prod DB ran (Claude, via
+# `vercel env pull --environment=production` + scripts/migrate.ts): ALL 0000-0005 already applied ->
+# prod schema READY. ⚠️ FINDING: prod DATABASE_URL points to the SAME Neon DB as dev/preview (endpoint
+# ep-restless-field-apvp3l79; prod = the direct endpoint, dev = the -pooler endpoint of the same DB) ->
+# ALL environments share ONE database (incl. the existing p8verify/rs-test test data + Phase 12-13 test
+# recordings). Fine PRE-LAUNCH (no real data), but BEFORE real beta users provision a SEPARATE prod Neon
+# (else preview testing reads/writes prod data — the ApexTrust lesson, see memory feedback_apex_branch_preview_db).
+# NOT a merge blocker. The master merge (PR #1) is now FUNCTIONALLY UNBLOCKED and awaits ONLY Felix's
+# explicit in-session "merge master" command (hard rule — never merge to master without it).
+BLOCKER_REASON=master-merge functionally UNBLOCKED 2026-06-08 (prod env fully provisioned + prod DB schema present). Awaits Felix's explicit "merge master". FLAG (not a blocker): prod shares the dev/preview Neon DB -> provision a separate prod DB before real beta users.
 BLOCKER_SET_AT=2026-06-08T03:21:00-04:00
 
 # --- EMAIL CHANNEL ---
