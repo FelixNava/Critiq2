@@ -15,8 +15,6 @@
  */
 import webpush from "web-push";
 
-let configured: boolean | null = null;
-
 /** BRANDING-ONLY interruption payload — no call content, never "recording". */
 export const INTERRUPTION_PUSH_PAYLOAD = {
   title: "Critiq",
@@ -32,16 +30,22 @@ function vapidEnv(): { publicKey: string; privateKey: string; subject: string } 
   return { publicKey, privateKey, subject };
 }
 
-/** True iff VAPID keys are present so the server can actually send pushes. */
+/**
+ * True iff VAPID keys are present so the server can actually send pushes. Reads
+ * env fresh each call (not memoized) so a warm serverless instance picks up a
+ * key rotation the same way the /api/push/vapid route does — a stale cached
+ * keypair would silently sign pushes the push service rejects after a rotation.
+ * setVapidDetails just stores the keys in the lib, so re-calling is cheap.
+ */
 export function isPushConfigured(): boolean {
-  if (configured !== null) return configured;
   const env = vapidEnv();
-  if (!env) {
-    configured = false;
+  if (!env) return false;
+  try {
+    webpush.setVapidDetails(env.subject, env.publicKey, env.privateKey);
+  } catch {
+    // Malformed keys — treat as unconfigured rather than throwing into a send.
     return false;
   }
-  webpush.setVapidDetails(env.subject, env.publicKey, env.privateKey);
-  configured = true;
   return true;
 }
 

@@ -1,12 +1,21 @@
 /**
  * Audible interruption chime (Phase 14, channel a). A short two-tone alert via
- * the Web Audio API — no asset to load, and the AudioContext is created/resumed
- * lazily so it inherits the user-gesture unlock from the Start button (iOS
- * requires audio to start from a gesture; by record time we already have one).
+ * the Web Audio API — no asset to load.
  *
- * A chime carries no text, so the lock-screen/branding-only privacy rule is moot
- * here. raise() plays once per interruption edge; clear() is a no-op (it's a
- * one-shot alert, not a sustained sound).
+ * iOS unlock + leak avoidance: the AudioContext is a MODULE SINGLETON created the
+ * first time a channel is built. createChimeChannel() runs inside the recorder's
+ * Start handler (a real user gesture), so creating + resuming the context there
+ * unlocks it on iOS/autoplay-restricted browsers (a context first touched at
+ * interruption time — outside any gesture — would stay suspended and never
+ * sound). One context for the page lifetime also means repeated record sessions
+ * don't leak a new context each time.
+ *
+ * Honest limit (device gate): on a LOCKED iPhone screen iOS suspends Web Audio,
+ * so the chime won't sound there — that lock-screen case is what Web Push covers.
+ * The chime is for the screen-on, tabbed/app-switched-away case.
+ *
+ * A chime carries no text, so the branding-only privacy rule is moot here.
+ * raise() plays once per interruption edge; clear() is a no-op (one-shot alert).
  */
 import type { NotificationChannel } from "./interruption";
 
@@ -25,16 +34,27 @@ export function isChimeSupported(): boolean {
   return audioCtor() !== null;
 }
 
-export function createChimeChannel(): NotificationChannel {
-  let ctx: AudioContext | null = null;
+// One context for the whole page — created/resumed within the Start gesture.
+let sharedCtx: AudioContext | null = null;
 
-  const ensureCtx = (): AudioContext | null => {
-    const Ctor = audioCtor();
-    if (!Ctor) return null;
-    if (!ctx) ctx = new Ctor();
-    if (ctx.state === "suspended") void ctx.resume();
-    return ctx;
-  };
+function ensureCtx(): AudioContext | null {
+  const Ctor = audioCtor();
+  if (!Ctor) return null;
+  if (!sharedCtx) {
+    try {
+      sharedCtx = new Ctor();
+    } catch {
+      return null;
+    }
+  }
+  // resume() is a no-op if already running; needed if the browser auto-suspended.
+  if (sharedCtx.state === "suspended") void sharedCtx.resume();
+  return sharedCtx;
+}
+
+export function createChimeChannel(): NotificationChannel {
+  // Eagerly unlock the context now — we're inside the Start gesture.
+  ensureCtx();
 
   const beep = (ac: AudioContext, startAt: number, freq: number): void => {
     const osc = ac.createOscillator();
@@ -60,7 +80,8 @@ export function createChimeChannel(): NotificationChannel {
       beep(ac, t + 0.26, 660);
     },
     clear() {
-      // One-shot; nothing to stop.
+      // One-shot; nothing to stop. The context is intentionally kept alive for
+      // the next interruption (and the next session).
     },
   };
 }

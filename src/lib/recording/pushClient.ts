@@ -166,6 +166,13 @@ export function createPushChannel(): {
   return {
     raise() {
       if (typeof fetch === "undefined") return;
+      // Skip the round-trip when push can't have a subscription: notifications
+      // are opt-in, so if permission isn't granted there are no endpoints to
+      // reach. This keeps a flapping mic from hammering /api/push/notify (auth +
+      // DB lookup) on the recorder's hot path for the common not-enabled case.
+      if (typeof Notification === "undefined" || Notification.permission !== "granted") {
+        return;
+      }
       void fetch("/api/push/notify", { method: "POST" }).catch(() => {});
     },
     clear() {

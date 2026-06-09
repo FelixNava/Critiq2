@@ -6,7 +6,6 @@ import {
   disablePush,
   pushSupport,
   notificationPermission,
-  type PushSupport,
 } from "@/lib/recording/pushClient";
 
 /**
@@ -27,7 +26,6 @@ export type PushUiState =
 
 export interface UsePushAlerts {
   state: PushUiState;
-  support: PushSupport | null;
   message: string | null;
   busy: boolean;
   enable: () => Promise<void>;
@@ -35,14 +33,12 @@ export interface UsePushAlerts {
 }
 
 export function usePushAlerts(): UsePushAlerts {
-  const [support, setSupport] = useState<PushSupport | null>(null);
   const [state, setState] = useState<PushUiState>("checking");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     const s = pushSupport();
-    setSupport(s);
     if (s === "unsupported") {
       setState("unsupported");
       return;
@@ -99,5 +95,5 @@ export function usePushAlerts(): UsePushAlerts {
     }
   }, []);
 
-  return { state, support, message, busy, enable, disable };
+  return { state, message, busy, enable, disable };
 }

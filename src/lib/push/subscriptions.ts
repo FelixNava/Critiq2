@@ -43,6 +43,7 @@ export async function saveSubscription(
   userId: string,
   input: SubscriptionInput,
 ): Promise<void> {
+  const now = new Date();
   await db
     .insert(pushSubscriptions)
     .values({
@@ -51,6 +52,7 @@ export async function saveSubscription(
       p256dh: input.p256dh,
       auth: input.auth,
       userAgent: input.userAgent ?? null,
+      lastUsedAt: now,
     })
     .onConflictDoUpdate({
       target: pushSubscriptions.endpoint,
@@ -59,6 +61,7 @@ export async function saveSubscription(
         p256dh: input.p256dh,
         auth: input.auth,
         userAgent: input.userAgent ?? null,
+        lastUsedAt: now,
       },
     });
 }

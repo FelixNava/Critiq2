@@ -16,7 +16,14 @@ export const dynamic = "force-dynamic";
  * server-side gap detector that can push to a fully-suspended device is a later
  * phase; this wires the full, working push path it will reuse.
  */
-export async function POST() {
+export async function POST(req: Request) {
+  // Belt-and-suspenders against cross-site triggering (the session cookie is
+  // SameSite=Lax already): reject requests a browser explicitly marks as
+  // cross-site. Same-origin / direct requests omit the header or send same-origin.
+  if (req.headers.get("sec-fetch-site") === "cross-site") {
+    return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+  }
+
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) {
