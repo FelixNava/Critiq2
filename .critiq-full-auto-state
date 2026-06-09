@@ -14,10 +14,10 @@ BUILD_TOTAL_TOKEN_BUDGET=4000000
 BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
-PHASE_CURRENT=
-PHASE_CURRENT_STATUS=
+PHASE_CURRENT=14/interruption-detection-notification
+PHASE_CURRENT_STATUS=building
 PHASE_CURRENT_PR=
-PHASE_NEXT=14/interruption-detection-notification
+PHASE_NEXT=15/deepgram-transcription
 PHASE_LAST_COMPLETED=13/auto-segmentation-heartbeat-recovery
 PHASE_LAST_COMPLETED_AT=2026-06-08T04:15:00-04:00
 
@@ -58,9 +58,9 @@ UI_VERIFY_PENDING=
 # 905d35f) THEN promoted to review-for-main (PR #17, merge 0fa2d78) by Felix's command.
 # review-for-main now holds Phases 2-13; build clean on the merged result. DEC-027.
 # NEXT (Block 1): Phase 14 (interruption detection + Web Push) off recording-staging.
-SESSION_LAST_HEARTBEAT=2026-06-08T04:15:00-04:00
-SESSION_TOKEN_BUDGET_USED=900000
-SESSION_ID=interactive-promote12-masterpause-phase13-2026-06-08
+SESSION_LAST_HEARTBEAT=2026-06-08T20:07:00-04:00
+SESSION_TOKEN_BUDGET_USED=0
+SESSION_ID=cron-phase14-interruption-notification-2026-06-08
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL
