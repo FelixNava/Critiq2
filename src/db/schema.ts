@@ -346,8 +346,42 @@ export const recordingChunks = pgTable(
   ],
 );
 
+/**
+ * Web Push subscriptions (Phase 14 — interruption notifications). One row per
+ * browser/PWA push endpoint a rep has granted, scoped to the rep (cascade on
+ * user delete). The server sends a BRANDING-ONLY interruption push to these
+ * endpoints; gone (404/410) endpoints are pruned on send. `endpoint` is the
+ * natural key (unique) so re-subscribing the same browser updates in place.
+ */
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    // The two keys from the browser PushSubscription (base64url).
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("push_subscriptions_endpoint_key").on(t.endpoint),
+    index("push_subscriptions_user_id_idx").on(t.userId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
+export type NewPushSubscriptionRow = typeof pushSubscriptions.$inferInsert;
 export type RepIntakeResponse = typeof repIntakeResponses.$inferSelect;
 export type NewRepIntakeResponse = typeof repIntakeResponses.$inferInsert;
 export type RepIntakeProgress = typeof repIntakeProgress.$inferSelect;

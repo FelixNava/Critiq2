@@ -43,6 +43,13 @@
       "when": 1780904708171,
       "tag": "0005_early_nico_minoru",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1780963930992,
+      "tag": "0006_absent_mister_sinister",
+      "breakpoints": true
     }
   ]
 }

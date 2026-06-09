@@ -1,6 +1,7 @@
 "use client";
 
 import { useRecorder, type ChunkView } from "@/hooks/useRecorder";
+import { usePushAlerts } from "@/hooks/usePushAlerts";
 import {
   buttonClass,
   cardClass,
@@ -156,12 +157,14 @@ export default function RecordingLabPanel() {
     recoveryTier,
     recoveryEvents,
     recoveredNote,
+    interrupted,
     error,
     busy,
     start,
     stop,
     runSelfTest,
   } = useRecorder();
+  const push = usePushAlerts();
 
   const isRecording = status === "recording" || status === "recovering";
   const s = statusLabel(status);
@@ -182,6 +185,20 @@ export default function RecordingLabPanel() {
         Confirm this device can capture audio and save it reliably. Nothing here
         is part of a live call; it is only a check.
       </p>
+
+      {interrupted && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm ring-1 ring-red-200"
+        >
+          <p className="font-semibold text-red-800">Capture was interrupted</p>
+          <p className="mt-0.5 text-red-700">
+            Another app may have taken the microphone. Come back to this tab to
+            keep going — we&apos;ll reconnect automatically when it&apos;s free.
+          </p>
+        </div>
+      )}
 
       {recoveredNote && (
         <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 ring-1 ring-emerald-200">
@@ -318,6 +335,72 @@ export default function RecordingLabPanel() {
             return <Row key={row.key} title={row.title} value={keepAliveLabel(value)} tone={tone} />;
           })}
         </div>
+      </div>
+
+      <div className="mt-6 border-t border-slate-100 pt-6">
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-sm font-semibold text-slate-900">
+            Alerts when you step away
+          </p>
+          {push.state === "on" && (
+            <span
+              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${toneClass.on}`}
+            >
+              On
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-slate-500">
+          If something interrupts capture while you&apos;re in another app, Critiq
+          plays a chime, flashes this tab, and shows a banner here. Turn on
+          notifications to also get an alert on your lock screen.
+        </p>
+
+        {push.state === "checking" && (
+          <p className="mt-3 text-sm text-slate-400">Checking this device…</p>
+        )}
+        {push.state === "off" && (
+          <button
+            type="button"
+            onClick={() => void push.enable()}
+            disabled={push.busy}
+            className={`${secondaryButtonClass} mt-3`}
+          >
+            Turn on notifications
+          </button>
+        )}
+        {push.state === "on" && (
+          <button
+            type="button"
+            onClick={() => void push.disable()}
+            disabled={push.busy}
+            className={`${secondaryButtonClass} mt-3`}
+          >
+            Turn off notifications
+          </button>
+        )}
+        {push.state === "needs-install" && (
+          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600 ring-1 ring-slate-200">
+            To get lock-screen alerts on iPhone, add Critiq to your Home Screen
+            first (Share → Add to Home Screen), then open it from there. The
+            chime, tab flash, and on-screen banner work either way.
+          </p>
+        )}
+        {push.state === "denied" && (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 ring-1 ring-amber-200">
+            Notifications are blocked for Critiq. Allow them in your browser
+            settings to get lock-screen alerts. The other alerts still work.
+          </p>
+        )}
+        {push.state === "unsupported" && (
+          <p className="mt-3 text-sm text-slate-500">
+            This browser can&apos;t show lock-screen alerts. The chime, tab flash,
+            and on-screen banner still work.
+          </p>
+        )}
+        {push.message && (
+          <p className="mt-2 text-xs text-slate-500">{push.message}</p>
+        )}
       </div>
 
       {recordingId && (

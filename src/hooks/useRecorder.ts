@@ -14,6 +14,13 @@ import {
   SessionKeepAlive,
   type KeepAliveLayers,
 } from "@/lib/recording/sessionKeepAlive";
+import {
+  InterruptionMonitor,
+  type NotificationChannel,
+} from "@/lib/recording/interruption";
+import { createChimeChannel } from "@/lib/recording/chime";
+import { createTabTitleChannel } from "@/lib/recording/tabTitle";
+import { createPushChannel } from "@/lib/recording/pushClient";
 
 /**
  * React orchestration for the recorder surface. Ties segmented capture (Phase 13:
@@ -52,6 +59,8 @@ export interface UseRecorder {
   recoveryTier: RecoveryTier;
   recoveryEvents: RecoveryEvent[];
   recoveredNote: string | null;
+  /** True while capture is interrupted (mic lost / grabbed) — drives the banner. */
+  interrupted: boolean;
   error: string | null;
   busy: boolean;
   start: () => Promise<void>;
@@ -103,6 +112,7 @@ export function useRecorder(): UseRecorder {
   const recorderRef = useRef<SegmentedRecorder | null>(null);
   const uploaderRef = useRef<ChunkUploader | null>(null);
   const keepAliveRef = useRef<SessionKeepAlive | null>(null);
+  const monitorRef = useRef<InterruptionMonitor | null>(null);
   const recordingIdRef = useRef<string | null>(null);
   const startedAtRef = useRef<number>(0);
   const chunkTotalRef = useRef<number>(0);
@@ -122,6 +132,7 @@ export function useRecorder(): UseRecorder {
   const [recoveryTier, setRecoveryTier] = useState<RecoveryTier>(0);
   const [recoveryEvents, setRecoveryEvents] = useState<RecoveryEvent[]>([]);
   const [recoveredNote, setRecoveredNote] = useState<string | null>(null);
+  const [interrupted, setInterrupted] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
 
@@ -189,11 +200,12 @@ export function useRecorder(): UseRecorder {
     };
   }, []);
 
-  // Tear capture + keep-alive down on unmount.
+  // Tear capture + keep-alive + the interruption alert down on unmount.
   useEffect(() => {
     return () => {
       void recorderRef.current?.stop();
       void keepAliveRef.current?.stop();
+      monitorRef.current?.reset();
     };
   }, []);
 
@@ -229,6 +241,11 @@ export function useRecorder(): UseRecorder {
         chunkCount = Math.max(0, chunkTotalRef.current - remaining);
       }
 
+      // Capture is over — clear any interruption alert (chime stop is a no-op,
+      // but the tab title is restored and the banner hidden).
+      monitorRef.current?.reset();
+      monitorRef.current = null;
+
       await keepAliveRef.current?.stop();
       keepAliveRef.current = null;
 
@@ -254,6 +271,7 @@ export function useRecorder(): UseRecorder {
     setHeartbeat(null);
     setRecoveryTier(0);
     setRecoveryEvents([]);
+    setInterrupted(false);
     chunkTotalRef.current = 0;
     opsRef.current = [];
     finalizedRef.current = false;
@@ -269,6 +287,22 @@ export function useRecorder(): UseRecorder {
       const keepAlive = new SessionKeepAlive((s) => setKeepAlive(s.layers));
       keepAliveRef.current = keepAlive;
       await keepAlive.start();
+
+      // Interruption alerts (Phase 14): the in-app banner is a channel that
+      // toggles React state; chime / tab-title / Web Push are the out-of-app
+      // channels. The monitor raises them on an interruption edge and clears
+      // them when capture resumes.
+      const bannerChannel: NotificationChannel = {
+        raise: () => setInterrupted(true),
+        clear: () => setInterrupted(false),
+      };
+      const monitor = new InterruptionMonitor({
+        chime: createChimeChannel(),
+        tabTitle: createTabTitleChannel(),
+        push: createPushChannel(),
+        banner: bannerChannel,
+      });
+      monitorRef.current = monitor;
 
       const recorder = new SegmentedRecorder({
         onChunk: (c) => {
@@ -304,7 +338,13 @@ export function useRecorder(): UseRecorder {
           setSegment({ index: s.segmentIndex, count: s.segmentCount });
           setHeartbeat(s.heartbeat);
           setRecoveryTier(s.recoveryTier);
+          monitorRef.current?.update({
+            status: s.status,
+            heartbeat: s.heartbeat,
+            recoveryTier: s.recoveryTier,
+          });
         },
+        onTrackEnded: () => monitorRef.current?.signalTrackEnded(),
         onError: (err) =>
           setError(
             err instanceof Error
@@ -335,6 +375,8 @@ export function useRecorder(): UseRecorder {
         recorderRef.current = null;
         uploaderRef.current = null;
         recordingIdRef.current = null;
+        monitorRef.current?.reset();
+        monitorRef.current = null;
         finalizedRef.current = true;
         await apiComplete(id, { status: "aborted", chunkCount: 0 });
       }
@@ -344,6 +386,8 @@ export function useRecorder(): UseRecorder {
       keepAliveRef.current = null;
       recorderRef.current = null;
       uploaderRef.current = null;
+      monitorRef.current?.reset();
+      monitorRef.current = null;
     } finally {
       setBusy(false);
     }
@@ -412,6 +456,7 @@ export function useRecorder(): UseRecorder {
     recoveryTier,
     recoveryEvents,
     recoveredNote,
+    interrupted,
     error,
     busy,
     start,

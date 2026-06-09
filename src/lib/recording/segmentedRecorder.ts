@@ -122,6 +122,13 @@ export interface MicStream {
   isLive(): boolean;
   /** Stop every track (releases the mic). */
   stop(): void;
+  /**
+   * Optional: register a callback fired the instant an audio track ends — the
+   * mic was revoked or grabbed by another app. Phase 14 uses this for IMMEDIATE
+   * interruption detection (faster than the ≤5s heartbeat). Optional so injected
+   * fakes need not implement it; the heartbeat remains the reliable fallback.
+   */
+  onEnded?(cb: () => void): void;
 }
 
 export interface SegmentRecorderHandle {
@@ -153,6 +160,11 @@ class BrowserMicStream implements MicStream {
   isLive(): boolean {
     const tracks = this.raw.getAudioTracks();
     return tracks.length > 0 && tracks.some((t) => t.readyState === "live");
+  }
+  onEnded(cb: () => void): void {
+    for (const t of this.raw.getAudioTracks()) {
+      t.addEventListener("ended", cb, { once: true });
+    }
   }
   stop(): void {
     for (const t of this.raw.getTracks()) {
@@ -233,6 +245,10 @@ export interface SegmentedRecorderCallbacks {
   /** Fired when the recorder stops itself (hard cap or unrecoverable fault) so
    *  the caller runs the same finalize (flush + complete) it runs on a user stop. */
   onAutoStop?: (reason: AutoStopReason) => void;
+  /** Fired the instant a mic track ends (audio session grabbed / mic revoked) —
+   *  Phase 14 turns this into the immediate interruption notification. Redundant
+   *  with the heartbeat's trackLive=false detection, just faster. */
+  onTrackEnded?: () => void;
 }
 
 /**
@@ -324,6 +340,7 @@ export class SegmentedRecorder {
       this.callbacks.onError?.(err);
       return;
     }
+    this.wireTrackEnded();
 
     this.mimeType = this.engine.pickMimeType();
     this.sessionStartMs = this.timers.now();
@@ -344,6 +361,16 @@ export class SegmentedRecorder {
     this.scheduleRotation();
     this.startHeartbeat();
     this.setStatus("recording");
+  }
+
+  /** Wire the current stream's track-ended signal to the Phase 14 callback. The
+   *  fault still flows through the heartbeat too (trackLive=false → recovery);
+   *  this just gives the notification layer an immediate edge. Best-effort: a
+   *  stream without onEnded (injected fakes) simply relies on the heartbeat. */
+  private wireTrackEnded(): void {
+    this.stream?.onEnded?.(() => {
+      if (!this.stopped) this.callbacks.onTrackEnded?.();
+    });
   }
 
   /** Create a segment recorder whose chunks are tagged with THIS segment index
@@ -532,6 +559,7 @@ export class SegmentedRecorder {
           return;
         }
         this.stream = nextStream;
+        this.wireTrackEnded();
         this.resetStallClock();
         this.current = this.makeSegmentRecorder(this.segmentIndex);
         this.current.start();
