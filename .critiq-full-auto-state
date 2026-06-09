@@ -1,0 +1,123 @@
+# Critiq Full Auto — Runtime State
+# Edit STOP=true from any device to halt at the next cron firing.
+# Edit URL: https://github.com/FelixNava/Critiq2/edit/review-for-main/.critiq-full-auto-state
+# This file is read by /critiq-full-auto skill at session start.
+# Format: KEY=VALUE, one per line, lines starting with # are comments.
+
+# --- KILL SWITCH (the only field you should ever edit manually) ---
+STOP=false
+
+# --- BUILD METADATA ---
+BUILD_START_ET=2026-06-05T02:25:00-04:00
+BUILD_LABEL=critiq-beta-foundation-live-supervised
+BUILD_TOTAL_TOKEN_BUDGET=4000000
+BUILD_PHASE_TOKEN_BUDGET=800000
+
+# --- PHASE TRACKING ---
+PHASE_CURRENT=
+PHASE_CURRENT_STATUS=
+PHASE_CURRENT_PR=
+PHASE_NEXT=15/deepgram-transcription
+# Phase 14 BUILT to OPEN PR #18 (base recording-staging) by the cron 2026-06-08;
+# NOT merged, awaiting Felix's iPhone device gate (UI_VERIFY_PENDING=14 below).
+PHASE_LAST_COMPLETED=13/auto-segmentation-heartbeat-recovery
+PHASE_LAST_COMPLETED_AT=2026-06-08T04:15:00-04:00
+
+# --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
+# DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
+# Also in .env.local: ANTHROPIC_API_KEY + RESEND_API_KEY (reused), AUTH_SECRET + CRON_SECRET.
+# Still to provision later: DEEPGRAM_API_KEY (Phase 15), SENTRY_DSN (Phase 4).
+# Phase 11 + 11a done + device-verified + promoted to review-for-main; client-side only, no env.
+# BLOB_READ_WRITE_TOKEN PROVISIONED 2026-06-06 (Felix, dashboard) — store critiq2-blob (store_LgqOObB7jYpcT6x8),
+#   scoped Preview/all-branches + Sensitive. Sensitive => NOT pullable to .env.local; verify Phase 12 on the PREVIEW.
+#   Pre-launch blob TODOs (decided "later" with Felix 2026-06-06): (1) add Production scope to the token before prod
+#   launch; (2) stand up a SEPARATE preview blob store (or strict path prefix) so beta test recordings don't mix with
+#   real prod audio (same lesson as the preview/prod env-sharing note). Not blocking Phase 12 (which runs on previews).
+ENV_READY=true
+# UI_VERIFY_PENDING: a headless cron sets this when it ships a UI phase it could
+# not drive via MCP; the next interactive session drives it via Chrome MCP, then
+# clears it. Empty = nothing pending.
+# CLEARED 2026-06-06 (interactive /critiq-full-auto):
+#   - Phases 2-8 verified earlier; Phases 9 & 10 driven via Chrome MCP 2026-06-05.
+#   - Phase 11/11a: the ON-DEVICE GATE PASSED on Felix's iPhone 2026-06-06 — the
+#     neutral "Critiq" lock-screen widget is PRESENT (the L3 branding the Phase 11
+#     oscillator never surfaced; fixed by Phase 11a's looping <audio> rewrite), and
+#     the keep-alive held green across app switches. Desktop drive (Chrome MCP, real
+#     preview) also confirmed the <audio> element + the CSP fix (errorCode 4 -> null,
+#     media-src blob:); sustained playback isn't observable in the hidden MCP tab
+#     (Chrome media throttle, same artifact as Wake Lock "Off") -> the device gate
+#     is the real proof.
+#   Recording stack (11 + 11a) promoted recording-staging -> review-for-main (PR #13).
+#   CLEARED 2026-06-07: Phase 12 DEVICE-GATE PASSED on iPhone (capture, keep-alive,
+#   offline-recover-on-reconnect) -> merged to recording-staging (PR #14, c7cb620).
+# 2026-06-08 (Phase 14 cron build): interruption detection + multi-channel
+#   notification (chime + tab-flash + Web Push + in-app banner) BUILT to OPEN
+#   PR #18 (base recording-staging). Headless cron = baseline only (build/types/
+#   unit, 32 assertions). Awaits Felix's iPhone DEVICE GATE: chime + tab-flash +
+#   Web Push + banner on a real mic-grab, branding-only on the lock screen, then
+#   recover-clears-all. VAPID keypair generated -> add to Vercel for runtime push
+#   (PR #18 body has the keys). Do NOT merge until the gate passes; then merge to
+#   recording-staging + promote to review-for-main per Felix.
+UI_VERIFY_PENDING=14
+
+# --- SESSION HEARTBEAT ---
+# Phase 13 DONE + DEVICE-VERIFIED (segmentation + heartbeat + Tier 1-4 recovery +
+# resume-after-tab-kill). Device gate PASSED on desktop + iPhone (session 8eb5e643:
+# 112/112 chunks uploaded, contiguous 0-111, segment_index {0:111,1:1} = a real
+# ~10-min rotation with zero audio loss). Merged to recording-staging (PR #16, squash
+# 905d35f) THEN promoted to review-for-main (PR #17, merge 0fa2d78) by Felix's command.
+# review-for-main now holds Phases 2-13; build clean on the merged result. DEC-027.
+# NEXT (Block 1): Phase 14 (interruption detection + Web Push) off recording-staging.
+SESSION_LAST_HEARTBEAT=2026-06-08T20:40:00-04:00
+SESSION_TOKEN_BUDGET_USED=420000
+SESSION_ID=cron-phase14-interruption-notification-2026-06-08
+
+# --- CRON SCHEDULE ---
+# Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL
+# scheduled task "critiq-fullauto-9-10-11" (cron "0 * * * *", fires ~:06 past each
+# hour, local TZ) -> builds Phase 9 & 10 into review-for-main and Phase 11 into
+# recording-staging, then self-stops (next phase > 11 -> exit + best-effort
+# disable via update_scheduled_task). Phase 11 is browser-media a headless cron
+# cannot verify -> it sets UI_VERIFY_PENDING=11 and stops for joint device
+# verification. Overlap guard: a firing skips if PHASE_CURRENT is set with a
+# heartbeat < 90 min old. Only fires while the desktop app is open (closed ->
+# runs on next launch). First run ~2026-06-05T18:06 ET / 22:06 UTC (Phase 9).
+# SCOPE BOUND REACHED 2026-06-05 ~20:20 ET: the hourly cron built its terminal
+# phase (11 -> recording-staging) and self-stops. Next un-built phase is 12,
+# which is OUTSIDE this task's 9-11 scope -> the task disables itself (best-effort
+# update_scheduled_task enabled=false). Phase 12+ is Felix-gated (Blob token +
+# joint device verification of Phase 11). Do NOT re-arm without Felix's go.
+NEXT_CRON_FIRE_ET=disabled-scope-bound-reached
+CRON_SCHEDULE_LABEL=critiq-fullauto-9-10-11-COMPLETE-self-disabling
+
+# --- BLOCKERS ---
+# 2026-06-08: Phase 12 PROMOTED recording-staging -> review-for-main (PR #15, merge
+# 1503a6f) by Felix's explicit command. review-for-main now holds Phases 2-12.
+# 🚦 MASTER MERGE (PR #1 review-for-main -> master) PAUSED — Felix explicitly commanded it
+# this session, but verification found PRODUCTION IS NOT PROVISIONED, so merging now would
+# ship a broken prod (master is still the bare scaffold; the only production-target deploy is
+# a redeploy of the scaffold commit 0bc1b60 -> promoting = the FIRST real prod deploy). Per
+# the hard rule (friction in the verification path -> STOP, do NOT degrade to merge-anyway),
+# the merge was left for Felix (DEC-026). Production is MISSING (Preview-only): AUTH_SECRET
+# (NextAuth REQUIRES it -> auth dead), RESEND_API_KEY, AUTH_RESEND_KEY, EMAIL_FROM,
+# BLOB_READ_WRITE_TOKEN. DATABASE_URL/_UNPOOLED have SEPARATE Production entries (distinct
+# from Preview) -> likely a different Neon branch that is UNMIGRATED (0001-0004 applied to the
+# dev Neon only). [RESOLVED 2026-06-08] PROD ENV FULLY PROVISIONED + PROD DB SCHEMA PRESENT:
+# (1) ✅ Claude added a FRESH prod AUTH_SECRET. (2) ✅ Claude added prod RESEND_API_KEY + AUTH_RESEND_KEY
+# + EMAIL_FROM + ANTHROPIC_API_KEY + CRON_SECRET (reused preview values). (3) ✅ Felix added
+# BLOB_READ_WRITE_TOKEN to Production. (4) ✅ Migration vs the prod DB ran (Claude, via
+# `vercel env pull --environment=production` + scripts/migrate.ts): ALL 0000-0005 already applied ->
+# prod schema READY. ⚠️ FINDING: prod DATABASE_URL points to the SAME Neon DB as dev/preview (endpoint
+# ep-restless-field-apvp3l79; prod = the direct endpoint, dev = the -pooler endpoint of the same DB) ->
+# ALL environments share ONE database (incl. the existing p8verify/rs-test test data + Phase 12-13 test
+# recordings). Fine PRE-LAUNCH (no real data), but BEFORE real beta users provision a SEPARATE prod Neon
+# (else preview testing reads/writes prod data — the ApexTrust lesson, see memory feedback_apex_branch_preview_db).
+# NOT a merge blocker. The master merge (PR #1) is now FUNCTIONALLY UNBLOCKED and awaits ONLY Felix's
+# explicit in-session "merge master" command (hard rule — never merge to master without it).
+BLOCKER_REASON=master-merge functionally UNBLOCKED 2026-06-08 (prod env fully provisioned + prod DB schema present). Awaits Felix's explicit "merge master". FLAG (not a blocker): prod shares the dev/preview Neon DB -> provision a separate prod DB before real beta users.
+BLOCKER_SET_AT=2026-06-08T03:21:00-04:00
+
+# --- EMAIL CHANNEL ---
+EMAIL_SENDER=notifications@critiq.firstlap.dev
+EMAIL_RECIPIENT=felix@firstlap.dev
+EMAIL_PR_COMMENT_FALLBACK=true
