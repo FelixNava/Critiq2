@@ -61,6 +61,12 @@ export interface UseRecorder {
   recoveredNote: string | null;
   /** True while capture is interrupted (mic lost / grabbed) — drives the banner. */
   interrupted: boolean;
+  /** Cumulative ms of audio NOT captured (phone backgrounded / screen locked). */
+  gapMs: number;
+  /** Number of capture gaps (stalls) this session. */
+  gapCount: number;
+  /** Fraction of the session actually captured (1 = no gaps). */
+  coverage: number;
   error: string | null;
   busy: boolean;
   start: () => Promise<void>;
@@ -82,7 +88,13 @@ async function apiStart(accountId?: string): Promise<string> {
 
 async function apiComplete(
   recordingId: string,
-  body: { durationMs?: number; chunkCount?: number; status?: string },
+  body: {
+    durationMs?: number;
+    chunkCount?: number;
+    gapMs?: number;
+    gapCount?: number;
+    status?: string;
+  },
 ): Promise<void> {
   await fetch("/api/recording/complete", {
     method: "POST",
@@ -116,6 +128,8 @@ export function useRecorder(): UseRecorder {
   const recordingIdRef = useRef<string | null>(null);
   const startedAtRef = useRef<number>(0);
   const chunkTotalRef = useRef<number>(0);
+  const gapMsRef = useRef<number>(0);
+  const gapCountRef = useRef<number>(0);
   // In-flight per-chunk handleChunk promises, so finalize() can wait for the tail
   // chunk to persist+upload before it reports the durable count.
   const opsRef = useRef<Promise<unknown>[]>([]);
@@ -133,6 +147,9 @@ export function useRecorder(): UseRecorder {
   const [recoveryEvents, setRecoveryEvents] = useState<RecoveryEvent[]>([]);
   const [recoveredNote, setRecoveredNote] = useState<string | null>(null);
   const [interrupted, setInterrupted] = useState<boolean>(false);
+  const [gapMs, setGapMs] = useState<number>(0);
+  const [gapCount, setGapCount] = useState<number>(0);
+  const [elapsedMs, setElapsedMs] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
 
@@ -254,6 +271,8 @@ export function useRecorder(): UseRecorder {
         await apiComplete(id, {
           durationMs: Date.now() - startedAtRef.current,
           chunkCount,
+          gapMs: gapMsRef.current,
+          gapCount: gapCountRef.current,
           ...(completeStatus ? { status: completeStatus } : {}),
         });
       }
@@ -272,7 +291,12 @@ export function useRecorder(): UseRecorder {
     setRecoveryTier(0);
     setRecoveryEvents([]);
     setInterrupted(false);
+    setGapMs(0);
+    setGapCount(0);
+    setElapsedMs(0);
     chunkTotalRef.current = 0;
+    gapMsRef.current = 0;
+    gapCountRef.current = 0;
     opsRef.current = [];
     finalizedRef.current = false;
     try {
@@ -338,6 +362,11 @@ export function useRecorder(): UseRecorder {
           setSegment({ index: s.segmentIndex, count: s.segmentCount });
           setHeartbeat(s.heartbeat);
           setRecoveryTier(s.recoveryTier);
+          setGapMs(s.gapMs);
+          setGapCount(s.gapCount);
+          setElapsedMs(s.elapsedMs);
+          gapMsRef.current = s.gapMs;
+          gapCountRef.current = s.gapCount;
           monitorRef.current?.update({
             status: s.status,
             heartbeat: s.heartbeat,
@@ -445,6 +474,9 @@ export function useRecorder(): UseRecorder {
     }
   }, [busy, makeUploader, refreshPending, upsertChunk]);
 
+  const coverage =
+    elapsedMs > 0 ? Math.max(0, Math.min(1, (elapsedMs - gapMs) / elapsedMs)) : 1;
+
   return {
     status,
     recordingId,
@@ -457,6 +489,9 @@ export function useRecorder(): UseRecorder {
     recoveryEvents,
     recoveredNote,
     interrupted,
+    gapMs,
+    gapCount,
+    coverage,
     error,
     busy,
     start,

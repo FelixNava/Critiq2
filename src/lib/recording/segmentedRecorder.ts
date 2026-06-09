@@ -38,6 +38,11 @@ export const HEARTBEAT_MS = 5000; // health check cadence
 // timeslice tolerates one missed/late chunk before we treat it as a stall.
 export const STALL_MS = 15000;
 export const MAX_RECOVERY_TIER = 4;
+// A chunk gap longer than this means capture stalled. On iOS the mic is
+// SUSPENDED whenever the PWA is backgrounded or the screen is locked (WebKit
+// policy — no keep-alive defeats it), so chunks simply stop arriving. 2× the 5s
+// timeslice tolerates normal cadence jitter; anything beyond is lost audio.
+export const GAP_THRESHOLD_MS = 10000;
 
 export interface SegmentedRecorderConfig {
   segmentMs: number;
@@ -46,6 +51,7 @@ export interface SegmentedRecorderConfig {
   timesliceMs: number;
   heartbeatMs: number;
   stallMs: number;
+  gapThresholdMs: number;
 }
 
 export const DEFAULT_CONFIG: SegmentedRecorderConfig = {
@@ -55,6 +61,7 @@ export const DEFAULT_CONFIG: SegmentedRecorderConfig = {
   timesliceMs: DEFAULT_TIMESLICE_MS,
   heartbeatMs: HEARTBEAT_MS,
   stallMs: STALL_MS,
+  gapThresholdMs: GAP_THRESHOLD_MS,
 };
 
 export type SegmentedStatus =
@@ -95,6 +102,10 @@ export interface SegmentedRecorderState {
   recoveryTier: RecoveryTier;
   heartbeat: HeartbeatState | null;
   elapsedMs: number;
+  /** Cumulative ms of audio NOT captured (mic suspended while backgrounded/locked). */
+  gapMs: number;
+  /** Number of capture gaps (stalls beyond the gap threshold) this session. */
+  gapCount: number;
 }
 
 // ---- injectable time ----
@@ -286,6 +297,13 @@ export class SegmentedRecorder {
   private heartbeat: HeartbeatState | null = null;
   private stopped = false;
 
+  // Coverage tracking: measure capture gaps from inter-chunk intervals.
+  // lastEmitAtMs is dedicated to this and is intentionally NOT reset by recovery
+  // (unlike lastChunkAtMs), so a gap that spans a recovery is still counted.
+  private gapMs = 0;
+  private gapCount = 0;
+  private lastEmitAtMs: number | null = null;
+
   constructor(
     callbacks: SegmentedRecorderCallbacks,
     opts?: {
@@ -313,6 +331,8 @@ export class SegmentedRecorder {
       recoveryTier: this.recoveryTier,
       heartbeat: this.heartbeat ? { ...this.heartbeat } : null,
       elapsedMs: this.sessionStartMs ? this.timers.now() - this.sessionStartMs : 0,
+      gapMs: this.gapMs,
+      gapCount: this.gapCount,
     };
   }
 
@@ -349,6 +369,9 @@ export class SegmentedRecorder {
     this.segmentCount = 1;
     this.globalChunkIndex = 0;
     this.lastChunkAtMs = null;
+    this.lastEmitAtMs = null;
+    this.gapMs = 0;
+    this.gapCount = 0;
     this.stopped = false;
 
     this.current = this.makeSegmentRecorder(this.segmentIndex);
@@ -385,7 +408,21 @@ export class SegmentedRecorder {
   }
 
   private emitChunk(segmentIndex: number, blob: Blob, mimeType: string): void {
-    this.lastChunkAtMs = this.timers.now();
+    const now = this.timers.now();
+    // Measure any capture gap since the previous chunk. On iOS a backgrounded /
+    // locked PWA has its mic suspended (no chunks arrive), so a large inter-chunk
+    // interval = audio we did not capture. Count everything beyond one chunk's
+    // worth of cadence as lost. (A gap in the TAIL — stopped while backgrounded —
+    // isn't measured; there's no following chunk to reveal it.)
+    if (this.lastEmitAtMs !== null) {
+      const interval = now - this.lastEmitAtMs;
+      if (interval > this.config.gapThresholdMs) {
+        this.gapMs += interval - this.config.timesliceMs;
+        this.gapCount += 1;
+      }
+    }
+    this.lastEmitAtMs = now;
+    this.lastChunkAtMs = now;
     this.callbacks.onChunk({
       index: this.globalChunkIndex++,
       segmentIndex,

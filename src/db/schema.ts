@@ -289,6 +289,12 @@ export const recordings = pgTable(
     endedAt: timestamp("ended_at", { withTimezone: true }),
     durationMs: integer("duration_ms"),
     chunkCount: integer("chunk_count").notNull().default(0),
+    // Capture coverage (Phase 14b). gapMs = ms of audio NOT captured (iOS
+    // suspends the mic when a PWA is backgrounded / the screen locks); gapCount =
+    // number of such stalls. Null on legacy rows. coverage = (durationMs - gapMs)
+    // / durationMs — a holey recording must never be treated as complete.
+    gapMs: integer("gap_ms"),
+    gapCount: integer("gap_count"),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

@@ -158,6 +158,9 @@ export default function RecordingLabPanel() {
     recoveryEvents,
     recoveredNote,
     interrupted,
+    gapMs,
+    gapCount,
+    coverage,
     error,
     busy,
     start,
@@ -170,6 +173,8 @@ export default function RecordingLabPanel() {
   const s = statusLabel(status);
   const uploaded = chunks.filter((c) => c.state === "uploaded").length;
   const showHealth = segment.count > 0 || isRecording;
+  const coveragePct = Math.round(coverage * 100);
+  const gapSeconds = Math.round(gapMs / 1000);
 
   return (
     <div className={cardClass}>
@@ -186,16 +191,28 @@ export default function RecordingLabPanel() {
         is part of a live call; it is only a check.
       </p>
 
+      <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm ring-1 ring-amber-200">
+        <p className="font-semibold text-amber-900">
+          On a phone, keep Critiq open with the screen on
+        </p>
+        <p className="mt-0.5 text-amber-800">
+          Phones pause the microphone the moment you lock the screen or switch
+          apps, so anything said while you&apos;re away isn&apos;t recorded. For a
+          full, reliable recording, use a laptop.
+        </p>
+      </div>
+
       {interrupted && (
         <div
           role="alert"
           aria-live="assertive"
           className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm ring-1 ring-red-200"
         >
-          <p className="font-semibold text-red-800">Capture was interrupted</p>
+          <p className="font-semibold text-red-800">Recording paused</p>
           <p className="mt-0.5 text-red-700">
-            Another app may have taken the microphone. Come back to this tab to
-            keep going — we&apos;ll reconnect automatically when it&apos;s free.
+            Critiq lost the microphone — you left the app, locked the screen, or
+            another app took it. Come back to Critiq to keep recording; it
+            reconnects automatically when the mic is free.
           </p>
         </div>
       )}
@@ -204,6 +221,21 @@ export default function RecordingLabPanel() {
         <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 ring-1 ring-emerald-200">
           {recoveredNote}
         </p>
+      )}
+
+      {gapCount > 0 && (
+        <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm ring-1 ring-amber-200">
+          <p className="font-semibold text-amber-900">
+            Only {coveragePct}% of this session was captured
+          </p>
+          <p className="mt-0.5 text-amber-800">
+            About {gapSeconds}s of audio is missing across {gapCount}{" "}
+            {gapCount === 1 ? "interruption" : "interruptions"} — the phone
+            backgrounded or the screen locked. A recording with gaps isn&apos;t
+            reliable for review; re-record with Critiq open and the screen on, or
+            use a laptop.
+          </p>
+        </div>
       )}
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -351,9 +383,10 @@ export default function RecordingLabPanel() {
           )}
         </div>
         <p className="mt-1 text-sm text-slate-500">
-          If something interrupts capture while you&apos;re in another app, Critiq
-          plays a chime, flashes this tab, and shows a banner here. Turn on
-          notifications to also get an alert on your lock screen.
+          If you leave Critiq while recording, capture pauses — so it plays a
+          chime and shows a banner to tell you to come back. Turn on notifications
+          for a best-effort lock-screen nudge (a fully locked phone can&apos;t
+          always be reached).
         </p>
 
         {push.state === "checking" && (

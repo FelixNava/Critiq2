@@ -74,9 +74,10 @@ export default function Home() {
 
         <section className="mx-auto max-w-3xl space-y-5 px-6 text-base leading-relaxed text-slate-600">
           <p>
-            Record your sales conversations — in person or over video — and
-            Critiq turns each one into a clear, honest debrief: what worked, what
-            slipped, and the one change most likely to move the next call.
+            Record your sales conversations — over video or in person, best from
+            your laptop — and Critiq turns each one into a clear, honest debrief:
+            what worked, what slipped, and the one change most likely to move the
+            next call.
           </p>
           <p>
             It scores every conversation against the frameworks top reps actually

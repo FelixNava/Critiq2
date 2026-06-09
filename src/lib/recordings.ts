@@ -109,6 +109,8 @@ export async function completeRecording(
   input: {
     durationMs?: number | null;
     chunkCount?: number | null;
+    gapMs?: number | null;
+    gapCount?: number | null;
     status?: RecordingStatus;
   } = {},
 ): Promise<boolean> {
@@ -119,6 +121,8 @@ export async function completeRecording(
       endedAt: new Date(),
       durationMs: input.durationMs ?? null,
       chunkCount: input.chunkCount ?? 0,
+      gapMs: input.gapMs ?? null,
+      gapCount: input.gapCount ?? null,
       updatedAt: new Date(),
     })
     .where(and(eq(recordings.id, recordingId), eq(recordings.userId, userId)))

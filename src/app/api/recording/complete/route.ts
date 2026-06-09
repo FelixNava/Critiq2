@@ -20,6 +20,8 @@ export async function POST(req: Request) {
     recordingId?: unknown;
     durationMs?: unknown;
     chunkCount?: unknown;
+    gapMs?: unknown;
+    gapCount?: unknown;
     status?: unknown;
   };
   try {
@@ -40,11 +42,15 @@ export async function POST(req: Request) {
     typeof body.durationMs === "number" ? body.durationMs : null;
   const chunkCount =
     typeof body.chunkCount === "number" ? body.chunkCount : null;
+  const gapMs = typeof body.gapMs === "number" ? body.gapMs : null;
+  const gapCount = typeof body.gapCount === "number" ? body.gapCount : null;
   const status = body.status === "aborted" ? "aborted" : "completed";
 
   const ok = await completeRecording(userId, recordingId, {
     durationMs,
     chunkCount,
+    gapMs,
+    gapCount,
     status,
   });
   if (!ok) {
