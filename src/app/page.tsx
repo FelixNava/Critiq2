@@ -19,6 +19,14 @@ const pillars = [
 export default function Home() {
   return (
     <>
+      {process.env.VERCEL_ENV !== "production" && (
+        <Link
+          href="/recording-lab"
+          className="block bg-indigo-600 px-6 py-3 text-center text-sm font-semibold text-white transition hover:bg-indigo-700"
+        >
+          🎙️ Recording Lab — device-test surface →
+        </Link>
+      )}
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-5">
         <span className="text-lg font-semibold tracking-tight text-slate-900">
           Critiq
