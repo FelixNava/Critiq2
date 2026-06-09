@@ -14,10 +14,12 @@ BUILD_TOTAL_TOKEN_BUDGET=4000000
 BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
-PHASE_CURRENT=14/interruption-detection-notification
-PHASE_CURRENT_STATUS=building
+PHASE_CURRENT=
+PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
 PHASE_NEXT=15/deepgram-transcription
+# Phase 14 BUILT to OPEN PR #18 (base recording-staging) by the cron 2026-06-08;
+# NOT merged, awaiting Felix's iPhone device gate (UI_VERIFY_PENDING=14 below).
 PHASE_LAST_COMPLETED=13/auto-segmentation-heartbeat-recovery
 PHASE_LAST_COMPLETED_AT=2026-06-08T04:15:00-04:00
 
@@ -48,7 +50,15 @@ ENV_READY=true
 #   Recording stack (11 + 11a) promoted recording-staging -> review-for-main (PR #13).
 #   CLEARED 2026-06-07: Phase 12 DEVICE-GATE PASSED on iPhone (capture, keep-alive,
 #   offline-recover-on-reconnect) -> merged to recording-staging (PR #14, c7cb620).
-UI_VERIFY_PENDING=
+# 2026-06-08 (Phase 14 cron build): interruption detection + multi-channel
+#   notification (chime + tab-flash + Web Push + in-app banner) BUILT to OPEN
+#   PR #18 (base recording-staging). Headless cron = baseline only (build/types/
+#   unit, 32 assertions). Awaits Felix's iPhone DEVICE GATE: chime + tab-flash +
+#   Web Push + banner on a real mic-grab, branding-only on the lock screen, then
+#   recover-clears-all. VAPID keypair generated -> add to Vercel for runtime push
+#   (PR #18 body has the keys). Do NOT merge until the gate passes; then merge to
+#   recording-staging + promote to review-for-main per Felix.
+UI_VERIFY_PENDING=14
 
 # --- SESSION HEARTBEAT ---
 # Phase 13 DONE + DEVICE-VERIFIED (segmentation + heartbeat + Tier 1-4 recovery +
@@ -58,8 +68,8 @@ UI_VERIFY_PENDING=
 # 905d35f) THEN promoted to review-for-main (PR #17, merge 0fa2d78) by Felix's command.
 # review-for-main now holds Phases 2-13; build clean on the merged result. DEC-027.
 # NEXT (Block 1): Phase 14 (interruption detection + Web Push) off recording-staging.
-SESSION_LAST_HEARTBEAT=2026-06-08T20:07:00-04:00
-SESSION_TOKEN_BUDGET_USED=0
+SESSION_LAST_HEARTBEAT=2026-06-08T20:40:00-04:00
+SESSION_TOKEN_BUDGET_USED=420000
 SESSION_ID=cron-phase14-interruption-notification-2026-06-08
 
 # --- CRON SCHEDULE ---

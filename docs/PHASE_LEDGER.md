@@ -396,9 +396,22 @@ Wake Lock + Silent Audio + Media Session (branding-only metadata, NO "recording"
 >
 > **Deferred (logged):** panel↔DeviceCheckPanel badge dedup (next panel phase); a late chunk from a stopped recorder can mask a stall one beat; stop-during-start no-op; per-chunk IndexedDB scan micro-opt.
 
-## Phase 14 — Interruption Detection + Multi-Channel Notification ☐ Planned
+## Phase 14 — Interruption Detection + Multi-Channel Notification 🔬 Built — PR #18 open, awaiting iPhone device gate
 
 `track.onended` + chime + tab title + Web Push (PWA-installed only) + in-app banner. Branding-only.
+
+**BUILT 2026-06-08 (headless Full Auto cron) → OPEN PR [#18](https://github.com/FelixNava/Critiq2/pull/18) (base `recording-staging`). NOT merged — awaits Felix's iPhone device gate (recording phase; never auto-merged).**
+
+**What shipped:**
+- `src/lib/recording/interruption.ts` — pure `deriveInterrupted()` predicate + injectable `InterruptionMonitor` state machine (armed-after-recording; `trackEnded` latch bridges the ≤5s heartbeat gap; idempotent raise/clear). Derives "interrupted" from Phase 13 signals: status `error`, or `recovering` with `heartbeat.trackLive===false` (a live-track Tier-1 hiccup is intentionally NOT alerted).
+- `SegmentedRecorder` gained an OPTIONAL `onTrackEnded` callback + `MicStream.onEnded?` seam (wired in `start()` + the Tier-2/3 re-acquire) for immediate detection. Optional ⇒ Phase 13 fake-engine tests untouched; the heartbeat stays the reliable fallback.
+- Four channels: **chime** (`chime.ts`, Web Audio, singleton AudioContext unlocked in the Start gesture), **tab-title flash** (`tabTitle.ts`, `⚠ Critiq needs you`, BRANDING-ONLY), **Web Push** (`public/sw.js` SW + VAPID + `push_subscriptions` table mig 0006 + routes `vapid`/`subscribe`/`unsubscribe`/`notify` + `lib/push/{webpush,subscriptions}.ts`, BRANDING-ONLY payload), **in-app banner** (`RecordingLabPanel` + `usePushAlerts` opt-in).
+- PWA install: `manifest.webmanifest` + PNG icons + apple-touch-icon + layout metadata (unlocks iOS Web Push).
+- **Privacy contract met:** every lock-screen/notification surface is branding-only — never "recording", never call content (unit-asserted).
+
+**Verification (headless = baseline only):** `pnpm build` + `tsc` clean; `scripts/verify-phase14.ts` 32/32; `verify-phase13.ts` still green; mig 0006 applied to dev Neon (additive). `/code-review` high-effort run — P1s fixed (chime gesture-unlock+leak, push hot-path gate, VAPID rotation-safety, `/notify` cross-site guard), P2s deferred (trackEnded re-edge flap ≤5s self-correcting; lock-screen notification lingers after auto-recovery; tab-title stale-original on concurrent title change).
+
+**Felix to do:** add VAPID keys to Vercel (PR #18 body); run the iPhone device gate; then merge → `recording-staging` → promote to `review-for-main`. See DEC-028.
 
 ## Phase 15 — Deepgram Nova-3 Integration ☐ Planned
 
