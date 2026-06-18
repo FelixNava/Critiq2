@@ -17,27 +17,28 @@ BUILD_PHASE_TOKEN_BUDGET=800000
 PHASE_CURRENT=
 PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
-PHASE_NEXT=17/prompt-caching
-# Phase 16 DONE 2026-06-18 (aggressive-auto, relaxed gate): three-pillar
-# SPIN/Voss/Navarro scoring engine — the value engine's second half. First
-# Anthropic-API phase (fetch, NO SDK; mirrors the Phase 15 Deepgram client).
-# Locked rubric src/lib/scoring/rubric.ts (SPIN 35 / Voss 35 / Navarro 30 = 100,
-# 12 sub-dims, assertRubricIntegrity() at import). Pure DI engine: prompt.ts
-# (locked methodology system block + cache_control breakpoint + rubric-derived
-# JSON contract), anthropic.ts (claude-sonnet-4-6, adaptive thinking, defensive
-# JSON parse — NO structured outputs: 12-dim+evidence schema overflows the
-# strict-grammar limit), score.ts (clamp every sub-dim to [0,max] then aggregate;
-# partialJudgement flag). call_scores table (migration 0010, additive, dev Neon);
-# CAS claim + attempts cap (3) + cron sweeper (/api/cron/score, 2-59/10, offset
-# 2 min after transcribe) mirror the transcription store/runner. Evidence-grounded
-# (verbatim quotes per sub-dim) -> sets up Phase 26 guard. NO UI (engine+API only)
-# -> no /design-critique. verify-phase16 60/60 + throwaway real-Postgres+real-Claude
-# probe 16/16 (a discriminating, fully evidence-cited 58/100 on a realistic SW-rep
-# transcript). Merged review-for-main (PR #21, squash f1fc1ac). DEC-031. FLAGGED
-# for Felix + expert coach: rubric/prompt quality, calibration on real audio,
-# text-only silence scoring, ~84s/call latency (Phase 17 caching is the lever).
-PHASE_LAST_COMPLETED=16/three-pillar-scoring
-PHASE_LAST_COMPLETED_AT=2026-06-18T06:40:00-04:00
+PHASE_NEXT=18/pre-call-brief
+# Phase 17 DONE 2026-06-18 (aggressive-auto, relaxed gate): Anthropic prompt
+# caching wiring + cache telemetry. Reusable layer src/lib/ai/cache.ts —
+# buildCachedSystem places cache_control breakpoints across ordered most-stable-
+# first layers (methodology forever + rep intake per rep, the locked memory arch;
+# each its own breakpoint; drops empty layers; caps at 4); summarizeCacheUsage/
+# formatCacheUsage read the usage object NaN-safely; MIN_CACHEABLE_TOKENS advisory.
+# cache_control is GA (no beta header). Scoring builds its system via the helper
+# (replaces Phase 16's inline breakpoint); AnthropicScorer gained an onUsage hook;
+# the runner LOGS the per-call cache hit rate (counts only, no PII). Telemetry by
+# logging, NOT a schema migration (additive, zero data-loss). NO UI (no /design-
+# critique), NO migration. verify-phase17 36/36 + verify-phase16 regression green;
+# typecheck+build clean. LIVE PROBE (throwaway): methodology block 1567 tok caches
+# on claude-sonnet-4-6 -> call1 created=1560, call2 read=1560 = 90% hit rate;
+# caching is live on the scoring call TODAY. DEC-032. FLAGGED for Felix: the
+# claude-api doc lists a 2048 min for Sonnet 4.6 but the live API cached at ~1560
+# (set MIN_CACHEABLE_TOKENS sonnet=1024 to match observation, advisory-only);
+# telemetry is log-only (no dashboard yet); rep-intake cache layer is tested but
+# has no live consumer until coaching/working-memory (18-21, 25). Merged
+# review-for-main (PR #22, squash abb912a).
+PHASE_LAST_COMPLETED=17/prompt-caching
+PHASE_LAST_COMPLETED_AT=2026-06-18T07:30:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -82,16 +83,16 @@ ENV_READY=true
 UI_VERIFY_PENDING=
 
 # --- SESSION HEARTBEAT ---
-# Phase 14 DONE + DEVICE-VERIFIED 2026-06-18 (interruption detection + 4 channels +
-# capture-coverage integrity + Tier-4 keep/discard prompt). Merged to recording-staging
-# (PR #18, squash c517ce7) + promoted to review-for-main by Felix's command -> review-for-main
-# now holds Phases 2-14. KEY FINDING (durable): on iOS a backgrounded/locked PWA has its mic
-# SUSPENDED (WebKit policy) -> phone recording is foreground+screen-on ONLY; the recorder now
-# DETECTS + DISCLOSES gaps (coverage) instead of silently saving a holey file. NEXT: Phase 15
-# (Deepgram) as the first phase of the AGGRESSIVE-AUTO run (15->26, relaxed gate, review-for-main only).
-SESSION_LAST_HEARTBEAT=2026-06-18T06:40:00-04:00
-SESSION_TOKEN_BUDGET_USED=300000
-SESSION_ID=fullauto-aggressive-phase16-2026-06-18
+# Phase 17 DONE 2026-06-18 (aggressive-auto run, scheduled task critiq-fullauto-
+# aggressive-15-26). Prompt caching wiring + telemetry merged to review-for-main
+# (PR #22, squash abb912a) -> review-for-main now holds Phases 2-17. The value
+# engine (15 Deepgram, 16 scoring, 17 caching) is complete. NEXT = Phase 18
+# (pre-call brief) — Block 3, the interaction loop (UI + AI): auto-build + the
+# /design-critique pass is REQUIRED before merge (UI phase) + best-effort Chrome
+# MCP smoke. Relaxed gate (build+types+unit) still applies; device gates are done.
+SESSION_LAST_HEARTBEAT=2026-06-18T07:30:00-04:00
+SESSION_TOKEN_BUDGET_USED=400000
+SESSION_ID=fullauto-aggressive-phase17-2026-06-18
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL

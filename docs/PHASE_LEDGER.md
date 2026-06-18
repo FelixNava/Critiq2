@@ -451,9 +451,19 @@ The value engine's second half: a completed/partial transcript (Phase 15) → a 
 
 **FLAGGED for Felix + the expert coach (quality, not blocking the relaxed gate):** (1) the RUBRIC weights/sub-dimensions + the scoring PROMPT need expert validation before reps see scores; (2) scoring QUALITY/calibration on real field audio (the sample is strong but is one short transcript); (3) text-only transcripts can't verify true silence/pacing — Voss "Silence & Pacing" is structurally under-evidenced (the model self-flags this); (4) per-call cost/latency at scale (~84s with adaptive thinking) — Phase 17 caching + a possible effort dial-down are the levers. See DEC-031.
 
-## Phase 17 — Anthropic Prompt Caching Wiring ☐ Planned
+## Phase 17 — Anthropic Prompt Caching Wiring ✅ DONE (review-for-main, PR #22, squash abb912a)
 
 Cache locked methodology + rep intake. Verify hit rate.
+
+**Built 2026-06-18 (aggressive-auto, relaxed gate).** A reusable prompt-caching layer — `src/lib/ai/cache.ts`, the single place Critiq builds a cache-aware Claude `system` array and reads cache usage back, so every AI consumer (scoring now; pre-call brief / coaching / working-memory later) caches the same way instead of hand-placing `cache_control`:
+- `buildCachedSystem(layers)` — places `cache_control: {type:"ephemeral"}` breakpoints across ordered, **most-stable-first** layers. The locked memory architecture's two stable layers — **methodology (cached forever)** + **rep intake (cached per rep)** — each get their own breakpoint (a rep-intake change still reads the methodology cache before it). Drops empty layers; caps at 4 breakpoints (Anthropic limit), keeping the earliest/most-reused. `cache_control` is **GA — no beta header**.
+- `summarizeCacheUsage` / `formatCacheUsage` — NaN-safe read of `cache_read_input_tokens` / `cache_creation_input_tokens` / `input_tokens` + a hit-rate.
+- `MIN_CACHEABLE_TOKENS` advisory floor (see finding).
+- **Scoring wired through the helper**: `buildScoringRequest` builds `system` via `buildCachedSystem([{ text: methodology }])` (replaces Phase 16's inline breakpoint). `AnthropicScorer` gained an `onUsage` hook; the **runner logs the per-call cache hit rate** to the Vercel runtime logs (counts only, no PII).
+
+**Verification (relaxed gate, all green):** typecheck + build clean; `verify-phase17.ts` **36/36** (breakpoint placement, multi-layer methodology+rep-intake, 4-breakpoint cap, empty-layer drop, NaN-safe usage, Phase-16 breakpoint regression, `onUsage` via fake fetch); `verify-phase16.ts` regression green. **Live cache probe (throwaway, not committed)** — the literal "verify hit rate": the methodology block is **1567 tokens**, and two identical scoring calls showed **call 1 `cache_creation=1560`, call 2 `cache_read=1560` → 90% cache hit rate**. Caching is **live on the scoring call today.**
+
+**⚑ FINDING flagged for Felix:** the claude-api docs state a **2048-token** minimum cacheable prefix for `claude-sonnet-4-6`, but the **live API cached the 1567-token methodology block** (created→read confirmed). The doc over-warns; `MIN_CACHEABLE_TOKENS["claude-sonnet-4-6"]` is set to **1024** (the documented floor, consistent with observation) so the advisory doesn't false-warn. Production logic never gates on it. **NO UI** (no design-critique) and **NO schema change** (no migration, zero data-loss risk) — additive only. See DEC-032.
 
 ## Phase 18 — Pre-Call Brief Flow ☐ Planned
 

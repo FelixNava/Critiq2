@@ -423,6 +423,22 @@ Trade-off flag: YES — Felix + the expert coach's review queue: (a) the rubric 
 
 ---
 
+## DEC-032 — Phase 17 design (reusable cache layer, the 2048-vs-observed minimum, telemetry by logging not schema)
+Phase: 17/prompt-caching
+Date: 2026-06-18 (aggressive-auto run)
+Type: trade-off (the ledger gave one line — "cache locked methodology + rep intake; verify hit rate"; the shape was mine)
+Context: Phase 16 had already planted an inline `cache_control` breakpoint on the methodology system block. Phase 17 = wire the locked caching strategy properly + verify the hit rate, under the relaxed aggressive gate. PR #22, squash abb912a.
+Chosen:
+  - **Reusable layer** `src/lib/ai/cache.ts` (`buildCachedSystem` + `summarizeCacheUsage`/`formatCacheUsage` + `MIN_CACHEABLE_TOKENS`) instead of leaving the breakpoint inline in the scorer. Rationale: the locked memory architecture caches TWO stable layers (methodology forever + rep intake per rep), and the coaching/working-memory phases (18–21, 25) will build the same layered system — a single tested helper is the right home, so cache_control placement isn't re-derived per phase. Scoring uses it for its one (methodology) layer; the multi-layer path is proven by unit tests, NOT by wiring an unused rep-profile param into the live scoring request (that would be dead code in a hot path — scoring is rep-agnostic today).
+  - **Telemetry via structured logging, NOT a schema migration.** `AnthropicScorer` gained an `onUsage` hook; the runner logs `cache: read/created/input/output/hitRate` per scored call. Rationale: "verify hit rate" needs observability, not persistence — a log line is additive, zero data-loss, visible in Vercel logs; a telemetry-columns migration is heavier than the ledger asks and can come later if a dashboard needs it.
+  - **MIN_CACHEABLE_TOKENS for claude-sonnet-4-6 = 1024, against the doc's 2048.** The claude-api per-model table lists 2048 for Sonnet 4.6, but the Phase 17 LIVE PROBE showed Critiq's 1567-token methodology block caches (call 1 created=1560 → call 2 read=1560, 90% hit). Per the verify-before-claim / user-is-ground-truth rules, the empirical result wins; 2048 would emit a false "won't cache" warning. Set to 1024 (the documented absolute floor, consistent with observation). It's advisory only — production never gates on it.
+  - **No structured-output / model change**; `cache_control` is GA (no beta header). No UI (no design-critique). No migration.
+Verification: typecheck + build clean; verify-phase17 36/36; verify-phase16 regression green; throwaway live probe confirmed a real 90% hit rate on the second identical-prefix scoring call.
+Iterability: high (the helper is one module; the advisory constant is one line; telemetry is a log line that can become a column later).
+Trade-off flag: YES — Felix's review queue: (a) the 2048-vs-1024 doc discrepancy (the live API cached under the documented minimum — worth a sanity check if Anthropic's doc is later authoritative); (b) telemetry is log-only for now (no cache-hit-rate dashboard/persistence yet); (c) rep-intake caching is a tested mechanism but has no live consumer until the coaching/working-memory phases.
+
+---
+
 ## End-of-build summary
 
 This section is filled by the master orchestrator at the end of every Full Auto run. It surfaces:
