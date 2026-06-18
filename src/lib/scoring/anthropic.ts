@@ -13,6 +13,12 @@
  * 17 builds the full caching strategy on top of this).
  */
 
+import {
+  buildCachedSystem,
+  summarizeCacheUsage,
+  type CacheUsageSummary,
+  type SystemTextBlock,
+} from "@/lib/ai/cache";
 import { buildSystemPrompt, buildUserPrompt } from "./prompt";
 import type { DimensionScore, RawScoreResult, ScorableTranscript, Scorer } from "./types";
 
@@ -27,7 +33,7 @@ export interface AnthropicRequest {
   model: string;
   max_tokens: number;
   thinking: { type: "adaptive" };
-  system: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }>;
+  system: SystemTextBlock[];
   messages: Array<{ role: "user"; content: string }>;
 }
 
@@ -49,15 +55,11 @@ export function buildScoringRequest(
     model: SCORING_MODEL,
     max_tokens: SCORING_MAX_TOKENS,
     thinking: { type: "adaptive" },
-    system: [
-      {
-        type: "text",
-        text: buildSystemPrompt(),
-        // The methodology block is identical on every call → cache it (Phase 17
-        // builds the full strategy; this is the breakpoint).
-        cache_control: { type: "ephemeral" },
-      },
-    ],
+    // The methodology block is identical on every scoring call → its own cache
+    // breakpoint (Phase 17). It's the only stable system layer scoring needs;
+    // coaching/working-memory phases add the rep-intake layer via the same
+    // buildCachedSystem([methodology, repIntake]) (locked memory architecture).
+    system: buildCachedSystem([{ text: buildSystemPrompt() }]),
     messages: [{ role: "user", content: buildUserPrompt(transcript) }],
   };
 }
@@ -187,9 +189,27 @@ function requireApiKey(): string {
   return key;
 }
 
+export interface AnthropicScorerOptions {
+  /** Inject a fake `fetch` in tests; defaults to the global. */
+  fetchImpl?: typeof fetch;
+  /**
+   * Called once per real Claude call with that call's cache activity (Phase 17).
+   * The runner uses this to log the methodology-block hit rate; tolerant of a
+   * missing usage object. Never throws — a callback error is swallowed so it
+   * can't fail the score.
+   */
+  onUsage?: (usage: CacheUsageSummary) => void;
+}
+
 /** The real Claude-backed Scorer. */
 export class AnthropicScorer implements Scorer {
-  constructor(private readonly fetchImpl: typeof fetch = fetch) {}
+  private readonly fetchImpl: typeof fetch;
+  private readonly onUsage?: (usage: CacheUsageSummary) => void;
+
+  constructor(opts: AnthropicScorerOptions = {}) {
+    this.fetchImpl = opts.fetchImpl ?? fetch;
+    this.onUsage = opts.onUsage;
+  }
 
   async score(transcript: ScorableTranscript): Promise<RawScoreResult> {
     const apiKey = requireApiKey();
@@ -217,7 +237,16 @@ export class AnthropicScorer implements Scorer {
         res.status,
       );
     }
-    const json = await res.json();
+    const json = (await res.json()) as AnthropicResponse;
+    // Surface cache activity for observability (Phase 17) before parsing — a bad
+    // callback must never sink a good score.
+    if (this.onUsage) {
+      try {
+        this.onUsage(summarizeCacheUsage(json.usage));
+      } catch {
+        /* ignore telemetry errors */
+      }
+    }
     return extractScoreFromResponse(json);
   }
 }

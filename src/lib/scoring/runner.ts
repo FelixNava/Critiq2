@@ -10,6 +10,7 @@
  * throw before a result marks the row failed (the cron retries up to the cap).
  */
 
+import { formatCacheUsage } from "@/lib/ai/cache";
 import { AnthropicScorer } from "./anthropic";
 import { scoreTranscript } from "./score";
 import {
@@ -53,7 +54,14 @@ export async function runScoringForRecording(
   const scoreId = claim.scoreId;
 
   try {
-    const scorer = deps.scorer ?? new AnthropicScorer();
+    const scorer =
+      deps.scorer ??
+      new AnthropicScorer({
+        // Log the methodology-block cache hit rate per scored call (Phase 17) so
+        // caching is observable in the Vercel runtime logs (counts only, no PII).
+        onUsage: (u) =>
+          console.log(`[scoring] recording=${recordingId} ${formatCacheUsage(u)}`),
+      });
     const result = await scoreTranscript(
       {
         text: transcript.text,
