@@ -22,6 +22,14 @@ export default function AppHeader({
         >
           Critiq
         </Link>
+        {process.env.VERCEL_ENV !== "production" && (
+          <Link
+            href="/recording-lab"
+            className="text-sm font-medium text-indigo-600 transition hover:text-indigo-800"
+          >
+            Recording Lab
+          </Link>
+        )}
         {backHref && (
           <Link
             href={backHref}

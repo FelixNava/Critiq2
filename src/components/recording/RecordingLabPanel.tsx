@@ -1,6 +1,7 @@
 "use client";
 
 import { useRecorder, type ChunkView } from "@/hooks/useRecorder";
+import { usePushAlerts } from "@/hooks/usePushAlerts";
 import {
   buttonClass,
   cardClass,
@@ -156,17 +157,26 @@ export default function RecordingLabPanel() {
     recoveryTier,
     recoveryEvents,
     recoveredNote,
+    interrupted,
+    gapMs,
+    gapCount,
+    coverage,
+    captureLost,
     error,
     busy,
     start,
     stop,
+    discard,
     runSelfTest,
   } = useRecorder();
+  const push = usePushAlerts();
 
   const isRecording = status === "recording" || status === "recovering";
   const s = statusLabel(status);
   const uploaded = chunks.filter((c) => c.state === "uploaded").length;
   const showHealth = segment.count > 0 || isRecording;
+  const coveragePct = Math.round(coverage * 100);
+  const gapSeconds = Math.round(gapMs / 1000);
 
   return (
     <div className={cardClass}>
@@ -183,41 +193,117 @@ export default function RecordingLabPanel() {
         is part of a live call; it is only a check.
       </p>
 
+      <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm ring-1 ring-amber-200">
+        <p className="font-semibold text-amber-900">
+          On a phone, keep Critiq open with the screen on
+        </p>
+        <p className="mt-0.5 text-amber-800">
+          Phones pause the microphone the moment you lock the screen or switch
+          apps, so anything said while you&apos;re away isn&apos;t recorded. For a
+          full, reliable recording, use a laptop.
+        </p>
+      </div>
+
+      {interrupted && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm ring-1 ring-red-200"
+        >
+          <p className="font-semibold text-red-800">Recording paused</p>
+          <p className="mt-0.5 text-red-700">
+            Critiq lost the microphone — you left the app, locked the screen, or
+            another app took it. Come back to Critiq to keep recording; it
+            reconnects automatically when the mic is free.
+          </p>
+        </div>
+      )}
+
       {recoveredNote && (
         <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 ring-1 ring-emerald-200">
           {recoveredNote}
         </p>
       )}
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        {isRecording ? (
-          <button
-            type="button"
-            onClick={() => void stop()}
-            disabled={busy}
-            className={buttonClass}
-          >
-            Stop
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => void start()}
-            disabled={busy}
-            className={buttonClass}
-          >
-            Start recording
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => void runSelfTest()}
-          disabled={busy || isRecording}
-          className={secondaryButtonClass}
+      {gapCount > 0 && (
+        <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm ring-1 ring-amber-200">
+          <p className="font-semibold text-amber-900">
+            Only {coveragePct}% of this session was captured
+          </p>
+          <p className="mt-0.5 text-amber-800">
+            About {gapSeconds}s of audio is missing across {gapCount}{" "}
+            {gapCount === 1 ? "interruption" : "interruptions"} — the phone
+            backgrounded or the screen locked. A recording with gaps isn&apos;t
+            reliable for review; re-record with Critiq open and the screen on, or
+            use a laptop.
+          </p>
+        </div>
+      )}
+
+      {captureLost && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm ring-1 ring-red-200"
         >
-          Run upload self-test
-        </button>
-      </div>
+          <p className="font-semibold text-red-800">Lost the microphone</p>
+          <p className="mt-0.5 text-red-700">
+            We couldn&apos;t reconnect. We&apos;re still trying in the background —
+            recording resumes on its own if the mic frees up. Keep what
+            you&apos;ve recorded so far?
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void stop()}
+              disabled={busy}
+              className={buttonClass}
+            >
+              Keep &amp; stop
+            </button>
+            <button
+              type="button"
+              onClick={() => void discard()}
+              disabled={busy}
+              className={secondaryButtonClass}
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!captureLost && (
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          {isRecording ? (
+            <button
+              type="button"
+              onClick={() => void stop()}
+              disabled={busy}
+              className={buttonClass}
+            >
+              Stop
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void start()}
+              disabled={busy}
+              className={buttonClass}
+            >
+              Start recording
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => void runSelfTest()}
+            disabled={busy || isRecording}
+            className={secondaryButtonClass}
+          >
+            Run upload self-test
+          </button>
+        </div>
+      )}
       <p className="mt-2 text-xs text-slate-400">
         Start recording asks for your microphone. The self-test saves a couple of
         placeholder clips instead, so you can check that uploading works without a
@@ -318,6 +404,73 @@ export default function RecordingLabPanel() {
             return <Row key={row.key} title={row.title} value={keepAliveLabel(value)} tone={tone} />;
           })}
         </div>
+      </div>
+
+      <div className="mt-6 border-t border-slate-100 pt-6">
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-sm font-semibold text-slate-900">
+            Alerts when you step away
+          </p>
+          {push.state === "on" && (
+            <span
+              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${toneClass.on}`}
+            >
+              On
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-slate-500">
+          If you leave Critiq while recording, capture pauses — so it plays a
+          chime and shows a banner to tell you to come back. Turn on notifications
+          for a best-effort lock-screen nudge (a fully locked phone can&apos;t
+          always be reached).
+        </p>
+
+        {push.state === "checking" && (
+          <p className="mt-3 text-sm text-slate-400">Checking this device…</p>
+        )}
+        {push.state === "off" && (
+          <button
+            type="button"
+            onClick={() => void push.enable()}
+            disabled={push.busy}
+            className={`${secondaryButtonClass} mt-3`}
+          >
+            Turn on notifications
+          </button>
+        )}
+        {push.state === "on" && (
+          <button
+            type="button"
+            onClick={() => void push.disable()}
+            disabled={push.busy}
+            className={`${secondaryButtonClass} mt-3`}
+          >
+            Turn off notifications
+          </button>
+        )}
+        {push.state === "needs-install" && (
+          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600 ring-1 ring-slate-200">
+            To get lock-screen alerts on iPhone, add Critiq to your Home Screen
+            first (Share → Add to Home Screen), then open it from there. The
+            chime, tab flash, and on-screen banner work either way.
+          </p>
+        )}
+        {push.state === "denied" && (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 ring-1 ring-amber-200">
+            Notifications are blocked for Critiq. Allow them in your browser
+            settings to get lock-screen alerts. The other alerts still work.
+          </p>
+        )}
+        {push.state === "unsupported" && (
+          <p className="mt-3 text-sm text-slate-500">
+            This browser can&apos;t show lock-screen alerts. The chime, tab flash,
+            and on-screen banner still work.
+          </p>
+        )}
+        {push.message && (
+          <p className="mt-2 text-xs text-slate-500">{push.message}</p>
+        )}
       </div>
 
       {recordingId && (

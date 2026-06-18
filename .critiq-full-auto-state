@@ -18,15 +18,20 @@ PHASE_CURRENT=
 PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
 PHASE_NEXT=15/deepgram-transcription
-# Phase 14 BUILT to OPEN PR #18 (base recording-staging) by the cron 2026-06-08;
-# NOT merged, awaiting Felix's iPhone device gate (UI_VERIFY_PENDING=14 below).
-PHASE_LAST_COMPLETED=13/auto-segmentation-heartbeat-recovery
-PHASE_LAST_COMPLETED_AT=2026-06-08T04:15:00-04:00
+# Phase 14 DONE 2026-06-18: interruption detection + 4 channels + CAPTURE-COVERAGE
+# INTEGRITY (gap_ms/gap_count, migration 0007) + honest phone repositioning + the
+# Tier-4 lost-mic keep/discard prompt. Device-verified: notifications (iPhone) +
+# coverage (session b47ea693, ~91%, gap detected+persisted). Merged to
+# recording-staging (PR #18, squash c517ce7) -> promoted to review-for-main.
+PHASE_LAST_COMPLETED=14/interruption-detection-coverage-integrity
+PHASE_LAST_COMPLETED_AT=2026-06-18T04:05:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
 # Also in .env.local: ANTHROPIC_API_KEY + RESEND_API_KEY (reused), AUTH_SECRET + CRON_SECRET.
-# Still to provision later: DEEPGRAM_API_KEY (Phase 15), SENTRY_DSN (Phase 4).
+# DEEPGRAM_API_KEY PROVISIONED 2026-06-18 (Felix's key; validated vs Deepgram API;
+#   Vercel prod + preview/all-branches Sensitive + .env.local) -> Phase 15 unblocked.
+# Still to provision: SENTRY_DSN (Phase 4/29).
 # Phase 11 + 11a done + device-verified + promoted to review-for-main; client-side only, no env.
 # BLOB_READ_WRITE_TOKEN PROVISIONED 2026-06-06 (Felix, dashboard) — store critiq2-blob (store_LgqOObB7jYpcT6x8),
 #   scoped Preview/all-branches + Sensitive. Sensitive => NOT pullable to .env.local; verify Phase 12 on the PREVIEW.
@@ -58,19 +63,22 @@ ENV_READY=true
 #   recover-clears-all. VAPID keypair generated -> add to Vercel for runtime push
 #   (PR #18 body has the keys). Do NOT merge until the gate passes; then merge to
 #   recording-staging + promote to review-for-main per Felix.
-UI_VERIFY_PENDING=14
+# CLEARED 2026-06-18: Phase 14 device gate PASSED (notifications on iPhone; coverage
+# session b47ea693 ~91%, gap_ms=10005 persisted). VAPID + Deepgram keys provisioned.
+# Phase 14 merged (PR #18, c517ce7) + promoted to review-for-main.
+UI_VERIFY_PENDING=
 
 # --- SESSION HEARTBEAT ---
-# Phase 13 DONE + DEVICE-VERIFIED (segmentation + heartbeat + Tier 1-4 recovery +
-# resume-after-tab-kill). Device gate PASSED on desktop + iPhone (session 8eb5e643:
-# 112/112 chunks uploaded, contiguous 0-111, segment_index {0:111,1:1} = a real
-# ~10-min rotation with zero audio loss). Merged to recording-staging (PR #16, squash
-# 905d35f) THEN promoted to review-for-main (PR #17, merge 0fa2d78) by Felix's command.
-# review-for-main now holds Phases 2-13; build clean on the merged result. DEC-027.
-# NEXT (Block 1): Phase 14 (interruption detection + Web Push) off recording-staging.
-SESSION_LAST_HEARTBEAT=2026-06-08T20:40:00-04:00
-SESSION_TOKEN_BUDGET_USED=420000
-SESSION_ID=cron-phase14-interruption-notification-2026-06-08
+# Phase 14 DONE + DEVICE-VERIFIED 2026-06-18 (interruption detection + 4 channels +
+# capture-coverage integrity + Tier-4 keep/discard prompt). Merged to recording-staging
+# (PR #18, squash c517ce7) + promoted to review-for-main by Felix's command -> review-for-main
+# now holds Phases 2-14. KEY FINDING (durable): on iOS a backgrounded/locked PWA has its mic
+# SUSPENDED (WebKit policy) -> phone recording is foreground+screen-on ONLY; the recorder now
+# DETECTS + DISCLOSES gaps (coverage) instead of silently saving a holey file. NEXT: Phase 15
+# (Deepgram) as the first phase of the AGGRESSIVE-AUTO run (15->26, relaxed gate, review-for-main only).
+SESSION_LAST_HEARTBEAT=2026-06-18T04:05:00-04:00
+SESSION_TOKEN_BUDGET_USED=0
+SESSION_ID=interactive-phase14-merge-arm-2026-06-18
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL
