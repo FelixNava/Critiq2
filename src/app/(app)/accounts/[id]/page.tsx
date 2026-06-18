@@ -64,6 +64,23 @@ export default async function AccountDetailPage({
           </span>
         </Link>
 
+        {/* Secondary action — debrief a finished call */}
+        <Link
+          href={`/accounts/${account.id}/debrief`}
+          className="mt-3 flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm transition hover:bg-slate-50"
+        >
+          <span>
+            <span className="block text-sm font-semibold">Debrief a call</span>
+            <span className="mt-0.5 block text-sm text-slate-500">
+              Just got off a call? Tell Critiq what happened and it writes up the
+              recap, commitments, and loose ends.
+            </span>
+          </span>
+          <span aria-hidden className="text-lg text-slate-400">
+            →
+          </span>
+        </Link>
+
         {/* Learning indicator */}
         <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
