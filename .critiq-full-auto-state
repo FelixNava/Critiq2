@@ -17,9 +17,37 @@ BUILD_PHASE_TOKEN_BUDGET=800000
 PHASE_CURRENT=
 PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
-# NEXT = 23 (Phase 22 email-drafting is DEFERRED post-launch per the aggressive-auto
-# scope order 21 → 23; if a future firing sees 22 as "next un-built", build 23).
-PHASE_NEXT=23/semantic-memory-account-consolidation
+# NEXT = 24 (Phase 22 email-drafting is DEFERRED post-launch; 23 done this firing).
+PHASE_NEXT=24/semantic-memory-rep-consolidation
+# Phase 23 DONE 2026-06-18 (aggressive-auto, relaxed gate): Semantic Memory — Account
+# Consolidation (Block 4, BACKEND, no UI). The ACCOUNT side of the semantic tier:
+# after every debrief a background job regenerates a single SHARED, rep-agnostic
+# running summary for the account from its completed Phase 20 debriefs (Option B),
+# with SOURCE ATTRIBUTION PER FACT (every fact carries the originating debrief id —
+# the Phase 26 hallucination-guard setup). Table account_summaries (mig 0015, one
+# row/account UNIQUE; narrative + headline + facts jsonb {text,lens,sourceDebriefId}
+# + debriefCount/consolidatedThroughAt high-water marks; CAS-claim/attempts-cap-3/
+# stale-reclaim like call_scores, keyed on account). src/lib/consolidation/
+# (types/prompt/anthropic/store/runner): fetch claude-sonnet-4-6, adaptive thinking,
+# no SDK, ONE cached methodology layer (rep-agnostic — no rep-profile layer); parse
+# DROPS facts citing an unknown debrief label (attribution guardrail) + empty-result
+# rejection; model attributes to labels D1.. → runner maps back to real ids. Reads ALL
+# completed debriefs across reps (shared intelligence); count-based new-material
+# detection resets the attempts budget. Write-back: narrative → account_records.summary
+# (reserved since Phase 9) lights up the Phase 10 card with ZERO new UI; deletedAt-
+# guarded, does NOT bump updatedAt. Two paths: /api/cron/consolidate-accounts
+# (CRON_SECRET, 5-59/10 vercel.json) = guaranteed; debrief route after() = best-effort
+# low-latency (maxDuration raised to 300). verify-phase23 56/56 + Phase 20/21
+# regressions green + throwaway real-PG+real-Claude probe (9 attributed facts all
+# traceable to real debriefs, idempotency, new-material reset, work-list, cascade).
+# High-effort /code-review (3 angles) → P1s fixed (eligibility↔claim alignment;
+# write-back updatedAt/deletedAt; after() budget; bounded work-list query; NULLS LAST;
+# debriefCount race; comment drift). NO UI → no /design-critique. NO DEVICE GATE.
+# Merged review-for-main (PR #27, squash <pending>). DEC-037. FLAGGED for Felix +
+# expert coach: consolidation prompt + fact/narrative QUALITY; rep-identity isolation
+# in the shared summary is PROMPT-enforced not code-enforced (validate on real data);
+# no caching yet (methodology under the Sonnet min-prefix); debrief-only (scores not
+# folded in); work-list scans debriefs (beta-acceptable, revisit at scale).
 # Phase 21 DONE 2026-06-18 (aggressive-auto, relaxed gate): Coaching Output Layer —
 # the interaction loop's payoff step (Signal PRD Step 06) + the FIRST surface to
 # combine the Phase 20 debrief (subjective, neutral) with the Phase 16 call_score
@@ -152,8 +180,8 @@ PHASE_NEXT=23/semantic-memory-account-consolidation
 # telemetry is log-only (no dashboard yet); rep-intake cache layer is tested but
 # has no live consumer until coaching/working-memory (18-21, 25). Merged
 # review-for-main (PR #22, squash abb912a).
-PHASE_LAST_COMPLETED=21/coaching-output-layer
-PHASE_LAST_COMPLETED_AT=2026-06-18T14:05:00-04:00
+PHASE_LAST_COMPLETED=23/account-consolidation
+PHASE_LAST_COMPLETED_AT=2026-06-18T16:30:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -211,9 +239,20 @@ UI_VERIFY_PENDING=
 # it). Block 4 (23-25) is the cleanest unattended-cron window in the build; Phase 26
 # (hallucination guard) gets scrutinized. Phase 23 has NO UI → no /design-critique pass
 # needed; it consumes the call_debriefs episodic records this phase + Phase 20 produce.
-SESSION_LAST_HEARTBEAT=2026-06-18T14:05:00-04:00
-SESSION_TOKEN_BUDGET_USED=520000
-SESSION_ID=fullauto-aggressive-phase21-2026-06-18
+# Phase 23 DONE 2026-06-18 (aggressive-auto, scheduled task critiq-fullauto-
+# aggressive-15-26). Account Consolidation (Block 4, backend) merged to review-for-main
+# (PR #27) → review-for-main now holds Phases 2-21 + 23. Built directly by the
+# orchestrator (DEC-004/013/030.. precedent for a fully-specified backend phase), the
+# cleanest unattended-cron window in the build. Relaxed gate (build+types+unit) + a
+# real-PG+real-Claude probe; high-effort /code-review P1s fixed. NO UI → no
+# /design-critique; NO device gate. NEXT = Phase 24 (Semantic Memory: Rep Consolidation
+# — runs every 10 debriefs, regenerates the per-rep running summary; mirrors Phase 23's
+# consolidation engine but rep-scoped + rep-private, and IS allowed rep identity). Then
+# 25 (working memory) + 26 (hallucination guard — gets scrutinized; it CONSUMES Phase
+# 23's source-tagged facts).
+SESSION_LAST_HEARTBEAT=2026-06-18T16:30:00-04:00
+SESSION_TOKEN_BUDGET_USED=470000
+SESSION_ID=fullauto-aggressive-phase23-2026-06-18
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL
