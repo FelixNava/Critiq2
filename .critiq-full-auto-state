@@ -14,14 +14,25 @@ BUILD_TOTAL_TOKEN_BUDGET=4000000
 BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
-PHASE_CURRENT=33/marketing-landing-redesign
-PHASE_CURRENT_STATUS=building
+PHASE_CURRENT=
+PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
-# Phase 33 (Marketing Landing Redesign) is the IMMEDIATE-NEXT build per the
-# reordered aggressive-auto scope (Felix 2026-06-18) — built BEFORE resuming the
-# numbered order (Phase 25 was already done; next numbered = 26). Branch
-# phase-33/marketing-landing-redesign off review-for-main; PR base review-for-main.
-# WIP committed; build+typecheck green. Next: design-critique + MCP smoke + PR + merge.
+# Phase 33 DONE 2026-06-18 (aggressive-auto, relaxed gate + mandatory /design-critique):
+# Marketing Landing Redesign — replaced the Phase 4 landing at `/` with the Felix-approved
+# cinematic prototype, ported into Next.js 16 + React (one "use client" LandingPage component
+# + scoped CSS module + next/font Space Grotesk/Inter), NOT a raw-HTML drop-in / not an iframe.
+# All 9 sections faithful (hero+live-analysis panel, tension, 5-step loop, 3 pillars, learns-you
+# +curve, bento, ICP, proof+testimonial, final CTA+footer); prototype's vanilla JS re-expressed
+# in ONE useEffect (refs + data-* hooks) with full prefers-reduced-motion gating; CTAs → /login
+# + /signup; metrics/testimonial code-flagged as ILLUSTRATIVE placeholders to swap pre-master.
+# Branch phase-33/marketing-landing-redesign off review-for-main; merged review-for-main (PR
+# #__PR__, squash __SQUASH__). /design-critique (design-reviewer) → 3 P0 fixed (focus-visible
+# ring, --faint AA contrast bump, <main> landmark) + P1/P2 (input semantics, aria-hidden
+# decoratives, scroll-margin-top, RM hover). VERIFIED live in real Chrome across all 9 sections
+# (full-page screenshots in the review packet); typecheck+build green, / prerenders static;
+# responsive at 375px clean. NO device gate. DEC-040. FLAGGED for Felix: eyeball fidelity on the
+# preview (rAF motion only confirmed progressing under the hidden-tab throttle); swap placeholder
+# metrics+testimonial before master.
 # NEXT = 26 Hallucination Guard (Phase 22 email-drafting is DEFERRED post-launch; 25 done this firing).
 # Phase 26 gets SCRUTINIZED (it consumes the source-tagged facts/traits from P23+P24 + the
 # working set from P25). After 26 → the MARKETING LANDING REDESIGN (final scope item).
@@ -243,8 +254,8 @@ PHASE_NEXT=26/hallucination-guard
 # block ~929 tok sits under the Sonnet 1024 cacheable floor on its own (caches once per-rep layer
 # extends the prefix); confirm the rep-private raw scope is intended; the ~4-chars/tok estimate is a
 # heuristic not a tokenizer; WIRING the consumers onto the builder is the real payoff + is NOT done.
-PHASE_LAST_COMPLETED=25/working-memory-assembly
-PHASE_LAST_COMPLETED_AT=2026-06-18T19:30:00-04:00
+PHASE_LAST_COMPLETED=33/marketing-landing-redesign
+PHASE_LAST_COMPLETED_AT=2026-06-18T20:30:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -337,9 +348,17 @@ UI_VERIFY_PENDING=
 # REDESIGN (final scope item, build ONLY after 15-26 all merged). Working-memory QUALITY (budget/
 # trim/scope) is FLAGGED for Felix + the expert coach; the builder is built-but-not-yet-wired into
 # the AI consumers (the real payoff, a flagged follow-up).
-SESSION_LAST_HEARTBEAT=2026-06-18T19:30:00-04:00
-SESSION_TOKEN_BUDGET_USED=360000
-SESSION_ID=fullauto-aggressive-phase25-2026-06-18
+# Phase 33 DONE 2026-06-18 (aggressive-auto, scheduled task critiq-fullauto-aggressive-15-26).
+# Marketing Landing Redesign merged to review-for-main (PR #__PR__) → review-for-main now holds
+# Phases 2-21 + 23 + 24 + 25 + 33. The IMMEDIATE-NEXT scope item (built before resuming the
+# numbered order; Phase 25 was already done). Cinematic prototype ported into real Next.js/React
+# (CSS module + next/font), /design-critique P0/P1 addressed, verified live across all 9 sections.
+# NEXT = Phase 26 (Hallucination Guard — gets SCRUTINIZED; consumes the source-tagged facts/traits
+# from P23+P24 and the P25 working set). After 26 → scope complete (landing + 25 + 26 all done) →
+# self-disable this task.
+SESSION_LAST_HEARTBEAT=2026-06-18T20:30:00-04:00
+SESSION_TOKEN_BUDGET_USED=420000
+SESSION_ID=fullauto-aggressive-phase33-landing-2026-06-18
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL

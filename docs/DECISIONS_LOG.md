@@ -584,6 +584,28 @@ Trade-off flag: YES — Felix + expert coach's review queue: (a) the 6000-token 
 
 ---
 
+## DEC-040 — Phase 33 design (Marketing Landing Redesign: port the Felix-approved cinematic prototype into real Next.js/React, not a raw-HTML drop-in)
+
+Date: 2026-06-18 · Type: build (UI) · Phase: 33 · Mode: aggressive-auto (scheduled task `critiq-fullauto-aggressive-15-26`), relaxed gate + mandatory /design-critique
+Decision: Replace the Phase 4 landing at `/` with the cinematic, high-conversion design Felix reviewed and signed off ("this is perfect"). Built FIRST per the reordered scope (the immediate-next item; Phase 25 was already done). Key choices:
+  - SOURCE OF TRUTH: `docs/design/landing-prototype.html` — a committed copy of `critiq-marketing/prototype-critiq-home.html`. Ported faithfully (all 9 sections, copy verbatim, design tokens, motion).
+  - PROPER PORT, NOT A DROP-IN: a real `"use client"` React component (`src/components/landing/LandingPage.tsx`) + a scoped CSS module (`landing.module.css`) + `next/font` (Space Grotesk display, Inter body) — NOT a raw-HTML page and NOT an iframe. The prototype's vanilla JS is re-expressed in ONE `useEffect` driving refs (gauge/typewriter/curve/cursor-glow/canvas/header) + `data-*` hooks for collections (`data-reveal`/`-stagger`/`-fill`/`-count`/`-magnetic`/`-tilt`). Full `prefers-reduced-motion` gating (renders final states, no heavy motion / no constellation rAF).
+  - CSS-MODULE OVER TAILWIND-UTILITY REWRITE: kept the prototype's bespoke ~600-line cinematic CSS as a module (fidelity + low risk) rather than re-deriving it in Tailwind utilities. Design tokens live on `.root`; every bare element / `*` selector is prefixed `.root ` so nothing leaks to the light-themed app; dynamically-toggled state (`is-in`/`scrolled`) is `:global()`.
+  - BRANCH BASE = review-for-main (NOT master): the phase-only diff requires basing on review-for-main (it holds Phases 2–25; master is far behind at 2–13) — consistent with every recent full-auto phase PR. PR base review-for-main; NEVER master.
+  - CTAs WIRED TO THE REAL APP: "Sign in" → /login; every "Start free" → /signup; the final email field prefills `/signup?email=` (it does NOT capture the address on the landing — keeps the copy honest). Footer Privacy/Terms → /privacy /terms. Dev/preview-only recording-lab banner preserved (hidden in production).
+  - PLACEHOLDERS marked in-code: the 3 metrics (+27% / 3.5× / 9-of-10) and the testimonial (Alex N. · Commercial Sales Rep · Beta) are ILLUSTRATIVE — a code comment flags them for Felix to swap with real beta data before promotion to master.
+  - /design-critique pass (design-reviewer, artifact mode): 3 P0 fixed before merge — (1) added `:focus-visible` rings to .btn/anchors/input (focus was invisible on the dark bg), (2) bumped `--faint` #6b7194 → #868dad for WCAG AA contrast on muted text, (3) wrapped sections in a `<main>` landmark; plus P1/P2: email input name/autoComplete + descriptive aria-label, aria-hidden on decorative viz (gauge bars / pillar rings / typed insight / emoji glyphs / mini-score), scroll-margin-top on anchored sections, RM scroll-behavior:auto + no hover-transform jumps, dropped dead `ms-overflow-style`.
+Alternatives considered:
+  - Raw-HTML drop-in or iframe of the prototype (rejected: the task explicitly forbids it; loses React/route integration, font optimization, and app cohesion).
+  - Rewrite the bespoke CSS as Tailwind 4 utilities (rejected for this phase: enormous, error-prone, and a fidelity risk on the highest-scrutiny item; a CSS module is idiomatic Next and keeps pixel fidelity).
+  - Branch off master (rejected: master holds only 2–13, so the PR diff would be huge/conflicting; review-for-main is the real integration mainline here).
+  - Capture the address on the landing (rejected: we don't store it — routing to /signup keeps the "Free during beta" copy honest).
+Verification: `pnpm typecheck` + `pnpm build` clean (`/` prerenders static `○`). Live verified in a real Chrome tab across ALL 9 sections (full-page screenshots in the PR review packet): gradient hero + animated live-analysis panel (gauge tweens — confirmed progressing, throttled only by the automation tab's hidden visibility; bars fill 82/74/80; typewriter + float badges), tension, the 5-step loop, the 3 pillars, "it learns you" + drawn relevance curve, bento, ICP, proof + testimonial, final CTA + footer. No console errors (the Next "1 Issue" dev badge was a stale mid-edit Fast-Refresh transient; current build is green). Responsive verified at 375px (no overflow; nav-links + float-badges hide; all grids collapse to 1 col).
+Iterability: high (copy + tokens are literals; placeholders are clearly marked; CTAs are route strings; the motion effect is self-contained; swapping CSS-module → Tailwind later is mechanical).
+Trade-off flag: YES — Felix's review queue: (a) EYEBALL THE FIDELITY on the preview/his own browser — this is the highest design-scrutiny item and rAF-driven motion (gauge / count-up / curve / constellation) could not be observed at full speed in the automation environment (hidden-tab rAF throttle), only confirmed progressing; (b) SWAP THE PLACEHOLDER metrics + testimonial with real beta data before promoting to master; (c) the landing keeps the existing root `metadata` (app-wide title) — decide if the punchier prototype title/description should be set per-route; (d) confirm the dev-only recording-lab banner placement is acceptable on previews (it sits above the fixed nav; absent in production).
+
+---
+
 ## End-of-build summary
 
 This section is filled by the master orchestrator at the end of every Full Auto run. It surfaces:
