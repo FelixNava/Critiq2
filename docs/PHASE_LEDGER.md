@@ -425,7 +425,7 @@ Multi-segment parallel transcription, concatenation, store transcripts.
 
 **FLAGGED for Felix (runtime/quality, not blocking staging):** (1) real Deepgram round-trip + private-Blob byte read needs a preview run (probes fake both); (2) transcription QUALITY on field-noise audio + diarization usefulness — validate before Phase 16 depends on it; (3) overlap (~2s seam) not text-deduped for beta; only `uploaded` chunks transcribed (gap/coverage already discloses holey captures); (4) lab UI is dev-surface. See DEC-030.
 
-## Phase 16 — Three-Pillar Scoring Engine ✅ DONE (review-for-main, PR #21, squash <pending>)
+## Phase 16 — Three-Pillar Scoring Engine ✅ DONE (review-for-main, PR #21, squash f1fc1ac)
 
 The value engine's second half: a completed/partial transcript (Phase 15) → a bounded, evidence-grounded 100-point evaluation. First Anthropic-API phase (fetch-based, **no SDK** — mirrors the Phase 15 Deepgram client).
 

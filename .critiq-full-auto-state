@@ -17,19 +17,27 @@ BUILD_PHASE_TOKEN_BUDGET=800000
 PHASE_CURRENT=
 PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
-PHASE_NEXT=16/three-pillar-scoring
-# Phase 15 DONE 2026-06-18 (aggressive-auto, relaxed gate): Deepgram Nova-3
-# multi-segment transcription. Tables recording_transcripts + transcript_segments
-# (migrations 0008 + 0009, additive, applied to dev Neon). Fetch-based Deepgram
-# client (no SDK), Option-B parallel-segment orchestration, idempotent CAS claim +
-# attempts cap (3) + distinct `partial` status, routes (sync trigger + GET
-# transcript + */10 CRON_SECRET sweeper). verify-phase15 37/37 + real-Postgres
-# integration probe 12/12; high-effort /code-review P1s fixed in-branch (infinite
-# re-transcribe loop, claim race, partial contradiction). Merged review-for-main
-# (PR #20, squash 0dfa45d). FLAGGED for Felix: real Deepgram round-trip + Blob
-# read + transcription QUALITY (preview/expert), overlap dedup deferred, lab UI.
-PHASE_LAST_COMPLETED=15/deepgram-transcription
-PHASE_LAST_COMPLETED_AT=2026-06-18T05:25:00-04:00
+PHASE_NEXT=17/prompt-caching
+# Phase 16 DONE 2026-06-18 (aggressive-auto, relaxed gate): three-pillar
+# SPIN/Voss/Navarro scoring engine — the value engine's second half. First
+# Anthropic-API phase (fetch, NO SDK; mirrors the Phase 15 Deepgram client).
+# Locked rubric src/lib/scoring/rubric.ts (SPIN 35 / Voss 35 / Navarro 30 = 100,
+# 12 sub-dims, assertRubricIntegrity() at import). Pure DI engine: prompt.ts
+# (locked methodology system block + cache_control breakpoint + rubric-derived
+# JSON contract), anthropic.ts (claude-sonnet-4-6, adaptive thinking, defensive
+# JSON parse — NO structured outputs: 12-dim+evidence schema overflows the
+# strict-grammar limit), score.ts (clamp every sub-dim to [0,max] then aggregate;
+# partialJudgement flag). call_scores table (migration 0010, additive, dev Neon);
+# CAS claim + attempts cap (3) + cron sweeper (/api/cron/score, 2-59/10, offset
+# 2 min after transcribe) mirror the transcription store/runner. Evidence-grounded
+# (verbatim quotes per sub-dim) -> sets up Phase 26 guard. NO UI (engine+API only)
+# -> no /design-critique. verify-phase16 60/60 + throwaway real-Postgres+real-Claude
+# probe 16/16 (a discriminating, fully evidence-cited 58/100 on a realistic SW-rep
+# transcript). Merged review-for-main (PR #21, squash f1fc1ac). DEC-031. FLAGGED
+# for Felix + expert coach: rubric/prompt quality, calibration on real audio,
+# text-only silence scoring, ~84s/call latency (Phase 17 caching is the lever).
+PHASE_LAST_COMPLETED=16/three-pillar-scoring
+PHASE_LAST_COMPLETED_AT=2026-06-18T06:40:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -81,9 +89,9 @@ UI_VERIFY_PENDING=
 # SUSPENDED (WebKit policy) -> phone recording is foreground+screen-on ONLY; the recorder now
 # DETECTS + DISCLOSES gaps (coverage) instead of silently saving a holey file. NEXT: Phase 15
 # (Deepgram) as the first phase of the AGGRESSIVE-AUTO run (15->26, relaxed gate, review-for-main only).
-SESSION_LAST_HEARTBEAT=2026-06-18T05:25:00-04:00
-SESSION_TOKEN_BUDGET_USED=320000
-SESSION_ID=fullauto-aggressive-phase15-2026-06-18
+SESSION_LAST_HEARTBEAT=2026-06-18T06:40:00-04:00
+SESSION_TOKEN_BUDGET_USED=300000
+SESSION_ID=fullauto-aggressive-phase16-2026-06-18
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL
