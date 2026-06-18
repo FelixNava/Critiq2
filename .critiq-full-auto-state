@@ -14,10 +14,10 @@ BUILD_TOTAL_TOKEN_BUDGET=4000000
 BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
-PHASE_CURRENT=
-PHASE_CURRENT_STATUS=
+PHASE_CURRENT=15/deepgram-transcription
+PHASE_CURRENT_STATUS=building
 PHASE_CURRENT_PR=
-PHASE_NEXT=15/deepgram-transcription
+PHASE_NEXT=16/three-pillar-scoring
 # Phase 14 DONE 2026-06-18: interruption detection + 4 channels + CAPTURE-COVERAGE
 # INTEGRITY (gap_ms/gap_count, migration 0007) + honest phone repositioning + the
 # Tier-4 lost-mic keep/discard prompt. Device-verified: notifications (iPhone) +
@@ -76,9 +76,9 @@ UI_VERIFY_PENDING=
 # SUSPENDED (WebKit policy) -> phone recording is foreground+screen-on ONLY; the recorder now
 # DETECTS + DISCLOSES gaps (coverage) instead of silently saving a holey file. NEXT: Phase 15
 # (Deepgram) as the first phase of the AGGRESSIVE-AUTO run (15->26, relaxed gate, review-for-main only).
-SESSION_LAST_HEARTBEAT=2026-06-18T04:05:00-04:00
+SESSION_LAST_HEARTBEAT=2026-06-18T05:10:00-04:00
 SESSION_TOKEN_BUDGET_USED=0
-SESSION_ID=interactive-phase14-merge-arm-2026-06-18
+SESSION_ID=fullauto-aggressive-phase15-2026-06-18
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL

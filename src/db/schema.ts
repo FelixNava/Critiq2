@@ -5,6 +5,7 @@ import {
   integer,
   boolean,
   jsonb,
+  real,
   primaryKey,
   index,
   uniqueIndex,
@@ -384,6 +385,104 @@ export const pushSubscriptions = pgTable(
   ],
 );
 
+/**
+ * Recording transcripts (Phase 15 — Deepgram Nova-3). One row per recording: the
+ * unified, concatenated transcript across all ~10-min capture segments (memory
+ * Option B — parallel transcribe → concat → unified analysis). The episodic raw
+ * layer (recordings + recording_chunks) is the source of truth; this is the
+ * derived text the scoring + coaching phases read. UNIQUE on recording_id (one
+ * transcript per recording) makes the trigger + cron sweeper idempotent.
+ * `status`: pending | processing | completed | failed. `text` is null until
+ * completed. FK cascades on recording delete (the transcript is derived data).
+ */
+export const recordingTranscripts = pgTable(
+  "recording_transcripts",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    recordingId: text("recording_id")
+      .notNull()
+      .references(() => recordings.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("pending"), // pending | processing | completed | partial | failed
+    provider: text("provider").notNull().default("deepgram"),
+    model: text("model").notNull().default("nova-3"),
+    // How many times transcription has been attempted. The cron sweeper stops
+    // re-picking a recording once this hits the cap, so a permanently-undecodable
+    // segment can't loop forever (bounded-retry, like the recorder's upload cap).
+    attempts: integer("attempts").notNull().default(0),
+    // The unified transcript (segments concatenated in segment order). Null until
+    // status = completed.
+    text: text("text"),
+    wordCount: integer("word_count"),
+    durationMs: integer("duration_ms"),
+    segmentCount: integer("segment_count").notNull().default(0),
+    language: text("language"),
+    // The last failure message (for the cron sweeper + the lab surface). Cleared
+    // on a successful retry.
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("recording_transcripts_recording_id_key").on(t.recordingId),
+    index("recording_transcripts_status_idx").on(t.status),
+  ],
+);
+
+/**
+ * Per-segment transcripts (Phase 15). One row per ~10-min capture segment, so a
+ * single failed segment can be retried without re-transcribing the whole
+ * recording, and Phase 16+ scoring can read speaker-attributed `words` (Deepgram
+ * diarization timestamps) per segment. `confidence` is Deepgram's 0–1 average for
+ * the segment. `words` holds the word-level timing/speaker array (jsonb). UNIQUE
+ * on (transcript_id, segment_index) is the idempotent upsert target.
+ */
+export const transcriptSegments = pgTable(
+  "transcript_segments",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    transcriptId: text("transcript_id")
+      .notNull()
+      .references(() => recordingTranscripts.id, { onDelete: "cascade" }),
+    recordingId: text("recording_id")
+      .notNull()
+      .references(() => recordings.id, { onDelete: "cascade" }),
+    segmentIndex: integer("segment_index").notNull(),
+    status: text("status").notNull().default("pending"), // pending | completed | failed
+    text: text("text"),
+    // Word-level timestamps + speaker labels from Deepgram (jsonb). Null on a
+    // failed/empty segment.
+    words: jsonb("words"),
+    confidence: real("confidence"),
+    durationMs: integer("duration_ms"),
+    chunkCount: integer("chunk_count").notNull().default(0),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("transcript_segments_transcript_segment_key").on(
+      t.transcriptId,
+      t.segmentIndex,
+    ),
+    index("transcript_segments_transcript_id_idx").on(t.transcriptId),
+    index("transcript_segments_recording_id_idx").on(t.recordingId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
@@ -402,3 +501,7 @@ export type Recording = typeof recordings.$inferSelect;
 export type NewRecording = typeof recordings.$inferInsert;
 export type RecordingChunk = typeof recordingChunks.$inferSelect;
 export type NewRecordingChunk = typeof recordingChunks.$inferInsert;
+export type RecordingTranscript = typeof recordingTranscripts.$inferSelect;
+export type NewRecordingTranscript = typeof recordingTranscripts.$inferInsert;
+export type TranscriptSegment = typeof transcriptSegments.$inferSelect;
+export type NewTranscriptSegment = typeof transcriptSegments.$inferInsert;
