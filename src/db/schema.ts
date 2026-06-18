@@ -404,9 +404,13 @@ export const recordingTranscripts = pgTable(
     recordingId: text("recording_id")
       .notNull()
       .references(() => recordings.id, { onDelete: "cascade" }),
-    status: text("status").notNull().default("pending"), // pending | processing | completed | failed
+    status: text("status").notNull().default("pending"), // pending | processing | completed | partial | failed
     provider: text("provider").notNull().default("deepgram"),
     model: text("model").notNull().default("nova-3"),
+    // How many times transcription has been attempted. The cron sweeper stops
+    // re-picking a recording once this hits the cap, so a permanently-undecodable
+    // segment can't loop forever (bounded-retry, like the recorder's upload cap).
+    attempts: integer("attempts").notNull().default(0),
     // The unified transcript (segments concatenated in segment order). Null until
     // status = completed.
     text: text("text"),

@@ -5,7 +5,7 @@
  * processing is idempotent — a concurrent trigger + cron can't double-transcribe.
  */
 
-import { and, eq, isNull, lt, or } from "drizzle-orm";
+import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   recordings,
@@ -19,6 +19,14 @@ import type { ChunkRef, SegmentResult, TranscriptionResult } from "./types";
 
 /** A processing claim older than this is considered stale (a dead run) and reclaimable. */
 export const STALE_PROCESSING_MS = 15 * 60 * 1000; // 15 min
+
+/**
+ * The cron sweeper stops auto-retrying a recording once attempts hits this cap,
+ * so a permanently-undecodable segment can't be re-transcribed forever (bounded
+ * loss, like the recorder's MAX_UPLOAD_ATTEMPTS). A human can still re-trigger
+ * past the cap via the authenticated route.
+ */
+export const MAX_TRANSCRIPTION_ATTEMPTS = 3;
 
 /** Chunk references for a recording, in chunk order. */
 export async function getChunkRefsForRecording(
@@ -110,16 +118,35 @@ export async function claimTranscript(
     // else: stale claim — fall through and re-claim.
   }
 
-  await db
+  // Compare-and-swap: only claim if the row STILL looks like what we just read
+  // (same status + same startedAt). If a concurrent trigger/cron claimed it
+  // between our SELECT and here, the WHERE matches zero rows and we back off —
+  // so two callers can never both transcribe the same recording (closes the
+  // SELECT-then-UPDATE race; onConflictDoNothing only guarded row creation).
+  const claimed = await db
     .update(recordingTranscripts)
     .set({
       status: "processing",
       startedAt: new Date(nowMs),
+      attempts: sql`${recordingTranscripts.attempts} + 1`,
       error: null,
       updatedAt: new Date(nowMs),
     })
-    .where(eq(recordingTranscripts.id, row.id));
+    .where(
+      and(
+        eq(recordingTranscripts.id, row.id),
+        eq(recordingTranscripts.status, row.status),
+        row.startedAt
+          ? eq(recordingTranscripts.startedAt, row.startedAt)
+          : isNull(recordingTranscripts.startedAt),
+      ),
+    )
+    .returning({ id: recordingTranscripts.id });
 
+  if (claimed.length === 0) {
+    // Lost the race — someone else owns the claim now.
+    return { claimed: false, reason: "in-progress", transcriptId: row.id };
+  }
   return { claimed: true, transcriptId: row.id };
 }
 
@@ -168,9 +195,12 @@ export async function finishTranscript(
   await db
     .update(recordingTranscripts)
     .set({
-      // A fully-empty transcript across all segments still "completed" (silent
-      // recording) — partial only flags segment-level failures.
-      status: result.partial ? "failed" : "completed",
+      // "partial" is its own terminal-ish state: some segments failed but the
+      // rest produced usable text. It is NOT "failed" (which means the whole run
+      // threw and we have nothing) — so a consumer reading `status IN
+      // ('completed','partial')` gets the text, and `completedAt` is only ever set
+      // alongside real text. The cron retries a partial only up to the attempt cap.
+      status: result.partial ? "partial" : "completed",
       text: result.text,
       wordCount: result.wordCount,
       durationMs: result.durationMs,
@@ -221,9 +251,19 @@ export async function findRecordingsNeedingTranscription(
         eq(recordings.status, "completed"),
         isNull(recordings.deletedAt),
         or(
+          // Never transcribed yet.
           isNull(recordingTranscripts.id),
-          eq(recordingTranscripts.status, "pending"),
-          eq(recordingTranscripts.status, "failed"),
+          // Retryable states, but only under the attempt cap so a permanently
+          // bad segment ('partial'/'failed') stops looping after MAX attempts.
+          and(
+            or(
+              eq(recordingTranscripts.status, "pending"),
+              eq(recordingTranscripts.status, "failed"),
+              eq(recordingTranscripts.status, "partial"),
+            ),
+            lt(recordingTranscripts.attempts, MAX_TRANSCRIPTION_ATTEMPTS),
+          ),
+          // A processing claim from a run that died (stale) — reclaim it.
           and(
             eq(recordingTranscripts.status, "processing"),
             lt(recordingTranscripts.startedAt, staleBefore),

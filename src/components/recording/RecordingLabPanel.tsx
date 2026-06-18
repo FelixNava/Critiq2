@@ -501,11 +501,23 @@ export default function RecordingLabPanel() {
               {transcribe.error}
             </p>
           )}
+          {transcribe.transcriptStatus === "partial" && (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 ring-1 ring-amber-200">
+              Part of this recording couldn&apos;t be transcribed — the text
+              below is incomplete.
+            </p>
+          )}
           {transcribe.text != null && (
             <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
               {transcribe.text.trim() ? (
                 <p className="whitespace-pre-wrap text-sm text-slate-700">
                   {transcribe.text}
+                </p>
+              ) : transcribe.transcriptStatus === "partial" ||
+                transcribe.transcriptStatus === "failed" ? (
+                <p className="text-sm text-slate-500">
+                  This recording couldn&apos;t be transcribed. Try again in a
+                  moment.
                 </p>
               ) : (
                 <p className="text-sm text-slate-400">
@@ -528,13 +540,16 @@ export default function RecordingLabPanel() {
 
 interface TranscriptApiResponse {
   error?: string;
-  transcript?: { transcript?: { text?: string | null } };
+  transcript?: {
+    transcript?: { text?: string | null; status?: string | null };
+  };
 }
 
 /** Minimal lab-only hook: POST the transcribe trigger and surface the text. */
 function useTranscribe(recordingId: string | null) {
   const [busy, setBusy] = useState(false);
   const [text, setText] = useState<string | null>(null);
+  const [transcriptStatus, setTranscriptStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function run() {
@@ -551,6 +566,7 @@ function useTranscribe(recordingId: string | null) {
         return;
       }
       setText(data.transcript?.transcript?.text ?? "");
+      setTranscriptStatus(data.transcript?.transcript?.status ?? null);
     } catch {
       setError("Couldn't reach the server. Try again.");
     } finally {
@@ -558,5 +574,5 @@ function useTranscribe(recordingId: string | null) {
     }
   }
 
-  return { busy, text, error, run };
+  return { busy, text, transcriptStatus, error, run };
 }
