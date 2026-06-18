@@ -897,6 +897,70 @@ export const accountSummaries = pgTable(
   ],
 );
 
+/**
+ * rep_summaries — the SEMANTIC memory tier for REPS (Phase 24). The mirror-image of
+ * account_summaries: a running PROFILE of how one rep sells, consolidated from THEIR own
+ * completed debriefs across every account they work. Two things make it the opposite of
+ * the account summary: it is REP-PRIVATE (read only by that rep / admin — rep-side data
+ * stays isolated), and rep IDENTITY IS ALLOWED (the profile is explicitly about the rep).
+ *
+ * One row per rep (UNIQUE user_id) — the profile is overwritten on each regeneration, so
+ * claiming it for processing is idempotent (same CAS-claim / attempts-cap / stale-reclaim
+ * lifecycle as account_summaries, keyed on the rep). It is regenerated on the locked
+ * EVERY-10-DEBRIEFS cadence, not after every debrief: `debrief_count` stores the
+ * every-10 threshold (10 / 20 / 30 …) the profile was last built at, and the cron work-
+ * list re-consolidates only when the rep crosses the next interval.
+ *
+ * `traits` carries SOURCE ATTRIBUTION PER TRAIT (each pattern cites the debrief it was
+ * observed in) — the same Phase 26 grounding contract as the account facts. `narrative`
+ * is the human-readable running profile; unlike the account summary it is NOT mirrored
+ * into any shared field — it is consumed by working-memory assembly (Phase 25). FK
+ * cascades on user delete (the profile dies with the rep; derived data, no inheritance).
+ */
+export const repSummaries = pgTable(
+  "rep_summaries",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("pending"), // pending | processing | completed | failed
+    provider: text("provider").notNull().default("anthropic"),
+    model: text("model").notNull().default("claude-sonnet-4-6"),
+    // Bounded-retry, mirroring the account/score/transcript sweepers. Reset to 1 when a
+    // NEW every-10 threshold is reached; incremented on a same-threshold retry so a
+    // persistently-failing consolidation can't loop forever.
+    attempts: integer("attempts").notNull().default(0),
+    // AI output (null until status = completed).
+    headline: text("headline"), // one-line "how this rep is selling right now"
+    narrative: text("narrative"), // the running profile prose (consumed by Phase 25)
+    // [{ text, lens, sourceDebriefId }] — every trait attributed to a debrief it was
+    // observed in (the Phase 26 source-tagging contract).
+    traits: jsonb("traits"),
+    // The every-10 threshold this profile reflects (10/20/30…) — the work-list's
+    // new-material high-water mark.
+    debriefCount: integer("debrief_count").notNull().default(0),
+    consolidatedThroughAt: timestamp("consolidated_through_at", {
+      withTimezone: true,
+    }),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("rep_summaries_user_id_key").on(t.userId),
+    index("rep_summaries_status_idx").on(t.status),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
@@ -931,3 +995,5 @@ export type CallCoaching = typeof callCoaching.$inferSelect;
 export type NewCallCoaching = typeof callCoaching.$inferInsert;
 export type AccountSummary = typeof accountSummaries.$inferSelect;
 export type NewAccountSummary = typeof accountSummaries.$inferInsert;
+export type RepSummary = typeof repSummaries.$inferSelect;
+export type NewRepSummary = typeof repSummaries.$inferInsert;

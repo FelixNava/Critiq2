@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/consolidate-accounts",
       "schedule": "5-59/10 * * * *"
+    },
+    {
+      "path": "/api/cron/consolidate-reps",
+      "schedule": "8-59/10 * * * *"
     }
   ]
 }

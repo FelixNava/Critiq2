@@ -8,14 +8,17 @@ import {
   getLatestDebriefForAccount,
 } from "@/lib/debrief/store";
 import { runConsolidationForAccount } from "@/lib/consolidation/runner";
+import { runRepConsolidation } from "@/lib/repconsolidation/runner";
 
 export const dynamic = "force-dynamic";
-// Two Claude round-trips can run in this invocation: the debrief itself (synchronous —
-// the rep waits) and then the Phase 23 account consolidation scheduled via after()
-// (post-response). after() shares this function's budget, so allow headroom for both;
-// the rep's response is sent after the first call, so the larger ceiling only affects
-// the background consolidation. The /api/cron/consolidate-accounts sweeper is the net
-// if this is still cut short.
+// Up to three Claude round-trips can run in this invocation: the debrief itself
+// (synchronous — the rep waits) and then, via after() (post-response), the Phase 23
+// account consolidation (every debrief) and the Phase 24 rep consolidation (only when the
+// rep crosses a new multiple of 10 — otherwise the runner no-ops cheaply with no Claude
+// call). after() shares this function's budget, so allow headroom; the rep's response is
+// sent after the first call, so the larger ceiling only affects the background work. The
+// /api/cron/consolidate-accounts and /api/cron/consolidate-reps sweepers are the net if
+// this is cut short.
 export const maxDuration = 300;
 
 /**
@@ -88,6 +91,19 @@ export async function POST(
       });
     } catch (e) {
       console.error(`[debrief] consolidation trigger failed for ${accountId}:`, e);
+    }
+  });
+
+  // Phase 24 — rep semantic memory. Also a best-effort post-response trigger. Unlike the
+  // account summary (every debrief), the rep profile regenerates only when the rep
+  // crosses a new multiple of 10 completed debriefs; runRepConsolidation checks that and
+  // no-ops cheaply (no Claude call) otherwise. The /api/cron/consolidate-reps sweeper is
+  // the guaranteed net. The runner catches its own errors; guard the callback regardless.
+  after(async () => {
+    try {
+      await runRepConsolidation(userId);
+    } catch (e) {
+      console.error(`[debrief] rep consolidation trigger failed for ${userId}:`, e);
     }
   });
 
