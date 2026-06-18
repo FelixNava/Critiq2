@@ -43,7 +43,7 @@ PHASE_NEXT=24/semantic-memory-rep-consolidation
 # High-effort /code-review (3 angles) → P1s fixed (eligibility↔claim alignment;
 # write-back updatedAt/deletedAt; after() budget; bounded work-list query; NULLS LAST;
 # debriefCount race; comment drift). NO UI → no /design-critique. NO DEVICE GATE.
-# Merged review-for-main (PR #27, squash <pending>). DEC-037. FLAGGED for Felix +
+# Merged review-for-main (PR #27, squash 78e1c83). DEC-037. FLAGGED for Felix +
 # expert coach: consolidation prompt + fact/narrative QUALITY; rep-identity isolation
 # in the shared summary is PROMPT-enforced not code-enforced (validate on real data);
 # no caching yet (methodology under the Sonnet min-prefix); debrief-only (scores not

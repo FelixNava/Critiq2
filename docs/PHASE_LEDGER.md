@@ -537,7 +537,7 @@ Post-debrief coaching delivery, three-pillar score display, next-step recommenda
 
 Account-aware email draft generation, copy-to-clipboard + Send via Resend.
 
-## Phase 23 — Semantic Memory: Account Consolidation ✅ DONE (review-for-main, PR #27, squash <pending>)
+## Phase 23 — Semantic Memory: Account Consolidation ✅ DONE (review-for-main, PR #27, squash 78e1c83)
 
 Background job after every debrief, regenerates account running summary. Source attribution per fact.
 
