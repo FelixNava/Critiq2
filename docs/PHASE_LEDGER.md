@@ -396,7 +396,9 @@ Wake Lock + Silent Audio + Media Session (branding-only metadata, NO "recording"
 >
 > **Deferred (logged):** panel↔DeviceCheckPanel badge dedup (next panel phase); a late chunk from a stopped recorder can mask a stall one beat; stop-during-start no-op; per-chunk IndexedDB scan micro-opt.
 
-## Phase 14 — Interruption Detection + Multi-Channel Notification 🔬 Built — PR #18 open, awaiting iPhone device gate
+## Phase 14 — Interruption Detection + Notification + Capture-Coverage Integrity ✅ DONE (device-verified 2026-06-18; PR #18 squash c517ce7 → recording-staging → review-for-main)
+
+> **Added this session (interactive, 2026-06-18), beyond the original cron build — see DEC-030:** **capture-coverage integrity** (the device gate found iOS silently drops audio when a PWA backgrounds/locks — `gap_ms`/`gap_count` + migration 0007 + the "only X% captured" warning), **honest phone repositioning** (foreground+screen-on only; lock-screen push reframed best-effort), and the **Tier-4 lost-mic prompt** (keep/discard, never auto-kill, auto-resume). Coverage device-verified on session `b47ea693` (~91%).
 
 `track.onended` + chime + tab title + Web Push (PWA-installed only) + in-app banner. Branding-only.
 
