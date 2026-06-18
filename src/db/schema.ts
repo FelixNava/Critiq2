@@ -831,6 +831,72 @@ export const callCoaching = pgTable(
   ],
 );
 
+/**
+ * Account semantic memory (Phase 23 — account consolidation). The SEMANTIC tier of
+ * the locked memory architecture for the ACCOUNT side: a single running summary per
+ * account, regenerated event-based after every debrief (consolidation policy Option
+ * B). Account intelligence is SHARED across reps (the account is the first-class
+ * entity), so this is rep-agnostic — it consolidates ALL completed debriefs on the
+ * account regardless of which rep wrote them, and never carries rep-side identity
+ * (rep data stays isolated per the privacy model).
+ *
+ * One row per account (UNIQUE account_id) — the running summary is overwritten on
+ * each regeneration, so claiming it for processing is idempotent (same CAS-claim /
+ * attempts-cap / stale-reclaim lifecycle as call_scores, but keyed on the account).
+ *
+ * The distinctive column is `facts`: each fact carries the originating debrief id
+ * (`sourceDebriefId`) — SOURCE ATTRIBUTION PER FACT. This is the grounding Phase 26's
+ * hallucination guard requires (never surface a personal detail unless it traces to
+ * an originating interaction). `narrative` is the human-readable running summary
+ * (also mirrored into account_records.summary so the per-account intelligence card
+ * surfaces it). `debriefCount` + `consolidatedThroughAt` are the high-water marks the
+ * cron work-list uses to detect new material (a newer/greater count ⇒ re-consolidate).
+ * FK cascades on account delete (derived data); SET NULL is not needed — the row dies
+ * with the account.
+ */
+export const accountSummaries = pgTable(
+  "account_summaries",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accountsTbl.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("pending"), // pending | processing | completed | failed
+    provider: text("provider").notNull().default("anthropic"),
+    model: text("model").notNull().default("claude-sonnet-4-6"),
+    // Bounded-retry, mirroring the score/transcript sweepers. Reset to 1 when NEW
+    // material arrives (debriefCount increases); incremented on a same-material retry
+    // so a persistently-failing consolidation can't loop forever.
+    attempts: integer("attempts").notNull().default(0),
+    // AI output (null until status = completed).
+    headline: text("headline"), // one-line "where this account stands"
+    narrative: text("narrative"), // the running summary prose (mirrored to account_records.summary)
+    // [{ text, lens, sourceDebriefId }] — every fact attributed to the debrief it
+    // came from (the Phase 26 source-tagging contract).
+    facts: jsonb("facts"),
+    // Provenance / high-water marks for the work-list's new-material detection.
+    debriefCount: integer("debrief_count").notNull().default(0),
+    consolidatedThroughAt: timestamp("consolidated_through_at", {
+      withTimezone: true,
+    }),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("account_summaries_account_id_key").on(t.accountId),
+    index("account_summaries_status_idx").on(t.status),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
@@ -863,3 +929,5 @@ export type CallDebrief = typeof callDebriefs.$inferSelect;
 export type NewCallDebrief = typeof callDebriefs.$inferInsert;
 export type CallCoaching = typeof callCoaching.$inferSelect;
 export type NewCallCoaching = typeof callCoaching.$inferInsert;
+export type AccountSummary = typeof accountSummaries.$inferSelect;
+export type NewAccountSummary = typeof accountSummaries.$inferInsert;
