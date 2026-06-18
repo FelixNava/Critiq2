@@ -415,11 +415,17 @@ Wake Lock + Silent Audio + Media Session (branding-only metadata, NO "recording"
 
 **Felix to do:** add VAPID keys to Vercel (PR #18 body); run the iPhone device gate; then merge → `recording-staging` → promote to `review-for-main`. See DEC-028.
 
-## Phase 15 — Deepgram Nova-3 Integration ☐ Planned
+## Phase 15 — Deepgram Nova-3 Integration ✅ DONE (review-for-main, PR #20, squash 0dfa45d)
 
 Multi-segment parallel transcription, concatenation, store transcripts.
 
-## Phase 16 — Three-Pillar Scoring Engine ☐ Planned
+**Built 2026-06-18 (aggressive-auto, relaxed gate).** Tables `recording_transcripts` (one/recording, the unified transcript) + `transcript_segments` (one/~10-min segment, `words` jsonb = Deepgram word timestamps + speaker labels) — migrations 0008 (tables) + 0009 (attempts cap), additive, applied to dev Neon. Fetch-based Deepgram client (no SDK; `nova-3` + `smart_format` + `diarize` + `punctuate`; pure `buildListenUrl`/`parseDeepgramResponse`). Pure orchestration (Option B): group chunks by segment → concat each segment's chunks → bounded-parallel transcribe → concat segment transcripts in segment order; partial-failure tolerant. Store: idempotent **compare-and-swap claim**, per-segment upsert, finalize/fail, cron work-list with **attempts cap (3)**; `partial` is a distinct status from `failed`. Routes: `POST /api/recording/[id]/transcribe` (auth+owner, sync), `GET …/transcript`, `POST /api/cron/transcribe` (CRON_SECRET, `*/10` in vercel.json — reliability net). Lab UI transcript affordance (flagged).
+
+**Verification (relaxed gate, all green):** build + tsc clean; `scripts/verify-phase15.ts` 37/37 (URL/parse/grouping/concat/ordering/bounded-parallel/partial/empty); real-Postgres integration probe 12/12 (CAS claim, jsonb persist, attempts, idempotent skip, cron in/exclusion, throwaway user cascade-cleaned). High-effort `/code-review` → P1s fixed in-branch (infinite re-transcribe loop, claim race, partial contradiction).
+
+**FLAGGED for Felix (runtime/quality, not blocking staging):** (1) real Deepgram round-trip + private-Blob byte read needs a preview run (probes fake both); (2) transcription QUALITY on field-noise audio + diarization usefulness — validate before Phase 16 depends on it; (3) overlap (~2s seam) not text-deduped for beta; only `uploaded` chunks transcribed (gap/coverage already discloses holey captures); (4) lab UI is dev-surface. See DEC-030.
+
+## Phase 16 — Three-Pillar Scoring Engine ☐ Planned (NEXT)
 
 SPIN/Voss/Navarro definitions in code, locked methodology block (cached prompt), Zod schemas, scoring prompt.
 

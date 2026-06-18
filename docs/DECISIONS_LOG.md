@@ -379,6 +379,28 @@ Trade-off flag: YES — DEFERRED P2s for Felix's review: (1) `trackEnded` re-edg
 
 ---
 
+## DEC-030 — Phase 15 design (Deepgram transcription: two tables, Option-B orchestration, partial status, attempts cap, CAS claim, cron sweeper)
+Phase: 15/deepgram-transcription
+Date: 2026-06-18 (aggressive-auto run)
+Type: trade-off (the ledger gave one line — "multi-segment parallel transcription, concatenation, store transcripts"; the shape was mine)
+Context: Phase 15 = the value engine's first half (transcription), built unattended under the relaxed aggressive gate (build + types + unit green = merge to review-for-main). DEEPGRAM_API_KEY was provisioned. PR #20, squash 0dfa45d.
+Chosen:
+  - TWO tables: `recording_transcripts` (one/recording, the unified concatenated transcript) + `transcript_segments` (one/~10-min segment, `words` jsonb = Deepgram word timestamps + speaker labels). Per-segment rows let a single failed segment retry alone and let Phase 16 scoring read speaker-attributed words per segment. (DEC-014/027 precedent: persist the segment grain.)
+  - Fetch-based Deepgram client, NO SDK dependency — keeps `buildListenUrl` + `parseDeepgramResponse` pure + unit-tested against sample JSON; key read at call time (build never needs it). `nova-3` + `smart_format` + `diarize` (who-said-what for scoring) + `punctuate`.
+  - Option B orchestration (locked memory arch): group chunks by segmentIndex → concat each segment's chunks (a segment = one rotating MediaRecorder's output, so its chunks concat into one decodable file) → bounded-parallel transcribe (concurrency 3) → concat segment transcripts in segment order into the unified text. Fully dependency-injected (Transcriber + ChunkFetcher) → deterministic unit tests with no network/Blob.
+  - Partial-failure tolerant: one segment's failure is captured as a failed SegmentResult; the rest still produce a (partial) transcript rather than losing everything.
+  - `partial` is a DISTINCT status from `failed` (code-review fix): a partial run has usable text → not mislabeled `failed`, and `completedAt` is only ever set alongside real text.
+  - attempts cap (MAX_TRANSCRIPTION_ATTEMPTS=3) + cron work-list gate (code-review fix): a permanently-undecodable segment can't be re-transcribed forever (bounded, mirrors the recorder's MAX_UPLOAD_ATTEMPTS); a human can still re-trigger past the cap via the authenticated route.
+  - claimTranscript is compare-and-swap (code-review fix): WHERE id + observed status + observed startedAt, RETURNING — closes the SELECT-then-UPDATE double-claim race between the cron and the manual trigger (onConflictDoNothing only guarded row creation).
+  - Synchronous trigger route (`POST /api/recording/[id]/transcribe`, auth+owner-gated, maxDuration 300) + a `*/10` CRON_SECRET-gated sweeper (`/api/cron/transcribe`, vercel.json) as the reliability net for timeouts / transient errors / recordings that completed without a trigger.
+  - Overlap (~2s Phase-13 seam) NOT deduped at the text level for beta — simple ordered concat (a small visible duplication beats silently dropping real words); transcript-level overlap dedupe using the word timestamps is a documented future refinement.
+Review: high-effort /code-review (3 correctness + cleanup angles) → P1s fixed in-branch: (1) infinite re-transcribe loop on a partial transcript [partial-status + attempts-cap]; (2) SELECT-then-UPDATE claim race [CAS]; (3) failed-with-text contradiction [partial status]. Lower-severity items flagged in the PR, not fixed (overlap dedup; uploaded-only chunks; cron sequential budget) — beta-acceptable.
+Verification: build + tsc clean; verify-phase15.ts 37/37 (pure logic); real-Postgres integration probe 12/12 (CAS, jsonb persist, attempts, idempotent skip, cron in/exclusion; throwaway user cascade-cleaned). The real Deepgram round-trip + private-Blob byte read + transcription QUALITY are FLAGGED for Felix's preview/expert validation (the relaxed aggressive gate does not block on them).
+Iterability: high (params in DEFAULT_OPTIONS + DEFAULT concurrency; status/attempts localized in the store; the engine is dependency-injected).
+Trade-off flag: YES — Felix's review queue: (a) transcription QUALITY on real field audio before Phase 16 scoring leans on it; (b) overlap dedup deferred; (c) only `uploaded` chunks transcribed; (d) the lab UI is dev-surface quality.
+
+---
+
 ## End-of-build summary
 
 This section is filled by the master orchestrator at the end of every Full Auto run. It surfaces:

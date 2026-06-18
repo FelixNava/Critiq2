@@ -14,17 +14,22 @@ BUILD_TOTAL_TOKEN_BUDGET=4000000
 BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
-PHASE_CURRENT=15/deepgram-transcription
-PHASE_CURRENT_STATUS=building
+PHASE_CURRENT=
+PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
 PHASE_NEXT=16/three-pillar-scoring
-# Phase 14 DONE 2026-06-18: interruption detection + 4 channels + CAPTURE-COVERAGE
-# INTEGRITY (gap_ms/gap_count, migration 0007) + honest phone repositioning + the
-# Tier-4 lost-mic keep/discard prompt. Device-verified: notifications (iPhone) +
-# coverage (session b47ea693, ~91%, gap detected+persisted). Merged to
-# recording-staging (PR #18, squash c517ce7) -> promoted to review-for-main.
-PHASE_LAST_COMPLETED=14/interruption-detection-coverage-integrity
-PHASE_LAST_COMPLETED_AT=2026-06-18T04:05:00-04:00
+# Phase 15 DONE 2026-06-18 (aggressive-auto, relaxed gate): Deepgram Nova-3
+# multi-segment transcription. Tables recording_transcripts + transcript_segments
+# (migrations 0008 + 0009, additive, applied to dev Neon). Fetch-based Deepgram
+# client (no SDK), Option-B parallel-segment orchestration, idempotent CAS claim +
+# attempts cap (3) + distinct `partial` status, routes (sync trigger + GET
+# transcript + */10 CRON_SECRET sweeper). verify-phase15 37/37 + real-Postgres
+# integration probe 12/12; high-effort /code-review P1s fixed in-branch (infinite
+# re-transcribe loop, claim race, partial contradiction). Merged review-for-main
+# (PR #20, squash 0dfa45d). FLAGGED for Felix: real Deepgram round-trip + Blob
+# read + transcription QUALITY (preview/expert), overlap dedup deferred, lab UI.
+PHASE_LAST_COMPLETED=15/deepgram-transcription
+PHASE_LAST_COMPLETED_AT=2026-06-18T05:25:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -76,8 +81,8 @@ UI_VERIFY_PENDING=
 # SUSPENDED (WebKit policy) -> phone recording is foreground+screen-on ONLY; the recorder now
 # DETECTS + DISCLOSES gaps (coverage) instead of silently saving a holey file. NEXT: Phase 15
 # (Deepgram) as the first phase of the AGGRESSIVE-AUTO run (15->26, relaxed gate, review-for-main only).
-SESSION_LAST_HEARTBEAT=2026-06-18T05:10:00-04:00
-SESSION_TOKEN_BUDGET_USED=0
+SESSION_LAST_HEARTBEAT=2026-06-18T05:25:00-04:00
+SESSION_TOKEN_BUDGET_USED=320000
 SESSION_ID=fullauto-aggressive-phase15-2026-06-18
 
 # --- CRON SCHEDULE ---
