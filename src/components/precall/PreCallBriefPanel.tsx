@@ -8,8 +8,12 @@ import {
   secondaryButtonClass,
   textareaClass,
 } from "@/components/onboarding/ui";
+import CallScriptPanel, {
+  type InitialScript,
+} from "@/components/precall/CallScriptPanel";
 
 type ObjectiveMode = "rep" | "signal";
+type StyleMode = "assertive" | "relational";
 
 export interface InitialBrief {
   id: string;
@@ -61,12 +65,20 @@ export default function PreCallBriefPanel({
   objectiveMode,
   hasSummary,
   initialBrief,
+  baselineStyleMode,
+  initialScript,
+  initialScriptBriefId,
 }: {
   accountId: string;
   interactionNumber: number;
   objectiveMode: ObjectiveMode;
   hasSummary: boolean;
   initialBrief: InitialBrief | null;
+  baselineStyleMode: StyleMode;
+  /** Latest script for the loaded brief (Phase 19); null if none / brief differs. */
+  initialScript: InitialScript | null;
+  /** The brief id the initialScript belongs to (so a regenerated brief resets it). */
+  initialScriptBriefId: string | null;
 }) {
   const draftKey = useMemo(
     () => `critiq:precall:v1:${accountId}`,
@@ -144,6 +156,10 @@ export default function PreCallBriefPanel({
         accountId={accountId}
         brief={brief}
         onBriefChange={setBrief}
+        baselineStyleMode={baselineStyleMode}
+        initialScript={
+          initialScriptBriefId === brief.id ? initialScript : null
+        }
         onPrepAgain={() => {
           setNarration(brief.narration);
           setObjective(
@@ -257,13 +273,19 @@ function BriefView({
   accountId,
   brief,
   onBriefChange,
+  baselineStyleMode,
+  initialScript,
   onPrepAgain,
 }: {
   accountId: string;
   brief: InitialBrief;
   onBriefChange: (b: InitialBrief) => void;
+  baselineStyleMode: StyleMode;
+  initialScript: InitialScript | null;
   onPrepAgain: () => void;
 }) {
+  // A script can only be generated once an objective is in force on the brief.
+  const hasObjective = Boolean(brief.objective && brief.objective.trim());
   return (
     <div className="mt-8 space-y-6">
       {brief.summary && (
@@ -332,6 +354,21 @@ function BriefView({
         brief={brief}
         onBriefChange={onBriefChange}
       />
+
+      {hasObjective ? (
+        <CallScriptPanel
+          key={brief.id}
+          accountId={accountId}
+          briefId={brief.id}
+          baselineStyleMode={baselineStyleMode}
+          initialScript={initialScript}
+        />
+      ) : (
+        <p className="border-t border-slate-200 pt-8 text-sm leading-relaxed text-slate-500">
+          Set an objective above and Critiq can write you a delivery-cued call
+          script.
+        </p>
+      )}
 
       <button type="button" onClick={onPrepAgain} className={secondaryButtonClass}>
         Start a new brief
