@@ -32,6 +32,7 @@ import type {
   GuardMode,
   GuardedOutput,
   GuardOptions,
+  VerifierSuspect,
   VerifierVerdict,
 } from "./types";
 import { DEFAULT_GUARD_MODE } from "./policy";
@@ -97,14 +98,20 @@ export async function guardOutput(
   const verdictBySpan = new Map<string, VerifierVerdict>();
   if (mode !== "off" && opts.verifier) {
     const seen = new Set<string>();
-    const suspects: { field: string; span: string; category: FieldRef["ref"]["category"] }[] =
-      [];
+    const suspects: VerifierSuspect[] = [];
     for (const { field, refs } of perField) {
       for (const fr of refs) {
         if (fr.grounded) continue;
+        // Dedupe by span (grounding is field-independent) but carry the FIRST field's text as
+        // context so the verifier sees the sentence the span lives in.
         if (seen.has(fr.ref.span)) continue;
         seen.add(fr.ref.span);
-        suspects.push({ field: field.key, span: fr.ref.span, category: fr.ref.category });
+        suspects.push({
+          field: field.key,
+          span: fr.ref.span,
+          category: fr.ref.category,
+          context: field.text,
+        });
       }
     }
     if (suspects.length > 0) {

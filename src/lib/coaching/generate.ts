@@ -180,6 +180,7 @@ export async function generateCoachingForDebrief(
       result,
       input.userId,
       input.accountId,
+      { name: account.name, summary: account.summary },
       coachingId,
       deps.guardVerifier,
     );
@@ -201,11 +202,12 @@ async function applyHallucinationGuard(
   result: CoachingResult,
   userId: string,
   accountId: string,
+  identity: { name?: string | null; summary?: string | null },
   coachingId: string,
   injectedVerifier?: GuardVerifier,
 ): Promise<CoachingResult> {
   try {
-    const sources = await buildGroundedSources(userId, accountId);
+    const sources = await buildGroundedSources(userId, accountId, identity);
     const verifier =
       injectedVerifier ??
       new AnthropicGuardVerifier({

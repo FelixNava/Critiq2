@@ -136,10 +136,20 @@ export interface VerifierVerdict {
   sourceId: string | null;
 }
 
-/** The set of suspect references handed to the verifier (deterministically ungrounded). */
+/** One suspect reference handed to the verifier (deterministically ungrounded). */
+export interface VerifierSuspect {
+  field: string;
+  span: string;
+  category: ReferenceCategory;
+  /** The full output field the span appears in — so the verifier judges it IN CONTEXT, not
+   *  as a bare token (a name/number means different things in different sentences). */
+  context: string;
+}
+
+/** The set of suspect references handed to the verifier. */
 export interface VerifierRequest {
   sources: GroundedSource[];
-  suspects: { field: string; span: string; category: ReferenceCategory }[];
+  suspects: VerifierSuspect[];
 }
 
 /** DI seam for the LLM verifier (real impl in anthropic.ts; a fake in tests). */

@@ -10,7 +10,7 @@
  * NO account/rep specifics — it's pure instructions, so it caches across every call.
  */
 
-import type { GroundedSource, ReferenceCategory } from "./types";
+import type { GroundedSource, ReferenceCategory, VerifierSuspect } from "./types";
 
 /** A short, stable label shown to the model for a source; mapped back to the real id. */
 export interface LabeledSource {
@@ -67,7 +67,7 @@ function describeCategory(c: ReferenceCategory): string {
 
 export function buildVerifierUserPrompt(
   labeled: LabeledSource[],
-  suspects: { field: string; span: string; category: ReferenceCategory }[],
+  suspects: VerifierSuspect[],
 ): string {
   const lines: string[] = [];
   lines.push("GROUNDED SOURCES (the only facts Critiq is allowed to assert):");
@@ -79,9 +79,12 @@ export function buildVerifierUserPrompt(
     }
   }
   lines.push("");
-  lines.push("SUSPECT REFERENCES (decide supported/unsupported for each):");
+  lines.push("SUSPECT REFERENCES (decide supported/unsupported for each, judging it in its");
+  lines.push("surrounding context — the same value can be a real claim or just phrasing):");
   suspects.forEach((s, i) => {
     lines.push(`  ${i + 1}. "${s.span}" — a ${describeCategory(s.category)}`);
+    const ctx = s.context.replace(/\s+/g, " ").trim();
+    if (ctx) lines.push(`     context: "${ctx}"`);
   });
   lines.push("");
   lines.push("Return the JSON object now.");

@@ -61,14 +61,23 @@ function reportToText(report: DebriefReport): string {
     .join(" ");
 }
 
+/** The account's own ground-truth identity (the rep named the account; it's safe to assert). */
+export interface AccountIdentity {
+  name?: string | null;
+  /** account_records.summary — the shared running narrative the model is given. */
+  summary?: string | null;
+}
+
 /**
  * Assemble the grounded corpus for a rep working an account. Independent reads run together.
- * Returns an empty array (not null) when the account is cold — the guard then treats every
- * personal reference as ungrounded (the correct paranoid posture for a brand-new account).
+ * Returns the account's own identity (always allowed) + whatever semantic/episodic grounding
+ * exists; a brand-new account with no history yields just the identity (so every other
+ * personal reference is treated as ungrounded — the correct paranoid posture).
  */
 export async function buildGroundedSources(
   userId: string,
   accountId: string,
+  identity: AccountIdentity = {},
 ): Promise<GroundedSource[]> {
   const [accountSummary, repSummary, raw] = await Promise.all([
     getAccountSummary(accountId),
@@ -82,8 +91,22 @@ export async function buildGroundedSources(
 
   const sources: GroundedSource[] = [];
 
-  // Phase 23 — shared account facts + the running narrative (only when completed).
-  if (accountSummary && accountSummary.status === "completed") {
+  // The account's own NAME is ground truth — the rep created/named the account, and the
+  // generator is given the name, so it must be groundable (else legitimately naming the
+  // account would be redacted whenever the Phase 23 summary isn't yet present).
+  const name = typeof identity.name === "string" ? identity.name.trim() : "";
+  if (name) sources.push({ id: "account-name", kind: "account-summary", text: name });
+
+  // The shared running narrative written back to account_records.summary (Phase 23), when set.
+  const recordSummary = typeof identity.summary === "string" ? identity.summary.trim() : "";
+  if (recordSummary) {
+    sources.push({ id: "account-summary", kind: "account-summary", text: recordSummary });
+  }
+
+  // Phase 23 — shared account facts + the running narrative. The stored facts are always the
+  // LAST GOOD consolidation (one row/account, rewritten only on finish), so they ground even
+  // while a regeneration is mid-flight — gate on having content, not on the transient status.
+  if (accountSummary) {
     for (const f of coerceAttributedSourced(accountSummary.facts)) {
       sources.push({ id: f.sourceDebriefId, kind: "account-fact", text: f.text });
     }
@@ -91,13 +114,13 @@ export async function buildGroundedSources(
       .map((s) => (typeof s === "string" ? s.trim() : ""))
       .filter(Boolean)
       .join(" ");
-    if (narrative) {
+    if (narrative && narrative !== recordSummary) {
       sources.push({ id: "account-summary", kind: "account-summary", text: narrative });
     }
   }
 
-  // Phase 24 — rep traits (rep-private; only when completed).
-  if (repSummary && repSummary.status === "completed") {
+  // Phase 24 — rep traits (rep-private). Same: the stored traits are the last good profile.
+  if (repSummary) {
     for (const t of coerceAttributedSourced(repSummary.traits)) {
       sources.push({ id: t.sourceDebriefId, kind: "rep-trait", text: t.text });
     }

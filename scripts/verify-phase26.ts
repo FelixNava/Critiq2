@@ -132,6 +132,39 @@ ok(!g("$9,999", "money").grounded, "does NOT ground a money amount absent from t
 ok(g("27%", "number").grounded, "grounds a percentage present in the corpus");
 ok(g("Q3", "date").grounded, "grounds a quarter present in the corpus");
 ok(!g("Q4", "date").grounded, "does NOT ground a quarter absent from the corpus");
+ok(g("2026-07-15", "date").grounded, "grounds an ISO date present in the corpus");
+
+// Exact-token numeric grounding (the fixed false-grounding bugs).
+const corpus2 = buildSearchCorpus([
+  { id: "X1", kind: "raw-interaction", text: "Their margin target is 127% of cost and the budget is $1,500." },
+]);
+const g2 = (span: string, c: Parameters<typeof groundReference>[0]["category"]) =>
+  groundReference({ span, category: c }, corpus2);
+ok(!g2("27%", "number").grounded, "27% is NOT falsely grounded by '127%' (exact-token match)");
+ok(g2("127%", "number").grounded, "127% IS grounded by '127%'");
+ok(!g2("$500", "money").grounded, "$500 is NOT falsely grounded by '$1,500' (exact-token match)");
+ok(g2("$1,500", "money").grounded, "$1,500 IS grounded; magnitude/commas normalized");
+// Cross-format date grounding (the fixed false-redaction bug).
+const corpus3 = buildSearchCorpus([
+  { id: "Y1", kind: "raw-interaction", text: "Follow up on 07/15/2026 about the order." },
+]);
+ok(
+  groundReference({ span: "2026-07-15", category: "date" }, corpus3).grounded,
+  "an ISO date grounds against the SAME date written 07/15/2026 (cross-format)",
+);
+// Account name grounding (the fixed false-redaction of the account's own name).
+const corpus4 = buildSearchCorpus([
+  { id: "account-name", kind: "account-summary", text: "Park Avenue Paint" },
+]);
+ok(
+  groundReference({ span: "Park Avenue Paint", category: "org-name" }, corpus4).grounded,
+  "the account's own name grounds against the account-name source",
+);
+// 2-digit quantity detection (the fixed small-number blind spot).
+ok(
+  cats("They ordered 85 gallons").some((c) => c === "number:85"),
+  "detects a 2-digit quantity (85) — fabricated counts are now checked",
+);
 
 // ---------------------------------------------------------------------------
 console.log("\n## Policy");
@@ -297,7 +330,9 @@ console.log("\n## Verifier request + parse (pure)");
 {
   const { body, labelToId } = buildVerifierRequest({
     sources: SOURCES,
-    suspects: [{ field: "summary", span: "Dana Klein", category: "person-name" }],
+    suspects: [
+      { field: "summary", span: "Dana Klein", category: "person-name", context: "Loop in Dana Klein." },
+    ],
   });
   ok(body.model === GUARD_VERIFIER_MODEL, "verifier request uses claude-sonnet-4-6");
   ok(
