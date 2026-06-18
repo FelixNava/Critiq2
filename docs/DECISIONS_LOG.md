@@ -401,6 +401,28 @@ Trade-off flag: YES — Felix's review queue: (a) transcription QUALITY on real 
 
 ---
 
+## DEC-031 — Phase 16 design (three-pillar scoring: locked rubric, model choice, no-structured-output, evidence grounding, clamp guardrail)
+Phase: 16/three-pillar-scoring
+Date: 2026-06-18 (aggressive-auto run)
+Type: trade-off (the ledger gave one line — "SPIN/Voss/Navarro definitions, locked methodology block, scoring prompt"; the rubric weights, model, output mechanism, and engine shape were mine)
+Context: Phase 16 = the value engine's second half (scoring), built unattended under the relaxed aggressive gate (build + types + unit green = merge to review-for-main). First Anthropic-API phase. ANTHROPIC_API_KEY already provisioned. PR #__, squash __.
+Chosen:
+  - RUBRIC (locked weights from /critiq-context "What Critiq Is"): SPIN 35 / Voss 35 / Navarro 30 = 100, split into 12 named sub-dimensions (`src/lib/scoring/rubric.ts` is the single source of truth for the prompt, the output contract, the aggregate math, and the DB columns). `assertRubricIntegrity()` runs at import so a weight drift is a build/test failure. The exact sub-dimension split + behavioral criteria are MINE and FLAGGED for the expert coach to validate.
+  - MODEL: `claude-sonnet-4-6`. The /critiq-context tech-stack table explicitly names "Anthropic Claude Sonnet 4.x" for scoring/coaching/summaries — the established plan governs over the claude-api skill's generic opus-4-8 default (source-of-truth hierarchy: critiq-context #1).
+  - NO SDK: fetch-based `AnthropicScorer`, mirroring the Phase 15 Deepgram client — pure `buildScoringRequest`/`extractScoreFromResponse`, key read at call time, deterministic unit tests with a fake Scorer.
+  - NO STRUCTURED OUTPUTS: the 12-dimension × (score+rationale+evidence[]) schema overflows the API's strict-grammar compiler (real 400: "The compiled grammar is too large"). So the JSON shape is specified IN the prompt (rubric-derived `buildOutputFormatSpec`) and parsed defensively (strip ``` fences → JSON.parse → fall back to the outermost {...} span). Sonnet 4.6 + the explicit contract returned clean, complete JSON on every probe run; the engine validates every field regardless.
+  - ADAPTIVE THINKING ON: scoring a transcript against a 12-dim rubric is a genuine reasoning task; the response carries thinking blocks then the JSON text block. Cost/latency (~84s/call) is the trade-off — Phase 17 caching + a possible effort dial-down are the levers.
+  - CLAMP GUARDRAIL: `aggregateRawScore` clamps every sub-dimension to [0, max] before summing, so a hallucinated out-of-range score can never corrupt the stored number. Separates "what the model said" (kept verbatim in rationale/evidence) from "the number we trust". A model-omitted dimension defaults to 0 and trips `partialJudgement` (surfaced, never throws).
+  - EVIDENCE GROUNDING (sets up Phase 26): every sub-dimension requires verbatim transcript quotes; the prompt forbids evidence-free credit. Absent skill → score 0 + empty evidence, never a fabricated quote.
+  - CACHE BREAKPOINT NOW: the locked methodology system block carries a `cache_control: ephemeral` breakpoint (Phase 17 builds the full caching strategy on top; this lays the structure per the ledger "locked methodology block (cached prompt)").
+  - STORE/RUNNER/CRON mirror Phase 15 exactly: `call_scores` UNIQUE per recording, CAS claim, attempts cap 3, partial-tolerant, `/api/cron/score` sweeper offset 2 min after the transcribe sweeper. Migration 0010 additive → dev Neon.
+  - NO UI: engine + API only → no /design-critique pass; the score-display surface is Phase 20/21.
+Verification: build + tsc clean; verify-phase16.ts 60/60 (pure logic incl. clamp/aggregate/partial math, refusal+truncation+fence-tolerant parsing); throwaway real-Postgres + REAL Claude probe 16/16 (CAS, work-list in/exclusion, persistence, cascade cleanup, AND a real claude-sonnet-4-6 round-trip on a realistic SW-rep↔contractor transcript → a discriminating, fully evidence-cited 58/100 [SPIN 21 · Voss 25 · Navarro 12]). The probe was a throwaway (not committed), mirroring Phase 15's pure-only committed surface.
+Iterability: high (rubric weights/criteria are constants; the engine is dependency-injected; model + max_tokens + the prompt are localized; output mechanism swappable back to structured outputs if the grammar limit lifts).
+Trade-off flag: YES — Felix + the expert coach's review queue: (a) the rubric sub-dimension split + criteria + the scoring prompt need expert validation before reps see scores; (b) scoring quality/calibration on real field audio (one strong sample ≠ proven); (c) text-only transcripts structurally under-evidence Voss "Silence & Pacing" (the model self-flags it); (d) ~84s/call cost+latency at scale (Phase 17 caching + effort tuning are the levers).
+
+---
+
 ## End-of-build summary
 
 This section is filled by the master orchestrator at the end of every Full Auto run. It surfaces:
