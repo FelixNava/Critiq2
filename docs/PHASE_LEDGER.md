@@ -584,7 +584,7 @@ Prompt builder loads rep + account + last 3 raw + rubric. Token budget enforceme
 
 **FLAGGED for Felix + the expert coach (quality, not blocking the relaxed gate):** (1) the per-call **token budget value (6000)** + the trim PRIORITY (account summary outranks the raw tail; last-3 raw cap) need validation once real working sets drive live calls; (2) the **methodology block (~929 tokens)** sits just under the Sonnet 1024 cacheable-prefix floor on its own — it caches once the per-rep layer extends the prefix (the Phase 17/19/23/24 finding); (3) **rep-private raw scope (DEC-039)** is a privacy call — raw verbatim reports stay per-rep; the SHARED account intelligence reaches other reps only via the rep-agnostic Phase 23 summary — confirm that's the intended boundary; (4) the **`~4 chars/token` estimate is a heuristic**, not a tokenizer — the API's own usage (`summarizeCacheUsage`) is ground truth; (5) **WIRING the existing AI consumers onto this builder is the real payoff and is not done** — flag for a follow-up phase; (6) the shared `{text,lens}` jsonb coerce helper is now duplicated a 4th time — fold into the already-flagged shared-helper cleanup PR.
 
-## Phase 26 — Hallucination Guard ✅ DONE (review-for-main, PR #31)
+## Phase 26 — Hallucination Guard ✅ DONE (review-for-main, PR #31, squash 2861951)
 
 Pre-output validator strips unsourced personal references. Conservative-mode defaults locked.
 
