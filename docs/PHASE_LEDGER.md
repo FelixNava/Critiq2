@@ -614,6 +614,28 @@ Drive every flow end-to-end. Document known limitations. Final test pass.
 
 ---
 
+## Phase 33 — Marketing Landing Redesign ⏳ In flight (aggressive-auto, relaxed gate + design-critique)
+
+> Felix-approved 2026-06-18 ("this is perfect"). Replaces the Phase 4 landing (`/`) with the cinematic, high-conversion design Felix signed off on. Highest design-fidelity item in the run — Felix WILL scrutinize it on the preview. Built FIRST (before resuming Phases 25/26 per the reordered scope; Phase 25 was already done). Branch `phase-33/marketing-landing-redesign` off `review-for-main`; PR base `review-for-main` (NEVER master).
+
+**Authoritative spec:** `docs/design/landing-prototype.html` (committed copy of `critiq-marketing/prototype-critiq-home.html`; live cross-check `critiq-marketing.vercel.app`).
+
+**What was built — a proper port (NOT a raw-HTML drop-in / NOT an iframe):**
+- `src/components/landing/LandingPage.tsx` — single `"use client"` component reproducing all 9 sections in order: (1) HERO (kinetic gradient headline + live "call analysis" panel — animated 0→100 gauge, three pillar bars, self-typing insight, two float badges, cursor-reactive constellation canvas + aurora/grain bg, dual CTA + trust strip); (2) TENSION; (3) THE LOOP (5 steps); (4) THE THREE PILLARS (SPIN 35 / Voss 35 / Navarro 30); (5) IT LEARNS YOU (rising relevance curve); (6) BENTO (8 cells incl. live mini-score feature cell); (7) WHO IT'S FOR (2 ICPs); (8) PROOF (3 metrics + testimonial); (9) FINAL CTA (email → /signup) + footer. Prototype's vanilla JS re-expressed as one `useEffect` driving refs + `data-*` hooks; full `prefers-reduced-motion` gating (renders final states, no heavy motion).
+- `src/components/landing/landing.module.css` — faithful CSS port; design tokens on `.root`; every bare element/`*` selector scoped under `.root` (no global leakage to the light-themed app); toggled state (`is-in`/`scrolled`) via `:global()`; fonts via next/font CSS vars.
+- `src/app/layout.tsx` — added Space Grotesk (display) + Inter (body) via `next/font/google` as CSS vars (app default `--font-sans` stays Geist).
+- `src/app/globals.css` — `html{scroll-behavior:smooth}` for anchor nav.
+- `src/app/page.tsx` — renders `<LandingPage />`; dev/preview-only recording-lab banner preserved.
+- CTAs route to the real app: "Sign in" → /login, every "Start free" → /signup (final email field prefills `/signup?email=` — does NOT capture, so copy stays honest). Footer Privacy/Terms → /privacy /terms.
+
+**PLACEHOLDERS (code-commented):** the 3 metrics (+27% / 3.5× / 9-of-10) and the testimonial (Alex N. · Commercial Sales Rep · Beta) are ILLUSTRATIVE — Felix swaps real beta data before promotion to master.
+
+**Verify:** `pnpm typecheck` + `pnpm build` clean (`/` prerenders static `○`). /design-critique pass + Chrome/Preview MCP desktop+mobile smoke + before/after screenshots → REVIEW PACKET. DEC-040.
+
+**Depends on:** Phase 4 (replaces its landing).
+
+---
+
 # What actually happened on 2026-06-05 (Path B)
 
 The original plan was to arm cron firings at 3/4/5/6am ET to autobuild Phases 2–6.

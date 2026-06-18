@@ -14,9 +14,14 @@ BUILD_TOTAL_TOKEN_BUDGET=4000000
 BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
-PHASE_CURRENT=
-PHASE_CURRENT_STATUS=
+PHASE_CURRENT=33/marketing-landing-redesign
+PHASE_CURRENT_STATUS=building
 PHASE_CURRENT_PR=
+# Phase 33 (Marketing Landing Redesign) is the IMMEDIATE-NEXT build per the
+# reordered aggressive-auto scope (Felix 2026-06-18) — built BEFORE resuming the
+# numbered order (Phase 25 was already done; next numbered = 26). Branch
+# phase-33/marketing-landing-redesign off review-for-main; PR base review-for-main.
+# WIP committed; build+typecheck green. Next: design-critique + MCP smoke + PR + merge.
 # NEXT = 26 Hallucination Guard (Phase 22 email-drafting is DEFERRED post-launch; 25 done this firing).
 # Phase 26 gets SCRUTINIZED (it consumes the source-tagged facts/traits from P23+P24 + the
 # working set from P25). After 26 → the MARKETING LANDING REDESIGN (final scope item).
