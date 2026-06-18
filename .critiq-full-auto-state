@@ -17,7 +17,38 @@ BUILD_PHASE_TOKEN_BUDGET=800000
 PHASE_CURRENT=
 PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
-PHASE_NEXT=20/debrief-reporter-mode
+PHASE_NEXT=21/coaching-output-layer
+# Phase 20 DONE 2026-06-18 (aggressive-auto, relaxed gate): Post-Call Debrief —
+# Reporter Mode (Block 3, the interaction loop, UI+AI) — Signal PRD Step 05. The
+# rep REPORTS what happened via guided observational prompts (text; voice=Phase 2);
+# Critiq STRUCTURES it into recap + neutral observations (each tagged a SPIN/Voss/
+# Navarro lens) + commitments + openQuestions + summary. THE REPORTER CONTRACT: it
+# organizes, it does NOT grade/score/advise (scoring=call_scores/Phase 16; coaching
+# ADVICE=Phase 21) — neutrality is unit-asserted in the system prompt; this lets
+# Phase 21 layer coaching + Phase 23 consolidate without double-counting judgment.
+# Account-scoped (DEC-035 conflict-res: no `calls` entity → /accounts/[id]/debrief,
+# mirrors Phase 18/19; the "call" = the debrief + an optional recording). call_debriefs
+# table (migration 0013, additive, dev Neon); nullable recordingId/briefId SET NULL
+# loop-links (Phase 21/23 joins, not wired in UI — beta reps debrief un-recorded
+# calls); raw `report` stored verbatim (episodic source of truth). src/lib/debrief/
+# (types/reporter/prompt/anthropic/store/generate) mirrors Phase 18: fetch
+# claude-sonnet-4-6, adaptive thinking, no SDK, defensive parse + lens coercion +
+# empty-debrief rejection; reporter.ts = single source for prompts→UI fields+guards+
+# narration; reuses Phase 17 buildCachedSystem + Phase 18 buildRepProfileBlock;
+# synchronous (no cron/CAS). Routes POST/GET /api/accounts/[id]/debrief + PATCH
+# .../[debriefId] (owner+account match; 1-5 rating). UI /accounts/[id]/debrief +
+# DebriefPanel (guided form → structured debrief, per-lens pills, rating, localStorage
+# draft) + account-card CTA. /design-critique P0:0, P1 fixed (h1 truncate, aria-busy,
+# per-lens pill tint, de-duped intro). High-effort /code-review P0:0 (no correctness
+# bugs — faithful, stricter mirror of Phase 18) + 2 hardenings (setDebriefRating
+# scopes UPDATE to userId; client coerces jsonb arrays like the server page).
+# verify-phase20 64/64 + Phase 18 regression green; throwaway real-PG+real-Claude
+# probe 17/17 (neutral, grounded, zero grading/advice). NO DEVICE GATE. Merged
+# review-for-main (PR #25, squash c5d80be). DEC-035. FLAGGED for Felix + expert coach:
+# reporter prompt + guided-prompt set + lens taxonomy quality; field calibration;
+# voice=Phase 2; decide whether to switch Phase 18's objective-handoff count source
+# to completed debriefs (the true call count this phase adds); live auth UI walk needs
+# a reachable preview.
 # Phase 19 DONE 2026-06-18 (aggressive-auto, relaxed gate): Script Generation with
 # Delivery Cues + Style Modes (Block 3, the interaction loop, UI+AI) — PRD Step 04.
 # Turn a COMPLETED Phase 18 brief into a delivery-cued conversation framework in a
@@ -83,8 +114,8 @@ PHASE_NEXT=20/debrief-reporter-mode
 # telemetry is log-only (no dashboard yet); rep-intake cache layer is tested but
 # has no live consumer until coaching/working-memory (18-21, 25). Merged
 # review-for-main (PR #22, squash abb912a).
-PHASE_LAST_COMPLETED=19/script-generation
-PHASE_LAST_COMPLETED_AT=2026-06-18T11:30:00-04:00
+PHASE_LAST_COMPLETED=20/debrief-reporter-mode
+PHASE_LAST_COMPLETED_AT=2026-06-18T12:45:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -129,16 +160,19 @@ ENV_READY=true
 UI_VERIFY_PENDING=
 
 # --- SESSION HEARTBEAT ---
-# Phase 19 DONE 2026-06-18 (aggressive-auto run, scheduled task critiq-fullauto-
-# aggressive-15-26). Script Generation with Delivery Cues + Style Modes (Block 3,
-# the interaction loop, UI+AI) merged to review-for-main (PR #24, squash 658f148)
-# -> review-for-main now holds Phases 2-19. /design-critique pass run (P0:0, P1
-# fixed) per the UI-phase rule. NEXT = Phase 20 (Post-Call Debrief: Reporter Mode)
-# — also Block 3 / UI+AI, so the /design-critique pass is REQUIRED again. Relaxed
-# gate (build+types+unit) applies; no device gates remain.
-SESSION_LAST_HEARTBEAT=2026-06-18T11:30:00-04:00
-SESSION_TOKEN_BUDGET_USED=300000
-SESSION_ID=fullauto-aggressive-phase19-2026-06-18
+# Phase 20 DONE 2026-06-18 (aggressive-auto run, scheduled task critiq-fullauto-
+# aggressive-15-26). Post-Call Debrief: Reporter Mode (Block 3, the interaction
+# loop, UI+AI) merged to review-for-main (PR #25, squash c5d80be) -> review-for-main
+# now holds Phases 2-20. /design-critique pass run (P0:0, P1 fixed) per the UI-phase
+# rule; high-effort /code-review run (P0:0 + 2 hardenings). NEXT = Phase 21 (Coaching
+# Output Layer: post-debrief coaching delivery + three-pillar score display + next-
+# step recommendation) — also Block 3 / UI+AI, so the /design-critique pass is
+# REQUIRED again. Relaxed gate (build+types+unit) applies; no device gates remain.
+# Note Phase 21 is the first surface to combine the debrief (Phase 20, subjective)
+# with call_scores (Phase 16, objective) — it will read both.
+SESSION_LAST_HEARTBEAT=2026-06-18T12:45:00-04:00
+SESSION_TOKEN_BUDGET_USED=420000
+SESSION_ID=fullauto-aggressive-phase20-2026-06-18
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL
