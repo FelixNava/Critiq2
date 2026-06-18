@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { auth } from "@/auth";
 import { getAccountForUser } from "@/lib/accounts";
 import { generateDebriefForAccount } from "@/lib/debrief/generate";
@@ -7,6 +7,7 @@ import {
   getDebriefForUser,
   getLatestDebriefForAccount,
 } from "@/lib/debrief/store";
+import { runConsolidationForAccount } from "@/lib/consolidation/runner";
 
 export const dynamic = "force-dynamic";
 // One Claude round-trip (adaptive thinking over a short report). The rep is
@@ -69,6 +70,22 @@ export async function POST(
       { status: 502 },
     );
   }
+
+  // Phase 23 — semantic memory. A completed debrief is new episodic material, so
+  // regenerate the SHARED account summary. Fire it AFTER the response (the rep
+  // shouldn't wait on a second Claude call); the /api/cron/consolidate-accounts
+  // sweeper is the guaranteed net if this best-effort run is frozen by the platform.
+  // Pass the account meta we already have so the runner skips a re-fetch. The runner
+  // catches its own errors (marks the row failed); guard the callback regardless.
+  after(async () => {
+    try {
+      await runConsolidationForAccount(accountId, {
+        account: { name: account.name, stage: account.stage },
+      });
+    } catch (e) {
+      console.error(`[debrief] consolidation trigger failed for ${accountId}:`, e);
+    }
+  });
 
   // Return the debrief just generated (by id) — not "latest" — so concurrent
   // debriefs in two tabs can't return each other's row.
