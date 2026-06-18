@@ -550,6 +550,78 @@ export const callScores = pgTable(
   ],
 );
 
+/**
+ * Pre-call briefs (Phase 18 — the interaction loop's prep step). One row per
+ * pre-call prep session: the rep narrates account context + call goal (text for
+ * beta; voice is a later phase), and Critiq produces a diagnostic brief
+ * (`diagnosis` + `approach` + anticipated `objections`) plus, from the third
+ * interaction onward, a recommended call `objective`.
+ *
+ * Objective handoff is a HARD RULE, not AI judgment (locked product mechanic):
+ *   - interactions 1–2 → the REP sets the objective (`objectiveSource = 'rep'`);
+ *   - interaction 3+   → Critiq recommends (`recommendedObjective`), the rep can
+ *     accept it (`objectiveSource = 'signal'`) or override (`overridden = true`,
+ *     `objectiveSource = 'rep'` — the deviation is recorded for the learning loop).
+ * `interactionNumber` is 1-based and drives the branch (see src/lib/precall).
+ *
+ * Account intelligence is SHARED, so the interaction count spans all reps on the
+ * account; rep narration + the rating stay with the authoring rep. Cascades on
+ * both account and user delete (the brief is derived prep data).
+ */
+export const preCallBriefs = pgTable(
+  "pre_call_briefs",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accountsTbl.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // 1-based: which interaction with this account this prep is for. Drives the
+    // objective handoff rule (rep sets on 1–2, Critiq recommends on 3+).
+    interactionNumber: integer("interaction_number").notNull().default(1),
+    // The rep's free-text narration of account context + call goal (text-only for
+    // beta; voice input is a later phase).
+    narration: text("narration").notNull(),
+    // Who set the in-force objective: 'rep' (interactions 1–2, or a rep override)
+    // or 'signal' (Critiq's recommendation, accepted on interaction 3+).
+    objectiveSource: text("objective_source").notNull().default("rep"),
+    // The FINAL objective in force for the call (null until set/recommended).
+    objective: text("objective"),
+    // What Critiq recommended (interaction 3+ only; null on 1–2).
+    recommendedObjective: text("recommended_objective"),
+    // True when the rep overrode Critiq's recommendation (the logged deviation).
+    overridden: boolean("overridden").notNull().default(false),
+    status: text("status").notNull().default("pending"), // pending | processing | completed | failed
+    provider: text("provider").notNull().default("anthropic"),
+    model: text("model").notNull().default("claude-sonnet-4-6"),
+    attempts: integer("attempts").notNull().default(0),
+    // AI brief output (null until status = completed).
+    diagnosis: text("diagnosis"), // where the account stands + what's likely to move it
+    approach: jsonb("approach"), // [{ focus, why }] strategic prep points
+    objections: jsonb("objections"), // [{ objection, response }] anticipated
+    summary: text("summary"), // one-line plain-language takeaway
+    // The rep's 1–5 usefulness rating (PRD beta metric). Null until rated.
+    usefulnessRating: integer("usefulness_rating"),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("pre_call_briefs_account_id_idx").on(t.accountId),
+    index("pre_call_briefs_user_id_idx").on(t.userId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
@@ -574,3 +646,5 @@ export type TranscriptSegment = typeof transcriptSegments.$inferSelect;
 export type NewTranscriptSegment = typeof transcriptSegments.$inferInsert;
 export type CallScore = typeof callScores.$inferSelect;
 export type NewCallScore = typeof callScores.$inferInsert;
+export type PreCallBrief = typeof preCallBriefs.$inferSelect;
+export type NewPreCallBrief = typeof preCallBriefs.$inferInsert;

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import AppHeader from "@/components/AppHeader";
@@ -44,6 +45,24 @@ export default async function AccountDetailPage({
           </div>
           <StageBadge stage={account.stage} className="mt-1" />
         </div>
+
+        {/* Primary action — prep for the next call */}
+        <Link
+          href={`/accounts/${account.id}/pre-call`}
+          className="mt-6 flex items-center justify-between gap-4 rounded-2xl border border-slate-900 bg-slate-900 p-5 text-white shadow-sm transition hover:bg-slate-800"
+        >
+          <span>
+            <span className="block text-sm font-semibold">
+              Prepare for a call
+            </span>
+            <span className="mt-0.5 block text-sm text-slate-300">
+              Get a quick read on this account and your objective before you dial.
+            </span>
+          </span>
+          <span aria-hidden className="text-lg">
+            →
+          </span>
+        </Link>
 
         {/* Learning indicator */}
         <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

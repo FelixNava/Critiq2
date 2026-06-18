@@ -9,6 +9,7 @@ const PUBLIC_PATHS = ["/", "/login", "/signup", "/verify", "/terms", "/privacy"]
 const PROTECTED_PREFIXES = [
   "/dashboard",
   "/onboarding",
+  "/accounts",
   "/recording-check",
   "/recording-lab",
 ];
