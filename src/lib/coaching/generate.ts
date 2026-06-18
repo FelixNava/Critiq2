@@ -19,11 +19,18 @@ import type {
 } from "@/lib/debrief/types";
 import { buildRepProfileBlock } from "@/lib/precall/repProfile";
 import { getScoreForRecording } from "@/lib/scoring/store";
+import { AnthropicGuardVerifier } from "@/lib/hallucinationguard/anthropic";
+import { formatGuardManifest } from "@/lib/hallucinationguard/guard";
+import { resolveGuardMode } from "@/lib/hallucinationguard/policy";
+import { buildGroundedSources } from "@/lib/hallucinationguard/sources";
+import type { GuardVerifier } from "@/lib/hallucinationguard/types";
 import { AnthropicCoachingGenerator } from "./anthropic";
+import { guardCoachingResult } from "./guard";
 import { createCoaching, failCoaching, finishCoaching } from "./store";
 import type {
   CoachingContext,
   CoachingGenerator,
+  CoachingResult,
   CoachingScoreInput,
   ScoreSnapshot,
 } from "./types";
@@ -43,6 +50,8 @@ export interface GenerateCoachingInput {
 export interface GenerateCoachingDeps {
   generator?: CoachingGenerator;
   nowMs?: number;
+  /** Phase 26 hallucination-guard verifier (DI for tests). Defaults to the Claude verifier. */
+  guardVerifier?: GuardVerifier;
 }
 
 /** Coerce a jsonb string-array column to a clean string[] (drop empties/non-strings). */
@@ -162,11 +171,63 @@ export async function generateCoachingForDebrief(
 
   try {
     const result = await generator.generate(context);
-    await finishCoaching(coachingId, result);
+    // Phase 26 — hallucination guard: strip unsourced personal references BEFORE the rep
+    // sees the coaching (the locked credibility guardrail). Conservative by default; the
+    // grounded corpus is the source-tagged facts/traits/raw interactions for THIS rep+account
+    // (P23/P24/P25). Fail-safe: a guard error never fails coaching — it ships unguarded with a
+    // logged warning rather than dropping the rep's result. No schema change; manifest logged.
+    const finalResult = await applyHallucinationGuard(
+      result,
+      input.userId,
+      input.accountId,
+      { name: account.name, summary: account.summary },
+      coachingId,
+      deps.guardVerifier,
+    );
+    await finishCoaching(coachingId, finalResult);
     return { status: "completed", coachingId };
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
     await failCoaching(coachingId, error);
     return { status: "failed", coachingId, error };
+  }
+}
+
+/**
+ * Run the coaching through the Phase 26 hallucination guard. Returns the guarded result on
+ * success, or the ORIGINAL result if anything in the guard path throws (fail-safe — the rep
+ * still gets coaching). Logs the guard manifest (counts only, no PII — Phase 17 posture).
+ */
+async function applyHallucinationGuard(
+  result: CoachingResult,
+  userId: string,
+  accountId: string,
+  identity: { name?: string | null; summary?: string | null },
+  coachingId: string,
+  injectedVerifier?: GuardVerifier,
+): Promise<CoachingResult> {
+  try {
+    const sources = await buildGroundedSources(userId, accountId, identity);
+    const verifier =
+      injectedVerifier ??
+      new AnthropicGuardVerifier({
+        onUsage: (usage: CacheUsageSummary) =>
+          console.log(`[coaching-guard] ${coachingId} ${formatCacheUsage(usage)}`),
+      });
+    const guarded = await guardCoachingResult(result, sources, {
+      mode: resolveGuardMode(),
+      verifier,
+    });
+    console.log(
+      `[coaching-guard] ${coachingId} ${formatGuardManifest(guarded.manifest)} ` +
+        `prioritiesDropped=${guarded.prioritiesDropped} reinforceDropped=${guarded.reinforcementsDropped}`,
+    );
+    return guarded.result;
+  } catch (e) {
+    console.warn(
+      `[coaching-guard] ${coachingId} guard skipped (shipping unguarded): ` +
+        `${e instanceof Error ? e.message : String(e)}`,
+    );
+    return result;
   }
 }

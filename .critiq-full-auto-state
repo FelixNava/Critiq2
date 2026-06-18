@@ -17,6 +17,28 @@ BUILD_PHASE_TOKEN_BUDGET=800000
 PHASE_CURRENT=
 PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
+# Phase 26 DONE 2026-06-18 (aggressive-auto, relaxed gate + high-effort code review). Hallucination
+# Guard — the conservative pre-output validator (the locked credibility guardrail). src/lib/
+# hallucinationguard/ (types/policy/detect/prompt/anthropic/guard/sources): a PURE LLM-free
+# detector + EXACT-token grounding backbone (always runs, fail-safe) + an in-context LLM verifier
+# (claude-sonnet-4-6, no SDK) escalated ONLY for the deterministically-ungrounded suspects (most
+# passes = zero Claude calls) that can only ADD recall. Conservative locked default (ungrounded ⇒
+# redacted), CRITIQ_HALLUCINATION_GUARD_MODE runtime kill-switch. Grounded corpus = P23 account
+# facts+narrative + P24 rep traits + P25 verbatim raw interactions + the account's own name/summary;
+# transparent manifest, NO silent caps. Wired fail-safe into the coaching output path (coaching/
+# guard.ts drops a point hinging on a redacted ref, inline-redacts next-step/summary; a guard error
+# ships unguarded coaching). NO migration/API/UI (additive, zero data-loss); manifest logged (P17
+# posture). verify-phase26 all-pass (incl. the false-grounding/cross-format/account-name/small-number
+# locks) + Phase 21 regression + throwaway real-Claude probe (4 hallucinations redacted, 2 priorities
+# dropped, every grounded ref kept). High-effort /code-review (3 angles) → 2 P0 grounding fixes applied
+# in-branch (unanchored numeric substring false-grounding; account name missing from corpus). Merged
+# review-for-main (PR #31). DEC-041. FLAGGED for Felix + expert coach: verifier-prompt/grounding QUALITY
+# (the credibility-killer — validate before reps rely on it); detector recall blind spots (documented);
+# wired only into coaching so far (adopt in pre-call/script/debrief); 8th extractJsonObject copy →
+# shared-helper cleanup PR; CRITIQ_HALLUCINATION_GUARD_MODE=off|balanced is the field kill-switch.
+# 🎯 AGGRESSIVE-AUTO SCOPE COMPLETE: the landing redesign + Phases 25 + 26 are all built+merged to
+# review-for-main → this scheduled task (critiq-fullauto-aggressive-15-26) self-disables.
+PHASE_NEXT=scope-complete-task-self-disabled
 # Phase 33 DONE 2026-06-18 (aggressive-auto, relaxed gate + mandatory /design-critique):
 # Marketing Landing Redesign — replaced the Phase 4 landing at `/` with the Felix-approved
 # cinematic prototype, ported into Next.js 16 + React (one "use client" LandingPage component
@@ -254,8 +276,8 @@ PHASE_NEXT=26/hallucination-guard
 # block ~929 tok sits under the Sonnet 1024 cacheable floor on its own (caches once per-rep layer
 # extends the prefix); confirm the rep-private raw scope is intended; the ~4-chars/tok estimate is a
 # heuristic not a tokenizer; WIRING the consumers onto the builder is the real payoff + is NOT done.
-PHASE_LAST_COMPLETED=33/marketing-landing-redesign
-PHASE_LAST_COMPLETED_AT=2026-06-18T20:30:00-04:00
+PHASE_LAST_COMPLETED=26/hallucination-guard
+PHASE_LAST_COMPLETED_AT=2026-06-18T21:30:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -356,9 +378,20 @@ UI_VERIFY_PENDING=
 # NEXT = Phase 26 (Hallucination Guard — gets SCRUTINIZED; consumes the source-tagged facts/traits
 # from P23+P24 and the P25 working set). After 26 → scope complete (landing + 25 + 26 all done) →
 # self-disable this task.
-SESSION_LAST_HEARTBEAT=2026-06-18T20:30:00-04:00
-SESSION_TOKEN_BUDGET_USED=420000
-SESSION_ID=fullauto-aggressive-phase33-landing-2026-06-18
+# Phase 26 DONE 2026-06-18 (aggressive-auto run, scheduled task critiq-fullauto-aggressive-15-26).
+# Hallucination Guard (the conservative pre-output validator, the credibility guardrail) merged to
+# review-for-main (PR #31) → review-for-main now holds Phases 2-21 + 23 + 24 + 25 + 26 + 33. The
+# FINAL scope item. Built as a primitive (src/lib/hallucinationguard/) consuming the P23/P24
+# source-tagged facts/traits + the P25 raw interactions as the grounded corpus, wired fail-safe into
+# the coaching output path. Relaxed gate (build+types+unit) + a throwaway real-Claude probe; high-
+# effort /code-review (3 angles) → 2 P0 grounding fixes applied in-branch. NO migration/API/UI;
+# manifest logged. DEC-041. AI-quality (verifier prompt + grounding judgment) FLAGGED for Felix + the
+# expert coach with sample outputs in the review packet — NOT gated. 🎯 SCOPE COMPLETE: the marketing
+# landing redesign + Phase 25 + Phase 26 are ALL built+merged → the scheduled task self-disables
+# (update_scheduled_task enabled=false). Nothing further to build in this task's scope.
+SESSION_LAST_HEARTBEAT=2026-06-18T21:30:00-04:00
+SESSION_TOKEN_BUDGET_USED=520000
+SESSION_ID=fullauto-aggressive-phase26-hallucination-guard-2026-06-18
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL
