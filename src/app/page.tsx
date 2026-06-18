@@ -19,6 +19,14 @@ const pillars = [
 export default function Home() {
   return (
     <>
+      {process.env.VERCEL_ENV !== "production" && (
+        <Link
+          href="/recording-lab"
+          className="block bg-indigo-600 px-6 py-3 text-center text-sm font-semibold text-white transition hover:bg-indigo-700"
+        >
+          🎙️ Recording Lab — device-test surface →
+        </Link>
+      )}
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-5">
         <span className="text-lg font-semibold tracking-tight text-slate-900">
           Critiq
@@ -66,9 +74,10 @@ export default function Home() {
 
         <section className="mx-auto max-w-3xl space-y-5 px-6 text-base leading-relaxed text-slate-600">
           <p>
-            Record your sales conversations — in person or over video — and
-            Critiq turns each one into a clear, honest debrief: what worked, what
-            slipped, and the one change most likely to move the next call.
+            Record your sales conversations — over video or in person, best from
+            your laptop — and Critiq turns each one into a clear, honest debrief:
+            what worked, what slipped, and the one change most likely to move the
+            next call.
           </p>
           <p>
             It scores every conversation against the frameworks top reps actually

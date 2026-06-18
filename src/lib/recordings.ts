@@ -109,6 +109,8 @@ export async function completeRecording(
   input: {
     durationMs?: number | null;
     chunkCount?: number | null;
+    gapMs?: number | null;
+    gapCount?: number | null;
     status?: RecordingStatus;
   } = {},
 ): Promise<boolean> {
@@ -119,8 +121,29 @@ export async function completeRecording(
       endedAt: new Date(),
       durationMs: input.durationMs ?? null,
       chunkCount: input.chunkCount ?? 0,
+      gapMs: input.gapMs ?? null,
+      gapCount: input.gapCount ?? null,
       updatedAt: new Date(),
     })
+    .where(and(eq(recordings.id, recordingId), eq(recordings.userId, userId)))
+    .returning({ id: recordings.id });
+  return result.length > 0;
+}
+
+/**
+ * Discard a capture session the rep chose not to keep (mic was lost and they
+ * declined to save the partial). Soft-delete (deletedAt + status 'aborted'),
+ * rep-owned. Returns false if not found/owned. The audio blobs are left for a
+ * later cleanup sweep; the row is hidden from any listing immediately.
+ */
+export async function discardRecording(
+  userId: string,
+  recordingId: string,
+): Promise<boolean> {
+  const now = new Date();
+  const result = await db
+    .update(recordings)
+    .set({ status: "aborted", endedAt: now, deletedAt: now, updatedAt: now })
     .where(and(eq(recordings.id, recordingId), eq(recordings.userId, userId)))
     .returning({ id: recordings.id });
   return result.length > 0;

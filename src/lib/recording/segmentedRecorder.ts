@@ -38,6 +38,11 @@ export const HEARTBEAT_MS = 5000; // health check cadence
 // timeslice tolerates one missed/late chunk before we treat it as a stall.
 export const STALL_MS = 15000;
 export const MAX_RECOVERY_TIER = 4;
+// A chunk gap longer than this means capture stalled. On iOS the mic is
+// SUSPENDED whenever the PWA is backgrounded or the screen is locked (WebKit
+// policy — no keep-alive defeats it), so chunks simply stop arriving. 2× the 5s
+// timeslice tolerates normal cadence jitter; anything beyond is lost audio.
+export const GAP_THRESHOLD_MS = 10000;
 
 export interface SegmentedRecorderConfig {
   segmentMs: number;
@@ -46,6 +51,7 @@ export interface SegmentedRecorderConfig {
   timesliceMs: number;
   heartbeatMs: number;
   stallMs: number;
+  gapThresholdMs: number;
 }
 
 export const DEFAULT_CONFIG: SegmentedRecorderConfig = {
@@ -55,6 +61,7 @@ export const DEFAULT_CONFIG: SegmentedRecorderConfig = {
   timesliceMs: DEFAULT_TIMESLICE_MS,
   heartbeatMs: HEARTBEAT_MS,
   stallMs: STALL_MS,
+  gapThresholdMs: GAP_THRESHOLD_MS,
 };
 
 export type SegmentedStatus =
@@ -95,6 +102,10 @@ export interface SegmentedRecorderState {
   recoveryTier: RecoveryTier;
   heartbeat: HeartbeatState | null;
   elapsedMs: number;
+  /** Cumulative ms of audio NOT captured (mic suspended while backgrounded/locked). */
+  gapMs: number;
+  /** Number of capture gaps (stalls beyond the gap threshold) this session. */
+  gapCount: number;
 }
 
 // ---- injectable time ----
@@ -122,6 +133,13 @@ export interface MicStream {
   isLive(): boolean;
   /** Stop every track (releases the mic). */
   stop(): void;
+  /**
+   * Optional: register a callback fired the instant an audio track ends — the
+   * mic was revoked or grabbed by another app. Phase 14 uses this for IMMEDIATE
+   * interruption detection (faster than the ≤5s heartbeat). Optional so injected
+   * fakes need not implement it; the heartbeat remains the reliable fallback.
+   */
+  onEnded?(cb: () => void): void;
 }
 
 export interface SegmentRecorderHandle {
@@ -153,6 +171,11 @@ class BrowserMicStream implements MicStream {
   isLive(): boolean {
     const tracks = this.raw.getAudioTracks();
     return tracks.length > 0 && tracks.some((t) => t.readyState === "live");
+  }
+  onEnded(cb: () => void): void {
+    for (const t of this.raw.getAudioTracks()) {
+      t.addEventListener("ended", cb, { once: true });
+    }
   }
   stop(): void {
     for (const t of this.raw.getTracks()) {
@@ -233,6 +256,14 @@ export interface SegmentedRecorderCallbacks {
   /** Fired when the recorder stops itself (hard cap or unrecoverable fault) so
    *  the caller runs the same finalize (flush + complete) it runs on a user stop. */
   onAutoStop?: (reason: AutoStopReason) => void;
+  /** Fired the instant a mic track ends (audio session grabbed / mic revoked) —
+   *  Phase 14 turns this into the immediate interruption notification. Redundant
+   *  with the heartbeat's trackLive=false detection, just faster. */
+  onTrackEnded?: () => void;
+  /** Fired when auto-recovery is exhausted (Tier 4). The session is kept ALIVE
+   *  (the heartbeat keeps retrying, so capture auto-resumes if the mic returns) —
+   *  the caller asks the rep whether to keep what was captured. Never auto-kills. */
+  onCaptureLost?: () => void;
 }
 
 /**
@@ -270,6 +301,13 @@ export class SegmentedRecorder {
   private heartbeat: HeartbeatState | null = null;
   private stopped = false;
 
+  // Coverage tracking: measure capture gaps from inter-chunk intervals.
+  // lastEmitAtMs is dedicated to this and is intentionally NOT reset by recovery
+  // (unlike lastChunkAtMs), so a gap that spans a recovery is still counted.
+  private gapMs = 0;
+  private gapCount = 0;
+  private lastEmitAtMs: number | null = null;
+
   constructor(
     callbacks: SegmentedRecorderCallbacks,
     opts?: {
@@ -297,6 +335,8 @@ export class SegmentedRecorder {
       recoveryTier: this.recoveryTier,
       heartbeat: this.heartbeat ? { ...this.heartbeat } : null,
       elapsedMs: this.sessionStartMs ? this.timers.now() - this.sessionStartMs : 0,
+      gapMs: this.gapMs,
+      gapCount: this.gapCount,
     };
   }
 
@@ -324,6 +364,7 @@ export class SegmentedRecorder {
       this.callbacks.onError?.(err);
       return;
     }
+    this.wireTrackEnded();
 
     this.mimeType = this.engine.pickMimeType();
     this.sessionStartMs = this.timers.now();
@@ -332,6 +373,9 @@ export class SegmentedRecorder {
     this.segmentCount = 1;
     this.globalChunkIndex = 0;
     this.lastChunkAtMs = null;
+    this.lastEmitAtMs = null;
+    this.gapMs = 0;
+    this.gapCount = 0;
     this.stopped = false;
 
     this.current = this.makeSegmentRecorder(this.segmentIndex);
@@ -346,6 +390,16 @@ export class SegmentedRecorder {
     this.setStatus("recording");
   }
 
+  /** Wire the current stream's track-ended signal to the Phase 14 callback. The
+   *  fault still flows through the heartbeat too (trackLive=false → recovery);
+   *  this just gives the notification layer an immediate edge. Best-effort: a
+   *  stream without onEnded (injected fakes) simply relies on the heartbeat. */
+  private wireTrackEnded(): void {
+    this.stream?.onEnded?.(() => {
+      if (!this.stopped) this.callbacks.onTrackEnded?.();
+    });
+  }
+
   /** Create a segment recorder whose chunks are tagged with THIS segment index
    *  (so overlap chunks from the outgoing recorder keep the old segment index). */
   private makeSegmentRecorder(segmentIndex: number): SegmentRecorderHandle {
@@ -358,7 +412,21 @@ export class SegmentedRecorder {
   }
 
   private emitChunk(segmentIndex: number, blob: Blob, mimeType: string): void {
-    this.lastChunkAtMs = this.timers.now();
+    const now = this.timers.now();
+    // Measure any capture gap since the previous chunk. On iOS a backgrounded /
+    // locked PWA has its mic suspended (no chunks arrive), so a large inter-chunk
+    // interval = audio we did not capture. Count everything beyond one chunk's
+    // worth of cadence as lost. (A gap in the TAIL — stopped while backgrounded —
+    // isn't measured; there's no following chunk to reveal it.)
+    if (this.lastEmitAtMs !== null) {
+      const interval = now - this.lastEmitAtMs;
+      if (interval > this.config.gapThresholdMs) {
+        this.gapMs += interval - this.config.timesliceMs;
+        this.gapCount += 1;
+      }
+    }
+    this.lastEmitAtMs = now;
+    this.lastChunkAtMs = now;
     this.callbacks.onChunk({
       index: this.globalChunkIndex++,
       segmentIndex,
@@ -532,6 +600,7 @@ export class SegmentedRecorder {
           return;
         }
         this.stream = nextStream;
+        this.wireTrackEnded();
         this.resetStallClock();
         this.current = this.makeSegmentRecorder(this.segmentIndex);
         this.current.start();
@@ -544,13 +613,13 @@ export class SegmentedRecorder {
           at,
         );
       } else {
-        // Tier 4 — auto-recovery exhausted. Notify, then save what we have and
-        // stop (release the keep-alive + close the session row) rather than leak
-        // resources on a session that can't continue. The chime/banner/Web-Push
-        // notification UX is Phase 14.
-        this.report(tier, "Couldn't recover — saved and stopped", false, at);
+        // Tier 4 — auto-recovery exhausted. DON'T kill the session: keep it ALIVE
+        // so the heartbeat keeps retrying (capture auto-resumes if the mic frees
+        // up) and ASK the rep whether to keep what's captured. Never finalize or
+        // discard capture without the user's call (Felix, 2026-06-18).
+        this.report(tier, "Lost the microphone — your call", false, at);
         this.setStatus("error");
-        await this.autoStop("fatal");
+        this.callbacks.onCaptureLost?.();
       }
     } finally {
       this.recoveryInFlight = false;

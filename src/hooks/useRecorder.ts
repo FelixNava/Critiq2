@@ -10,10 +10,18 @@ import {
 } from "@/lib/recording/segmentedRecorder";
 import { ChunkUploader, type ChunkUploadState } from "@/lib/recording/uploader";
 import { recoverOrphanedRecordings } from "@/lib/recording/recovery";
+import { clearRecording } from "@/lib/recording/chunkStore";
 import {
   SessionKeepAlive,
   type KeepAliveLayers,
 } from "@/lib/recording/sessionKeepAlive";
+import {
+  InterruptionMonitor,
+  type NotificationChannel,
+} from "@/lib/recording/interruption";
+import { createChimeChannel } from "@/lib/recording/chime";
+import { createTabTitleChannel } from "@/lib/recording/tabTitle";
+import { createPushChannel } from "@/lib/recording/pushClient";
 
 /**
  * React orchestration for the recorder surface. Ties segmented capture (Phase 13:
@@ -52,10 +60,22 @@ export interface UseRecorder {
   recoveryTier: RecoveryTier;
   recoveryEvents: RecoveryEvent[];
   recoveredNote: string | null;
+  /** True while capture is interrupted (mic lost / grabbed) — drives the banner. */
+  interrupted: boolean;
+  /** Cumulative ms of audio NOT captured (phone backgrounded / screen locked). */
+  gapMs: number;
+  /** Number of capture gaps (stalls) this session. */
+  gapCount: number;
+  /** Fraction of the session actually captured (1 = no gaps). */
+  coverage: number;
+  /** True when auto-recovery is exhausted and we're asking the rep to keep/discard. */
+  captureLost: boolean;
   error: string | null;
   busy: boolean;
   start: () => Promise<void>;
   stop: () => Promise<void>;
+  /** Discard the partial recording (rep declined to keep it after a lost mic). */
+  discard: () => Promise<void>;
   runSelfTest: () => Promise<void>;
 }
 
@@ -73,7 +93,13 @@ async function apiStart(accountId?: string): Promise<string> {
 
 async function apiComplete(
   recordingId: string,
-  body: { durationMs?: number; chunkCount?: number; status?: string },
+  body: {
+    durationMs?: number;
+    chunkCount?: number;
+    gapMs?: number;
+    gapCount?: number;
+    status?: string;
+  },
 ): Promise<void> {
   await fetch("/api/recording/complete", {
     method: "POST",
@@ -103,9 +129,12 @@ export function useRecorder(): UseRecorder {
   const recorderRef = useRef<SegmentedRecorder | null>(null);
   const uploaderRef = useRef<ChunkUploader | null>(null);
   const keepAliveRef = useRef<SessionKeepAlive | null>(null);
+  const monitorRef = useRef<InterruptionMonitor | null>(null);
   const recordingIdRef = useRef<string | null>(null);
   const startedAtRef = useRef<number>(0);
   const chunkTotalRef = useRef<number>(0);
+  const gapMsRef = useRef<number>(0);
+  const gapCountRef = useRef<number>(0);
   // In-flight per-chunk handleChunk promises, so finalize() can wait for the tail
   // chunk to persist+upload before it reports the durable count.
   const opsRef = useRef<Promise<unknown>[]>([]);
@@ -122,6 +151,11 @@ export function useRecorder(): UseRecorder {
   const [recoveryTier, setRecoveryTier] = useState<RecoveryTier>(0);
   const [recoveryEvents, setRecoveryEvents] = useState<RecoveryEvent[]>([]);
   const [recoveredNote, setRecoveredNote] = useState<string | null>(null);
+  const [interrupted, setInterrupted] = useState<boolean>(false);
+  const [captureLost, setCaptureLost] = useState<boolean>(false);
+  const [gapMs, setGapMs] = useState<number>(0);
+  const [gapCount, setGapCount] = useState<number>(0);
+  const [elapsedMs, setElapsedMs] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
 
@@ -189,11 +223,12 @@ export function useRecorder(): UseRecorder {
     };
   }, []);
 
-  // Tear capture + keep-alive down on unmount.
+  // Tear capture + keep-alive + the interruption alert down on unmount.
   useEffect(() => {
     return () => {
       void recorderRef.current?.stop();
       void keepAliveRef.current?.stop();
+      monitorRef.current?.reset();
     };
   }, []);
 
@@ -229,6 +264,11 @@ export function useRecorder(): UseRecorder {
         chunkCount = Math.max(0, chunkTotalRef.current - remaining);
       }
 
+      // Capture is over — clear any interruption alert (chime stop is a no-op,
+      // but the tab title is restored and the banner hidden).
+      monitorRef.current?.reset();
+      monitorRef.current = null;
+
       await keepAliveRef.current?.stop();
       keepAliveRef.current = null;
 
@@ -237,6 +277,8 @@ export function useRecorder(): UseRecorder {
         await apiComplete(id, {
           durationMs: Date.now() - startedAtRef.current,
           chunkCount,
+          gapMs: gapMsRef.current,
+          gapCount: gapCountRef.current,
           ...(completeStatus ? { status: completeStatus } : {}),
         });
       }
@@ -254,7 +296,14 @@ export function useRecorder(): UseRecorder {
     setHeartbeat(null);
     setRecoveryTier(0);
     setRecoveryEvents([]);
+    setInterrupted(false);
+    setCaptureLost(false);
+    setGapMs(0);
+    setGapCount(0);
+    setElapsedMs(0);
     chunkTotalRef.current = 0;
+    gapMsRef.current = 0;
+    gapCountRef.current = 0;
     opsRef.current = [];
     finalizedRef.current = false;
     try {
@@ -269,6 +318,22 @@ export function useRecorder(): UseRecorder {
       const keepAlive = new SessionKeepAlive((s) => setKeepAlive(s.layers));
       keepAliveRef.current = keepAlive;
       await keepAlive.start();
+
+      // Interruption alerts (Phase 14): the in-app banner is a channel that
+      // toggles React state; chime / tab-title / Web Push are the out-of-app
+      // channels. The monitor raises them on an interruption edge and clears
+      // them when capture resumes.
+      const bannerChannel: NotificationChannel = {
+        raise: () => setInterrupted(true),
+        clear: () => setInterrupted(false),
+      };
+      const monitor = new InterruptionMonitor({
+        chime: createChimeChannel(),
+        tabTitle: createTabTitleChannel(),
+        push: createPushChannel(),
+        banner: bannerChannel,
+      });
+      monitorRef.current = monitor;
 
       const recorder = new SegmentedRecorder({
         onChunk: (c) => {
@@ -304,7 +369,21 @@ export function useRecorder(): UseRecorder {
           setSegment({ index: s.segmentIndex, count: s.segmentCount });
           setHeartbeat(s.heartbeat);
           setRecoveryTier(s.recoveryTier);
+          setGapMs(s.gapMs);
+          setGapCount(s.gapCount);
+          setElapsedMs(s.elapsedMs);
+          gapMsRef.current = s.gapMs;
+          gapCountRef.current = s.gapCount;
+          // Capture resumed on its own (the mic came back) → clear the prompt.
+          if (s.status === "recording") setCaptureLost(false);
+          monitorRef.current?.update({
+            status: s.status,
+            heartbeat: s.heartbeat,
+            recoveryTier: s.recoveryTier,
+          });
         },
+        onTrackEnded: () => monitorRef.current?.signalTrackEnded(),
+        onCaptureLost: () => setCaptureLost(true),
         onError: (err) =>
           setError(
             err instanceof Error
@@ -313,13 +392,11 @@ export function useRecorder(): UseRecorder {
           ),
         onRecovery: (event) =>
           setRecoveryEvents((prev) => [...prev.slice(-9), event]),
-        onAutoStop: (reason) => {
-          setRecoveredNote(
-            reason === "hard-cap"
-              ? "Reached the 75-minute limit — saved and stopped."
-              : "Lost the microphone and couldn't reconnect — saved what we had and stopped.",
-          );
-          void finalize(reason === "hard-cap" ? "completed" : "failed");
+        onAutoStop: () => {
+          // Only the deliberate 75-min hard cap auto-stops now; a lost mic asks
+          // the rep (onCaptureLost) instead of auto-saving-and-killing.
+          setRecoveredNote("Reached the 75-minute limit — saved and stopped.");
+          void finalize("completed");
         },
       });
       recorderRef.current = recorder;
@@ -335,6 +412,8 @@ export function useRecorder(): UseRecorder {
         recorderRef.current = null;
         uploaderRef.current = null;
         recordingIdRef.current = null;
+        monitorRef.current?.reset();
+        monitorRef.current = null;
         finalizedRef.current = true;
         await apiComplete(id, { status: "aborted", chunkCount: 0 });
       }
@@ -344,6 +423,8 @@ export function useRecorder(): UseRecorder {
       keepAliveRef.current = null;
       recorderRef.current = null;
       uploaderRef.current = null;
+      monitorRef.current?.reset();
+      monitorRef.current = null;
     } finally {
       setBusy(false);
     }
@@ -362,6 +443,39 @@ export function useRecorder(): UseRecorder {
       setBusy(false);
     }
   }, [busy, finalize]);
+
+  // Rep declined to keep a partial after a lost mic: stop, soft-delete the row,
+  // and drop the local chunks (so resume-after-tab-kill won't re-upload them).
+  // Never auto-invoked — only the rep's "Discard" calls this.
+  const discard = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      finalizedRef.current = true; // ensure this session is never also saved
+      await recorderRef.current?.stop();
+      recorderRef.current = null;
+      monitorRef.current?.reset();
+      monitorRef.current = null;
+      await keepAliveRef.current?.stop();
+      keepAliveRef.current = null;
+      const id = recordingIdRef.current;
+      if (id) {
+        await fetch("/api/recording/discard", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ recordingId: id }),
+        }).catch(() => {});
+        await clearRecording(id).catch(() => {});
+      }
+      setCaptureLost(false);
+      setStatus("stopped");
+      setRecoveredNote("Discarded — nothing was saved.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not discard.");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy]);
 
   const runSelfTest = useCallback(async () => {
     if (busy || recorderRef.current) return;
@@ -401,6 +515,9 @@ export function useRecorder(): UseRecorder {
     }
   }, [busy, makeUploader, refreshPending, upsertChunk]);
 
+  const coverage =
+    elapsedMs > 0 ? Math.max(0, Math.min(1, (elapsedMs - gapMs) / elapsedMs)) : 1;
+
   return {
     status,
     recordingId,
@@ -412,10 +529,16 @@ export function useRecorder(): UseRecorder {
     recoveryTier,
     recoveryEvents,
     recoveredNote,
+    interrupted,
+    gapMs,
+    gapCount,
+    coverage,
+    captureLost,
     error,
     busy,
     start,
     stop,
+    discard,
     runSelfTest,
   };
 }

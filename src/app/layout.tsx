@@ -16,6 +16,14 @@ export const metadata: Metadata = {
   title: "Critiq — the AI sales coach that learns the rep",
   description:
     "Critiq records your sales calls, scores them against proven frameworks, and coaches you with feedback that gets sharper every conversation.",
+  // PWA install (Phase 14): an installed PWA is what unlocks Web Push interruption
+  // alerts on iOS (Add to Home Screen → standalone). Android/desktop install too.
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "Critiq", statusBarStyle: "default" },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
