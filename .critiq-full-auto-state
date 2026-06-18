@@ -17,8 +17,10 @@ BUILD_PHASE_TOKEN_BUDGET=800000
 PHASE_CURRENT=
 PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
-# NEXT = 25 (Phase 22 email-drafting is DEFERRED post-launch; 24 done this firing).
-PHASE_NEXT=25/working-memory-assembly
+# NEXT = 26 Hallucination Guard (Phase 22 email-drafting is DEFERRED post-launch; 25 done this firing).
+# Phase 26 gets SCRUTINIZED (it consumes the source-tagged facts/traits from P23+P24 + the
+# working set from P25). After 26 → the MARKETING LANDING REDESIGN (final scope item).
+PHASE_NEXT=26/hallucination-guard
 # Phase 24 DONE 2026-06-18 (aggressive-auto, relaxed gate): Semantic Memory — Rep
 # Consolidation (Block 4, BACKEND, no UI). The REP side of the semantic tier and the
 # mirror-image of Phase 23: a PRIVATE running profile of how a rep sells (strengths,
@@ -209,8 +211,35 @@ PHASE_NEXT=25/working-memory-assembly
 # telemetry is log-only (no dashboard yet); rep-intake cache layer is tested but
 # has no live consumer until coaching/working-memory (18-21, 25). Merged
 # review-for-main (PR #22, squash abb912a).
-PHASE_LAST_COMPLETED=24/rep-consolidation
-PHASE_LAST_COMPLETED_AT=2026-06-18T18:05:00-04:00
+# Phase 25 DONE 2026-06-18 (aggressive-auto, relaxed gate): Working Memory Assembly — the
+# WORKING tier of the locked memory architecture (Episodic→Semantic→WORKING). A PURE builder
+# (src/lib/workingmemory/) that assembles, under a per-call TOKEN BUDGET, methodology(rubric) +
+# rep profile + this account's profile + last 3 raw interactions into a working set for a Claude
+# call. NO table/migration/API route/UI — reads existing tiers only (additive, zero data-loss).
+# Cache-aware split: stableLayers (methodology cached-forever + rep profile cached-per-rep, typed
+# as the reused CacheableLayer → buildCachedSystem) + volatileContext (account summary + recent
+# raw → user message, never cached) + a transparent manifest (every include/trim/truncate + token
+# math, NO silent caps). Budget default 6000; deterministic trim policy (foundation methodology+rep
+# NEVER trimmed; account summary outranks the raw tail; raw filled newest-first, truncate-then-drop).
+# estimateTokens = ~4-chars/tok heuristic (rounds up; API usage is ground truth). Rep-profile
+# cold-start fallback: learned summary (P24) → static intake (P18) → none. RAW INTERACTIONS SCOPED
+# REP-PRIVATE (userId+accountId, DEC-039) — shared account intel flows via the rep-agnostic P23
+# summary; malformed empty-`happened` rows filtered IN SQL before LIMIT. build.ts buildWorkingMemory
+# (userId, accountId) gated by getAccountForUser (null for an unassigned rep). PRIMITIVE BUILT +
+# TESTED but NOT yet wired into the existing AI consumers (pre-call/script/debrief/coaching) — a
+# flagged follow-up (Phase 17 cache-helper posture). verify-phase25 62/62 + throwaway real-PG probe
+# (access boundary, learned→intake fallback, account summary, rep-private scope, newest-first,
+# older-than-cap disclosure, empty-row exclusion, cascade). High-effort /code-review (3 angles) →
+# fixes applied in-branch (raw-header token undercount → count actual emitted text + reserve header;
+# maxRawInteractions honored at the assembler; exact drop accounting; truncation back-half boundary;
+# CacheableLayer reuse; resolveAccountSummary→string|null; memoized METHODOLOGY_BLOCK; empty-row
+# guard moved to SQL). NO UI → no /design-critique. Merged review-for-main (PR #29, squash c2496bf).
+# DEC-039. FLAGGED for Felix + expert coach: the 6000 budget + trim PRIORITY + last-3 cap; methodology
+# block ~929 tok sits under the Sonnet 1024 cacheable floor on its own (caches once per-rep layer
+# extends the prefix); confirm the rep-private raw scope is intended; the ~4-chars/tok estimate is a
+# heuristic not a tokenizer; WIRING the consumers onto the builder is the real payoff + is NOT done.
+PHASE_LAST_COMPLETED=25/working-memory-assembly
+PHASE_LAST_COMPLETED_AT=2026-06-18T19:30:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -292,9 +321,20 @@ UI_VERIFY_PENDING=
 # per-call token budget). Then 26 (hallucination guard — gets scrutinized; it CONSUMES the
 # source-tagged facts/traits from Phase 23 + 24). The rep-profile QUALITY is FLAGGED for
 # Felix + the expert coach (not blocking the relaxed gate).
-SESSION_LAST_HEARTBEAT=2026-06-18T18:05:00-04:00
-SESSION_TOKEN_BUDGET_USED=300000
-SESSION_ID=fullauto-aggressive-phase24-2026-06-18
+# Phase 25 DONE 2026-06-18 (aggressive-auto run, scheduled task critiq-fullauto-aggressive-15-26).
+# Working Memory Assembly (Block 4, the WORKING tier, BACKEND, no UI) merged to review-for-main
+# (PR #29, squash c2496bf) → review-for-main now holds Phases 2-21 + 23 + 24 + 25. Built directly
+# by the orchestrator (fully-specified backend phase, DEC-039/038/037/004/013 precedent). Relaxed
+# gate (build+types+unit 62/62) + a throwaway real-PG probe; high-effort /code-review (3 angles)
+# P0/P1:0, all fixes applied in-branch. NO UI → no /design-critique; NO device gate. NEXT = Phase 26
+# (Hallucination Guard — gets SCRUTINIZED; it CONSUMES the source-tagged facts/traits from P23+P24
+# and the working set from P25; conservative-mode defaults locked). After 26 → the MARKETING LANDING
+# REDESIGN (final scope item, build ONLY after 15-26 all merged). Working-memory QUALITY (budget/
+# trim/scope) is FLAGGED for Felix + the expert coach; the builder is built-but-not-yet-wired into
+# the AI consumers (the real payoff, a flagged follow-up).
+SESSION_LAST_HEARTBEAT=2026-06-18T19:30:00-04:00
+SESSION_TOKEN_BUDGET_USED=360000
+SESSION_ID=fullauto-aggressive-phase25-2026-06-18
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL
