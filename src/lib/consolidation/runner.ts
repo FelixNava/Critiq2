@@ -115,9 +115,11 @@ export async function runConsolidationForAccount(
       headline: result.headline,
       narrative: result.narrative,
       facts,
-      // The high-water mark is the TOTAL completed count (not the capped read count),
-      // so a fully-consolidated account isn't re-picked forever when > cap debriefs exist.
-      debriefCount: completedCount,
+      // The high-water mark is the count of debriefs REFLECTED in this summary. Use the
+      // total completed count (so a >cap account isn't re-picked forever) but never less
+      // than the rows we actually read — if a debrief completed between the count and the
+      // read, it's in this summary, so don't undercount and re-consolidate it needlessly.
+      debriefCount: Math.max(completedCount, debriefs.length),
       consolidatedThroughAt: debriefs[0]?.occurredAt ?? null,
     });
     return { status: "completed", summaryId, factCount: facts.length };

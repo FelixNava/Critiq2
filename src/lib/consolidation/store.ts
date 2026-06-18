@@ -14,7 +14,7 @@
  * the per-account intelligence card surfaces it with no new UI.
  */
 
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   accountSummaries,
@@ -93,7 +93,12 @@ export async function getCompletedDebriefsForConsolidation(
         eq(callDebriefs.status, "completed"),
       ),
     )
-    .orderBy(desc(callDebriefs.completedAt), desc(callDebriefs.createdAt))
+    // NULLS LAST so a (defensively-possible) completed debrief with a null
+    // completedAt can't sort to the top and be mistaken for the newest call.
+    .orderBy(
+      sql`${callDebriefs.completedAt} DESC NULLS LAST`,
+      desc(callDebriefs.createdAt),
+    )
     .limit(limit);
 
   return rows.map((r) => ({
@@ -123,8 +128,10 @@ function coerceObservations(
     const o = (item ?? {}) as Record<string, unknown>;
     const note = typeof o.note === "string" ? o.note.trim() : "";
     if (!note) continue;
+    // The lens is already a validated ObservationLens (Phase 20 normalized it before
+    // storing) and is only model-input context here, not stored output — so keep the
+    // stored string; if it's missing, default to "general".
     const lensRaw = typeof o.lens === "string" ? o.lens : "general";
-    // The lens is re-coerced in the prompt layer anyway; keep the raw string here.
     out.push({
       note,
       lens: lensRaw as DebriefDigest["observations"][number]["lens"],
@@ -234,6 +241,14 @@ export interface FinishConsolidationInput {
  * account_records.summary so the per-account intelligence card surfaces it. Both
  * writes run in one db.batch (neon-http's atomic primitive — no interactive
  * transaction) so the structured row and the displayed summary can't diverge.
+ *
+ * The account write-back deliberately does NOT touch account_records.updatedAt: this
+ * is a background job (often triggered by another rep's debrief), and bumping
+ * updatedAt would reorder every assigned rep's account list by AI timing rather than
+ * real rep activity (listAccountsForUser orders by updatedAt). It is also guarded by
+ * `deletedAt IS NULL` so a run that finishes after the account was soft-deleted
+ * mid-flight can't write a fresh summary onto — and partially resurrect — a deleted
+ * account (the cron work list already excludes deleted accounts; this closes the race).
  */
 export async function finishConsolidation(
   summaryId: string,
@@ -258,8 +273,8 @@ export async function finishConsolidation(
       .where(eq(accountSummaries.id, summaryId)),
     db
       .update(accountsTbl)
-      .set({ summary: input.narrative, updatedAt: now })
-      .where(eq(accountsTbl.id, accountId)),
+      .set({ summary: input.narrative })
+      .where(and(eq(accountsTbl.id, accountId), isNull(accountsTbl.deletedAt))),
   ]);
 }
 
@@ -302,28 +317,33 @@ export function consolidationEligibility(
   completedDebriefCount: number,
   nowMs = Date.now(),
 ): { eligible: boolean; isNewMaterial: boolean } {
+  // This mirrors claimConsolidation's branch order EXACTLY so the work list never
+  // surfaces an account the claim would then refuse (which would waste a bounded
+  // sweep slot and could starve other eligible accounts).
   if (completedDebriefCount <= 0) return { eligible: false, isNewMaterial: false };
   if (!summary) return { eligible: true, isNewMaterial: true };
 
   const isNewMaterial = completedDebriefCount > summary.debriefCount;
+
+  // Already reflects the latest material.
+  if (summary.status === "completed" && !isNewMaterial) {
+    return { eligible: false, isNewMaterial };
+  }
+  // A fresh run is in flight — let it finish.
   const startedMs = summary.startedAt ? summary.startedAt.getTime() : 0;
   const staleProcessing =
     summary.status === "processing" &&
     nowMs - startedMs >= STALE_PROCESSING_MS;
-
-  // A fresh run is in flight — let it finish.
   if (summary.status === "processing" && !staleProcessing) {
     return { eligible: false, isNewMaterial };
   }
-  if (isNewMaterial) return { eligible: true, isNewMaterial: true };
-  if (
-    (summary.status === "pending" || summary.status === "failed") &&
-    summary.attempts < MAX_CONSOLIDATION_ATTEMPTS
-  ) {
-    return { eligible: true, isNewMaterial: false };
+  // Same material that has burned through its retry budget — bounded loss. This
+  // covers pending/failed AND a stale-processing row at the cap (claim → 'exhausted').
+  if (!isNewMaterial && summary.attempts >= MAX_CONSOLIDATION_ATTEMPTS) {
+    return { eligible: false, isNewMaterial };
   }
-  if (staleProcessing) return { eligible: true, isNewMaterial: false };
-  return { eligible: false, isNewMaterial };
+  // New material (claim resets attempts), an under-cap retry, or a stale reclaim.
+  return { eligible: true, isNewMaterial };
 }
 
 /**
@@ -355,6 +375,9 @@ export async function findAccountsNeedingConsolidation(
 
   if (counts.length === 0) return [];
 
+  // Only the accounts that actually have completed debriefs can need consolidation,
+  // so scope the summary read to them (bounded) rather than scanning the whole table.
+  const candidateIds = counts.map((c) => c.accountId);
   const summaryRows = await db
     .select({
       accountId: accountSummaries.accountId,
@@ -363,7 +386,8 @@ export async function findAccountsNeedingConsolidation(
       debriefCount: accountSummaries.debriefCount,
       startedAt: accountSummaries.startedAt,
     })
-    .from(accountSummaries);
+    .from(accountSummaries)
+    .where(inArray(accountSummaries.accountId, candidateIds));
   const byAccount = new Map(summaryRows.map((r) => [r.accountId, r]));
 
   const eligible = counts

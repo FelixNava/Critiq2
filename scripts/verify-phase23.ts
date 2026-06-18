@@ -315,10 +315,16 @@ async function main() {
       !consolidationEligibility({ status: "processing", attempts: 1, debriefCount: 2, startedAt: fresh }, 2, NOW).eligible,
       "fresh processing claim → not eligible",
     );
-    // Stale processing → eligible (dead run reclaim).
+    // Stale processing under the cap → eligible (dead run reclaim).
     ok(
       consolidationEligibility({ status: "processing", attempts: 1, debriefCount: 2, startedAt: stale }, 2, NOW).eligible,
-      "stale processing claim → eligible (reclaim)",
+      "stale processing claim under the cap → eligible (reclaim)",
+    );
+    // Stale processing AT the cap (same material) → NOT eligible — must agree with
+    // claimConsolidation, which returns 'exhausted' here (no wasted work-list slot).
+    ok(
+      !consolidationEligibility({ status: "processing", attempts: MAX_CONSOLIDATION_ATTEMPTS, debriefCount: 2, startedAt: stale }, 2, NOW).eligible,
+      "stale processing AT the cap (same material) → not eligible (mirrors claim 'exhausted')",
     );
     // Fresh processing BUT new material → still not eligible (the in-flight run may pick it up; next sweep will).
     ok(

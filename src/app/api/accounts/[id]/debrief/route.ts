@@ -10,9 +10,13 @@ import {
 import { runConsolidationForAccount } from "@/lib/consolidation/runner";
 
 export const dynamic = "force-dynamic";
-// One Claude round-trip (adaptive thinking over a short report). The rep is
-// waiting, so this is synchronous; give it headroom but well under the gateway cap.
-export const maxDuration = 120;
+// Two Claude round-trips can run in this invocation: the debrief itself (synchronous —
+// the rep waits) and then the Phase 23 account consolidation scheduled via after()
+// (post-response). after() shares this function's budget, so allow headroom for both;
+// the rep's response is sent after the first call, so the larger ceiling only affects
+// the background consolidation. The /api/cron/consolidate-accounts sweeper is the net
+// if this is still cut short.
+export const maxDuration = 300;
 
 /**
  * Create a Reporter-Mode debrief for a rep-owned account. The rep's guided answers
