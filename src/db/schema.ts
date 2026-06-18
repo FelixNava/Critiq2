@@ -678,6 +678,81 @@ export const callScripts = pgTable(
   ],
 );
 
+/**
+ * Call debriefs (Phase 20 — the interaction loop's Reporter Mode, Signal PRD Step
+ * 05). After a call, the rep REPORTS what happened through guided observational
+ * prompts (text for beta; voice is a later phase), and Critiq STRUCTURES that
+ * account into an organized recap + neutral observations (through the
+ * SPIN/Voss/Navarro lens) + the commitments/next steps + open follow-ups. This is
+ * the "reporter" — it organizes, it does NOT grade or advise: scoring lives in
+ * call_scores (the recorded-transcript path, Phase 16) and coaching ADVICE is
+ * Phase 21. The debrief is a first-class EPISODIC record (the locked memory
+ * architecture: raw interactions stored forever) that Phase 23 account
+ * consolidation and Phase 21 coaching both read.
+ *
+ * Account-scoped (mirrors pre_call_briefs). The raw guided answers are preserved in
+ * `report` (jsonb) — the episodic source of truth — alongside the AI's structured
+ * output. `recordingId` + `briefId` are nullable links (SET NULL): a debrief MAY
+ * reference the recorded call and the prep that preceded it so Phase 21/23 can join
+ * them, but neither is required — beta reps debrief un-recorded calls too (recording
+ * is best-effort, especially on mobile). Generated synchronously in the rep's
+ * request (the rep is waiting), like the brief/script → no cron/CAS. Cascades on
+ * account + user delete (it's the rep's record of their own call).
+ */
+export const callDebriefs = pgTable(
+  "call_debriefs",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accountsTbl.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // Optional links closing the loop. SET NULL so deleting the recording/brief
+    // never erases the rep's debrief. Not wired in the Phase 20 UI (the debrief
+    // stands alone); a later phase supplies them in the real call flow.
+    recordingId: text("recording_id").references(() => recordings.id, {
+      onDelete: "set null",
+    }),
+    briefId: text("brief_id").references(() => preCallBriefs.id, {
+      onDelete: "set null",
+    }),
+    // The rep's guided observational answers (the raw episodic input). Shape:
+    // { objective?, happened, reaction?, commitments?, surprises? }.
+    report: jsonb("report").notNull(),
+    status: text("status").notNull().default("pending"), // pending | processing | completed | failed
+    provider: text("provider").notNull().default("anthropic"),
+    model: text("model").notNull().default("claude-sonnet-4-6"),
+    attempts: integer("attempts").notNull().default(0),
+    // AI structured output (null until status = completed).
+    recap: text("recap"), // organized narrative of what happened
+    observations: jsonb("observations"), // [{ note, lens }] neutral observations by pillar lens
+    commitments: jsonb("commitments"), // string[] concrete commitments / next steps
+    openQuestions: jsonb("open_questions"), // string[] unresolved items to follow up
+    summary: text("summary"), // one-line plain-language takeaway
+    // The rep's 1–5 usefulness rating (PRD beta metric). Null until rated.
+    usefulnessRating: integer("usefulness_rating"),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("call_debriefs_account_id_idx").on(t.accountId),
+    index("call_debriefs_user_id_idx").on(t.userId),
+    index("call_debriefs_recording_id_idx").on(t.recordingId),
+    index("call_debriefs_brief_id_idx").on(t.briefId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
@@ -706,3 +781,5 @@ export type PreCallBrief = typeof preCallBriefs.$inferSelect;
 export type NewPreCallBrief = typeof preCallBriefs.$inferInsert;
 export type CallScript = typeof callScripts.$inferSelect;
 export type NewCallScript = typeof callScripts.$inferInsert;
+export type CallDebrief = typeof callDebriefs.$inferSelect;
+export type NewCallDebrief = typeof callDebriefs.$inferInsert;
