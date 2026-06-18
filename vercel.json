@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/transcribe",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/score",
+      "schedule": "2-59/10 * * * *"
     }
   ]
 }

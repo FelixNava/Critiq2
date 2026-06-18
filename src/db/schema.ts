@@ -483,6 +483,73 @@ export const transcriptSegments = pgTable(
   ],
 );
 
+/**
+ * Call scores (Phase 16 — three-pillar SPIN/Voss/Navarro engine). One row per
+ * recording: the derived 100-point evaluation Claude produces from the unified
+ * transcript. The transcript (Phase 15) is the input; this is the scored output
+ * the debrief + coaching phases read. UNIQUE on recording_id (one score per
+ * recording) makes the trigger + cron sweeper idempotent — same lifecycle as
+ * recording_transcripts (CAS claim, attempts cap, partial-tolerant).
+ *
+ * `overall_score` is 0–100 (the sum of the three pillar columns); the pillar
+ * columns are bounded by the locked rubric (spin 35, voss 35, navarro 30). The
+ * per-sub-dimension detail (score + rationale + verbatim evidence quotes) lives
+ * in `dimensions` jsonb — the evidence is the grounding Phase 26's hallucination
+ * guard will require. `strengths`/`improvements` are the coaching seeds Phase 21
+ * consumes. Scores are null until status = completed. FK cascades on recording
+ * delete (the score is derived data).
+ */
+export const callScores = pgTable(
+  "call_scores",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    recordingId: text("recording_id")
+      .notNull()
+      .references(() => recordings.id, { onDelete: "cascade" }),
+    // The transcript this score was derived from (provenance; SET NULL if the
+    // transcript row is ever rebuilt). Nullable for defensive cron paths.
+    transcriptId: text("transcript_id").references(
+      () => recordingTranscripts.id,
+      { onDelete: "set null" },
+    ),
+    status: text("status").notNull().default("pending"), // pending | processing | completed | failed
+    provider: text("provider").notNull().default("anthropic"),
+    model: text("model").notNull().default("claude-sonnet-4-6"),
+    // Bounded-retry, mirroring the transcript sweeper: the cron stops re-picking
+    // a recording once attempts hits the cap so a permanently-unscorable
+    // transcript can't loop forever. A human can re-trigger past the cap.
+    attempts: integer("attempts").notNull().default(0),
+    // Aggregates (null until completed). overall = spin + voss + navarro.
+    overallScore: integer("overall_score"),
+    spinScore: integer("spin_score"),
+    vossScore: integer("voss_score"),
+    navarroScore: integer("navarro_score"),
+    // Per-sub-dimension detail: { <key>: { score, rationale, evidence[] } }.
+    dimensions: jsonb("dimensions"),
+    // Coaching seeds (string arrays) + a one-paragraph plain-language summary.
+    strengths: jsonb("strengths"),
+    improvements: jsonb("improvements"),
+    summary: text("summary"),
+    // True when the model omitted a rubric dimension (engine defaulted it to 0).
+    partialJudgement: boolean("partial_judgement").notNull().default(false),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("call_scores_recording_id_key").on(t.recordingId),
+    index("call_scores_status_idx").on(t.status),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
@@ -505,3 +572,5 @@ export type RecordingTranscript = typeof recordingTranscripts.$inferSelect;
 export type NewRecordingTranscript = typeof recordingTranscripts.$inferInsert;
 export type TranscriptSegment = typeof transcriptSegments.$inferSelect;
 export type NewTranscriptSegment = typeof transcriptSegments.$inferInsert;
+export type CallScore = typeof callScores.$inferSelect;
+export type NewCallScore = typeof callScores.$inferInsert;

@@ -425,9 +425,31 @@ Multi-segment parallel transcription, concatenation, store transcripts.
 
 **FLAGGED for Felix (runtime/quality, not blocking staging):** (1) real Deepgram round-trip + private-Blob byte read needs a preview run (probes fake both); (2) transcription QUALITY on field-noise audio + diarization usefulness — validate before Phase 16 depends on it; (3) overlap (~2s seam) not text-deduped for beta; only `uploaded` chunks transcribed (gap/coverage already discloses holey captures); (4) lab UI is dev-surface. See DEC-030.
 
-## Phase 16 — Three-Pillar Scoring Engine ☐ Planned (NEXT)
+## Phase 16 — Three-Pillar Scoring Engine ✅ DONE (review-for-main, PR #21, squash <pending>)
 
-SPIN/Voss/Navarro definitions in code, locked methodology block (cached prompt), Zod schemas, scoring prompt.
+The value engine's second half: a completed/partial transcript (Phase 15) → a bounded, evidence-grounded 100-point evaluation. First Anthropic-API phase (fetch-based, **no SDK** — mirrors the Phase 15 Deepgram client).
+
+**The locked rubric (`src/lib/scoring/rubric.ts` — SINGLE SOURCE OF TRUTH for prompt + schema + math + DB):** SPIN 35 · Voss 35 · Navarro 30 = 100. 12 sub-dimensions:
+- SPIN: Situation 5 · Problem 10 · Implication 10 · Need-Payoff 10
+- Voss: Mirroring 7 · Labeling 7 · Calibrated Questions 8 · Tactical Empathy 7 · Silence & Pacing 6
+- Navarro: Genuine Curiosity 10 · Long-Term Orientation 10 · Territory Command 10
+- `assertRubricIntegrity()` runs at import → a bad weight is a build/test failure, not a skewed score.
+
+**Engine (pure, dependency-injected like Phase 15):** `prompt.ts` (locked methodology system block + per-call user transcript + rubric-derived JSON output contract), `anthropic.ts` (fetch `AnthropicScorer`, `claude-sonnet-4-6`, adaptive thinking, `cache_control` breakpoint on the methodology block, defensive JSON extraction), `score.ts` (`aggregateRawScore`: **clamps every sub-dimension to [0, max]** so a hallucinated 99/10 can't corrupt the stored number, then sums pillars + overall; flags `partialJudgement` if the model omits a dimension). `store.ts` + `runner.ts` mirror the transcription store/runner exactly (CAS claim, attempts cap 3, partial-tolerant, cron sweeper).
+
+**Evidence grounding (sets up Phase 26):** every sub-dimension carries verbatim transcript quotes; the prompt forbids evidence-free credit ("the cardinal sin"). Absent skill → score 0 + empty evidence array, never a fabricated quote.
+
+**DB:** `call_scores` (one/recording, UNIQUE recording_id; overall + pillar columns + `dimensions` jsonb + strengths/improvements/summary + partial_judgement) — **migration 0010**, additive, applied to dev Neon. FK cascades on recording delete.
+
+**Routes:** `POST /api/recording/[id]/score` (auth+owner, sync, maxDuration 300), `GET …/score`, `POST /api/cron/score` (CRON_SECRET, `2-59/10` in vercel.json — offset 2 min after the transcribe sweeper so scoring runs once the transcript lands).
+
+**Model note:** `claude-sonnet-4-6` per the locked tech-stack ("Anthropic Claude Sonnet 4.x" for scoring/coaching/summaries) — the established plan governs over the generic opus default. **No structured outputs:** the 12-dim + evidence schema overflows the API's strict-grammar limit ("compiled grammar is too large"), so the JSON shape is specified in the prompt (rubric-derived) and parsed defensively; Sonnet 4.6 + the explicit contract returned clean JSON on every probe run.
+
+**Verify (relaxed gate, all green):** build + tsc clean; `verify-phase16.ts` 60/60 (rubric integrity, prompt/schema, refusal/truncation/fence-tolerant parsing, clamp/aggregate/partial math, end-to-end with a fake scorer); throwaway real-Postgres + **real Claude** probe 16/16 (CAS, work-list in/exclusion, persistence, cascade cleanup, AND a real `claude-sonnet-4-6` round-trip on a realistic SW-rep↔contractor transcript → discriminating, fully evidence-cited 58/100). See DEC-031.
+
+**NO UI** this phase (engine + API only) → no /design-critique pass needed; the score-display surface is Phase 20/21 (debrief reporter + coaching output).
+
+**FLAGGED for Felix + the expert coach (quality, not blocking the relaxed gate):** (1) the RUBRIC weights/sub-dimensions + the scoring PROMPT need expert validation before reps see scores; (2) scoring QUALITY/calibration on real field audio (the sample is strong but is one short transcript); (3) text-only transcripts can't verify true silence/pacing — Voss "Silence & Pacing" is structurally under-evidenced (the model self-flags this); (4) per-call cost/latency at scale (~84s with adaptive thinking) — Phase 17 caching + a possible effort dial-down are the levers. See DEC-031.
 
 ## Phase 17 — Anthropic Prompt Caching Wiring ☐ Planned
 
