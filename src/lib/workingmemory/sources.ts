@@ -18,7 +18,6 @@ import { buildRepProfileBlock } from "@/lib/precall/repProfile";
 import { getRepSummary } from "@/lib/repconsolidation/store";
 import { getAccountSummary } from "@/lib/consolidation/store";
 import { formatRepProfileFromSummary, formatAccountSummaryBlock } from "./format";
-import type { AccountSummary } from "@/db/schema";
 import type { RawInteraction, RepProfileSource } from "./types";
 
 /** Coerce the stored `report` jsonb into a DebriefReport (defensive — jsonb is `unknown`). */
@@ -36,6 +35,7 @@ function coerceReport(v: unknown): DebriefReport {
   };
 }
 
+
 /**
  * This rep's recent COMPLETED debriefs WITH THIS ACCOUNT, newest first, capped at `limit`,
  * plus the total completed count (so the caller can disclose how many older ones were not
@@ -46,10 +46,15 @@ export async function getRecentRawInteractionsForAccount(
   accountId: string,
   limit: number,
 ): Promise<{ interactions: RawInteraction[]; totalCompleted: number }> {
+  // Phase 20 guarantees a completed debrief has a non-empty `happened`; this content guard
+  // (applied IN SQL, before LIMIT, so the cap counts only valid rows and totalCompleted
+  // stays exact) drops any malformed/backfilled row that would otherwise occupy a raw slot
+  // with a content-less stub.
   const where = and(
     eq(callDebriefs.userId, userId),
     eq(callDebriefs.accountId, accountId),
     eq(callDebriefs.status, "completed"),
+    sql`btrim(coalesce(${callDebriefs.report}->>'happened', '')) <> ''`,
   );
 
   const [countRow] = await db
@@ -109,10 +114,10 @@ export async function resolveRepProfile(
 export async function resolveAccountSummary(
   accountId: string,
   accountName: string,
-): Promise<{ summary: AccountSummary | null; text: string | null }> {
+): Promise<string | null> {
   const summary = await getAccountSummary(accountId);
   if (summary && summary.status === "completed") {
-    return { summary, text: formatAccountSummaryBlock(summary, accountName) };
+    return formatAccountSummaryBlock(summary, accountName);
   }
-  return { summary, text: null };
+  return null;
 }

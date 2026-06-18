@@ -47,3 +47,11 @@ export function buildMethodologyBlock(): string {
     "GROUNDING RULE: Base everything you say on what you can actually trace to the rep's intake, this account's history, and the raw interactions provided. Never invent personal details, prior commitments, or facts about the buyer that are not grounded in that material.",
   ].join("\n");
 }
+
+/**
+ * The methodology block, computed ONCE at module load. It takes no inputs and is pure, so
+ * the result is byte-identical forever — caching it here makes that stability structural
+ * (every working set reuses the same string instead of re-building it per call) and is what
+ * lets the cached-forever prefix actually cache.
+ */
+export const METHODOLOGY_BLOCK = buildMethodologyBlock();

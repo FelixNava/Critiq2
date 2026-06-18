@@ -13,7 +13,7 @@
  */
 
 import { getAccountForUser } from "@/lib/accounts";
-import { buildMethodologyBlock } from "./methodology";
+import { METHODOLOGY_BLOCK } from "./methodology";
 import { assembleWorkingMemory } from "./assemble";
 import {
   getRecentRawInteractionsForAccount,
@@ -54,10 +54,10 @@ export async function buildWorkingMemory(
   );
 
   const sources: WorkingMemorySources = {
-    methodology: buildMethodologyBlock(),
+    methodology: METHODOLOGY_BLOCK,
     repProfile: repProfile.text,
     repProfileSource: repProfile.source,
-    accountSummary: accountSummary.text,
+    accountSummary,
     rawInteractions: raw.interactions,
     olderInteractionsOmitted,
   };

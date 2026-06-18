@@ -60,10 +60,14 @@ export function truncateToTokens(text: string, maxTokens: number): string {
   const maxChars = bodyTokens * CHARS_PER_TOKEN;
   let cut = text.slice(0, maxChars);
 
-  // Prefer cutting at the last newline, then the last space, to avoid a mid-word stub.
+  // Prefer cutting at a line/word boundary to avoid a mid-word stub — but ONLY if that
+  // boundary sits in the back half, so we never collapse the body to a sliver (which would
+  // emit a block that's mostly the marker). Otherwise keep the full-length hard cut.
+  const half = maxChars * 0.5;
   const lastNewline = cut.lastIndexOf("\n");
   const lastSpace = cut.lastIndexOf(" ");
-  const boundary = lastNewline > maxChars * 0.5 ? lastNewline : lastSpace;
+  const boundary =
+    lastNewline > half ? lastNewline : lastSpace > half ? lastSpace : -1;
   if (boundary > 0) cut = cut.slice(0, boundary);
 
   return `${cut.trimEnd()}${TRUNCATION_MARKER}`;

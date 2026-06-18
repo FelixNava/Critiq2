@@ -26,6 +26,7 @@
  * semantic + episodic tables and assembles text. Additive — zero data-loss risk.
  */
 
+import type { CacheableLayer } from "@/lib/ai/cache";
 import type { DebriefReport } from "@/lib/debrief/types";
 
 /** Where the rep-profile layer came from (cold-start visibility, not just a string). */
@@ -118,11 +119,12 @@ export interface WorkingMemoryManifest {
 /** The assembled working set, ready to drive a Claude call. */
 export interface WorkingMemory {
   /**
-   * Stable, cacheable layers in cache order (methodology first, then rep profile). Pass
-   * straight to `buildCachedSystem(workingMemory.stableLayers)`. Empty-text layers are
-   * already dropped.
+   * Stable, cacheable layers in cache order (methodology first, then rep profile). The
+   * shape IS `CacheableLayer` (reused from src/lib/ai/cache.ts), so this passes straight to
+   * `buildCachedSystem(workingMemory.stableLayers)` and can never drift from it. Empty-text
+   * layers are already dropped.
    */
-  stableLayers: { text: string; cache?: boolean }[];
+  stableLayers: CacheableLayer[];
   /**
    * The volatile working context — the account summary + recent raw interactions — as one
    * text block for the per-call user message. Empty string when there's no volatile

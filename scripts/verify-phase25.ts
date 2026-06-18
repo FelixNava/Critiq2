@@ -159,19 +159,19 @@ ok(coldAccount.manifest.rawInteractionsIncluded === 0, "manifest: no raw interac
 // ---------------------------------------------------------------------------
 console.log("\n## Assembler — budget squeeze drops raw interactions newest-first");
 // ---------------------------------------------------------------------------
-// Methodology(50) + rep(50) reserved = 100. Budget 260 → volatile 160. Account(80) leaves 80.
-// Three raw blocks ~60 tokens each: only the newest fits (60 ≤ 80); next would need 60 but only
-// 20 remain (< MIN_USEFUL) → dropped.
+// Methodology(50) + rep(50) reserved = 100. Budget 225 → volatile 125. Account(20) leaves 105.
+// Raw header (~15) reserved → ~90 for blocks of ~67 tokens each: only the newest fits (67 ≤ 90);
+// the next needs 67 but only ~23 remain (< MIN_USEFUL) → dropped.
 const bigRaw = (id: string): RawInteraction =>
   rawInteraction({ debriefId: id, report: { happened: tok(55) } });
 const squeezed = assembleWorkingMemory(
   baseSources({
     methodology: tok(50),
     repProfile: tok(50),
-    accountSummary: tok(80),
+    accountSummary: tok(20),
     rawInteractions: [bigRaw("newest"), bigRaw("mid"), bigRaw("oldest")],
   }),
-  { tokenBudget: 260 },
+  { tokenBudget: 225 },
 );
 ok(squeezed.manifest.accountSummaryIncluded, "squeeze: account summary kept (outranks raw tail)");
 ok(
@@ -190,8 +190,8 @@ ok(
 // ---------------------------------------------------------------------------
 console.log("\n## Assembler — account summary truncates under pressure; raw drops first");
 // ---------------------------------------------------------------------------
-// Reserved 100, budget 360 → volatile 260. Account 120 fits (leaves 140 ≥ MIN_USEFUL). One raw
-// of ~210 doesn't fit in 140 but 140 ≥ MIN_USEFUL → truncated to 140.
+// Reserved 100, budget 380 → volatile 280. Account 120 fits (leaves 160). Raw header (~15)
+// reserved → ~145 ≥ MIN_USEFUL; the ~210-token raw doesn't fit → truncated, not dropped.
 const trunc = assembleWorkingMemory(
   baseSources({
     methodology: tok(50),
@@ -199,7 +199,7 @@ const trunc = assembleWorkingMemory(
     accountSummary: tok(120),
     rawInteractions: [rawInteraction({ report: { happened: tok(200) } })],
   }),
-  { tokenBudget: 360 },
+  { tokenBudget: 380 },
 );
 ok(trunc.manifest.accountSummaryIncluded && !trunc.manifest.accountSummaryTruncated,
   "account summary fits fully when there's room");
@@ -229,6 +229,36 @@ const overflow = assembleWorkingMemory(
 );
 ok(!overflow.manifest.withinBudget, "withinBudget=false when methodology+rep alone exceed the budget");
 ok(overflow.stableLayers.length === 2, "foundation still emitted even when it overflows the budget");
+
+// ---------------------------------------------------------------------------
+console.log("\n## Assembler — honors maxRawInteractions + exact token accounting (review fixes)");
+// ---------------------------------------------------------------------------
+const capped = assembleWorkingMemory(
+  baseSources({
+    rawInteractions: [
+      rawInteraction({ debriefId: "a" }),
+      rawInteraction({ debriefId: "b" }),
+      rawInteraction({ debriefId: "c" }),
+    ],
+  }),
+  { maxRawInteractions: 1 },
+);
+ok(capped.manifest.rawInteractionsIncluded === 1, "assembler honors maxRawInteractions (caps to 1)");
+ok(capped.manifest.rawInteractionsDropped === 2, "assembler discloses the 2 capped-out interactions (no silent cap)");
+
+// estimatedTokens must equal stable-layer estimates + the ACTUAL volatile text (so the
+// raw-section header + separators are counted — the undercount the review caught).
+const counted = assembleWorkingMemory(baseSources());
+const expectStable = counted.stableLayers.reduce((n, l) => n + estimateTokens(l.text), 0);
+ok(
+  counted.manifest.estimatedTokens === expectStable + estimateTokens(counted.volatileContext),
+  "estimatedTokens counts the actual emitted text (header + separators included)",
+);
+ok(
+  counted.volatileContext.includes("RECENT INTERACTIONS") &&
+    estimateTokens(counted.volatileContext) >= estimateTokens("RECENT INTERACTIONS WITH THIS ACCOUNT (most recent first):"),
+  "the raw-section header is part of the costed volatile text",
+);
 
 // ---------------------------------------------------------------------------
 console.log("\n## Assembler — older-than-cap omissions fold into 'dropped'");

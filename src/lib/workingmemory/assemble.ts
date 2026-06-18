@@ -19,6 +19,7 @@
  */
 
 import {
+  DEFAULT_MAX_RAW_INTERACTIONS,
   DEFAULT_WORKING_MEMORY_BUDGET,
   MIN_USEFUL_TOKENS,
   estimateTokens,
@@ -33,8 +34,10 @@ import type {
   WorkingMemorySources,
 } from "./types";
 
-/** Section separator between the account summary and the raw interactions in the volatile block. */
+/** Separator between the account summary and the raw-interactions sections of the volatile block. */
 const SECTION_SEP = "\n\n";
+/** Header introducing the recent-interactions section (costed against the budget). */
+const RAW_SECTION_HEADER = "RECENT INTERACTIONS WITH THIS ACCOUNT (most recent first):";
 
 export function assembleWorkingMemory(
   sources: WorkingMemorySources,
@@ -55,13 +58,11 @@ export function assembleWorkingMemory(
   const reservedTokens = methodologyTokens + repProfileTokens;
   // The foundation is never trimmed even if it alone exceeds the budget (a degenerate
   // case); volatileBudget just floors at 0 and withinBudget reports the overflow.
-  const volatileBudget = Math.max(0, budget - reservedTokens);
+  let remaining = Math.max(0, budget - reservedTokens);
 
-  // ---- Volatile layer: account summary (truncate if needed), then raw interactions. ----
-  let remaining = volatileBudget;
   const volatileParts: string[] = [];
 
-  // (3) Account summary.
+  // ---- (3) Account summary (truncate if needed). ----
   let accountIncluded = false;
   let accountTruncated = false;
   let accountTokens = 0;
@@ -86,55 +87,71 @@ export function assembleWorkingMemory(
     // else: no room — account summary dropped (rare; only under severe pressure).
   }
 
-  // (4) Raw interactions, newest first.
+  // ---- (4) Raw interactions, newest first. ----
+  // Honor the per-call cap HERE too (not only at the DB layer), so a direct assembler
+  // caller's maxRawInteractions is respected; the overflow is disclosed, not silent.
+  const maxRaw = options.maxRawInteractions ?? DEFAULT_MAX_RAW_INTERACTIONS;
+  const rawCandidates = sources.rawInteractions.slice(0, Math.max(0, maxRaw));
+  const cappedByMax = sources.rawInteractions.length - rawCandidates.length;
+
+  // Reserve the section header so the raw budget includes the text actually emitted around
+  // the blocks (block separators are whitespace → ~0 tokens by the heuristic). Only spend
+  // it when there's at least one candidate (no candidates ⇒ no header emitted).
+  const rawHeaderCost = estimateTokens(RAW_SECTION_HEADER);
+  let rawRemaining =
+    rawCandidates.length > 0 ? Math.max(0, remaining - rawHeaderCost) : remaining;
+
   let rawIncluded = 0;
   let rawTruncated = 0;
   let rawDroppedForBudget = 0;
-  let rawTokens = 0;
   const renderedRaw: string[] = [];
 
-  for (let i = 0; i < sources.rawInteractions.length; i++) {
-    const block = formatRawInteraction(sources.rawInteractions[i], i + 1);
+  for (let i = 0; i < rawCandidates.length; i++) {
+    const block = formatRawInteraction(rawCandidates[i], i + 1);
     const cost = estimateTokens(block);
-    if (cost <= remaining) {
+    if (cost <= rawRemaining) {
       renderedRaw.push(block);
       rawIncluded += 1;
-      rawTokens += cost;
-      remaining -= cost;
-    } else if (remaining >= MIN_USEFUL_TOKENS) {
+      rawRemaining -= cost;
+    } else if (rawRemaining >= MIN_USEFUL_TOKENS) {
       // Partial room for the newest that didn't fit — truncate it, then stop.
-      const trimmed = truncateToTokens(block, remaining);
+      const trimmed = truncateToTokens(block, rawRemaining);
       if (trimmed) {
         renderedRaw.push(trimmed);
         rawIncluded += 1;
         rawTruncated += 1;
-        rawTokens += estimateTokens(trimmed);
-        remaining = 0;
+        rawRemaining = 0;
+        rawDroppedForBudget += rawCandidates.length - (i + 1); // the older ones
+      } else {
+        // truncate yielded nothing usable — this one is dropped too (exact accounting).
+        rawDroppedForBudget += rawCandidates.length - i;
       }
-      // Everything after this is dropped for budget.
-      rawDroppedForBudget += sources.rawInteractions.length - (i + 1);
       break;
     } else {
       // No useful room left — drop this and all remaining.
-      rawDroppedForBudget += sources.rawInteractions.length - i;
+      rawDroppedForBudget += rawCandidates.length - i;
       break;
     }
   }
 
+  let rawSection = "";
   if (renderedRaw.length > 0) {
-    volatileParts.push(
-      ["RECENT INTERACTIONS WITH THIS ACCOUNT (most recent first):", ...renderedRaw].join(
-        "\n\n",
-      ),
-    );
+    rawSection = [RAW_SECTION_HEADER, ...renderedRaw].join("\n\n");
+    volatileParts.push(rawSection);
   }
 
   const volatileContext = volatileParts.join(SECTION_SEP);
 
-  // Dropped = older-than-cap (never fetched) + dropped-for-budget here.
-  const rawInteractionsDropped = sources.olderInteractionsOmitted + rawDroppedForBudget;
+  // Exact token accounting from the ACTUAL emitted text (section header + separators
+  // included), so the estimate never UNDER-counts (budget.ts contract) and withinBudget is
+  // trustworthy. The per-layer figures below are component estimates for the breakdown.
+  const rawTokens = estimateTokens(rawSection);
+  const stableTokens = stableLayers.reduce((n, l) => n + estimateTokens(l.text), 0);
+  const estimatedTokens = stableTokens + estimateTokens(volatileContext);
 
-  const estimatedTokens = reservedTokens + accountTokens + rawTokens;
+  // Dropped = capped-by-max + older-than-cap (never fetched) + dropped-for-budget.
+  const rawInteractionsDropped =
+    sources.olderInteractionsOmitted + cappedByMax + rawDroppedForBudget;
 
   const layers: WorkingMemoryLayerInfo[] = [
     {

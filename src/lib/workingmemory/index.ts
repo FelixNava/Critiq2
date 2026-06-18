@@ -5,7 +5,7 @@
 
 export { buildWorkingMemory } from "./build";
 export { assembleWorkingMemory } from "./assemble";
-export { buildMethodologyBlock } from "./methodology";
+export { buildMethodologyBlock, METHODOLOGY_BLOCK } from "./methodology";
 export {
   DEFAULT_WORKING_MEMORY_BUDGET,
   DEFAULT_MAX_RAW_INTERACTIONS,
