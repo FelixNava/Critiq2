@@ -2,10 +2,17 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import AppHeader from "@/components/AppHeader";
 import StageBadge from "@/components/accounts/StageBadge";
+import type { InitialCoaching } from "@/components/coaching/CoachingPanel";
 import DebriefPanel, {
   type InitialDebrief,
 } from "@/components/debrief/DebriefPanel";
 import { getAccountForUser } from "@/lib/accounts";
+import { getLatestCoachingForDebrief } from "@/lib/coaching/store";
+import type {
+  CoachingPriority,
+  CoachingReinforcement,
+  ScoreSnapshot,
+} from "@/lib/coaching/types";
 import { getLatestDebriefForAccount } from "@/lib/debrief/store";
 import type { DebriefObservation } from "@/lib/debrief/types";
 
@@ -38,6 +45,24 @@ export default async function DebriefPage({
       }
     : null;
 
+  // The latest coaching for that debrief (if the rep has already coached it).
+  const latestCoaching = latest
+    ? await getLatestCoachingForDebrief(userId, latest.id)
+    : null;
+  const initialCoaching: InitialCoaching | null = latestCoaching
+    ? {
+        id: latestCoaching.id,
+        priorities: (latestCoaching.priorities as CoachingPriority[]) ?? [],
+        reinforce:
+          (latestCoaching.reinforce as CoachingReinforcement[]) ?? [],
+        nextStep: latestCoaching.nextStep,
+        summary: latestCoaching.summary,
+        scoreSnapshot:
+          (latestCoaching.scoreSnapshot as ScoreSnapshot | null) ?? null,
+        usefulnessRating: latestCoaching.usefulnessRating,
+      }
+    : null;
+
   return (
     <div className="min-h-dvh bg-slate-50">
       <AppHeader backHref={`/accounts/${id}`} backLabel={account.name} />
@@ -59,6 +84,7 @@ export default async function DebriefPage({
           accountId={id}
           hasSummary={Boolean(account.summary && account.summary.trim())}
           initialDebrief={initialDebrief}
+          initialCoaching={initialCoaching}
         />
       </main>
     </div>

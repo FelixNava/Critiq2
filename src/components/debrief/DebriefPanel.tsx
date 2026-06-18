@@ -7,6 +7,9 @@ import {
   secondaryButtonClass,
   textareaClass,
 } from "@/components/onboarding/ui";
+import CoachingPanel, {
+  type InitialCoaching,
+} from "@/components/coaching/CoachingPanel";
 import {
   REPORTER_PROMPTS,
   type ReportField,
@@ -96,10 +99,13 @@ export default function DebriefPanel({
   accountId,
   hasSummary,
   initialDebrief,
+  initialCoaching,
 }: {
   accountId: string;
   hasSummary: boolean;
   initialDebrief: InitialDebrief | null;
+  /** The latest coaching for `initialDebrief` (null if none / for a fresh debrief). */
+  initialCoaching: InitialCoaching | null;
 }) {
   const draftKey = useMemo(
     () => `critiq:debrief:v1:${accountId}`,
@@ -177,10 +183,17 @@ export default function DebriefPanel({
   }
 
   if (!showForm && debrief) {
+    // Coaching only carries over for the server-loaded debrief; a freshly generated
+    // debrief starts with no coaching (its own id, CoachingPanel remounts by key).
+    const coachingForView =
+      initialDebrief && debrief.id === initialDebrief.id
+        ? initialCoaching
+        : null;
     return (
       <DebriefView
         accountId={accountId}
         debrief={debrief}
+        coaching={coachingForView}
         onDebriefChange={setDebrief}
         onNew={() => {
           setForm({});
@@ -275,11 +288,13 @@ export default function DebriefPanel({
 function DebriefView({
   accountId,
   debrief,
+  coaching,
   onDebriefChange,
   onNew,
 }: {
   accountId: string;
   debrief: InitialDebrief;
+  coaching: InitialCoaching | null;
   onDebriefChange: (d: InitialDebrief) => void;
   onNew: () => void;
 }) {
@@ -360,6 +375,15 @@ function DebriefView({
         debrief={debrief}
         onDebriefChange={onDebriefChange}
       />
+
+      {debrief.id && (
+        <CoachingPanel
+          key={debrief.id}
+          accountId={accountId}
+          debriefId={debrief.id}
+          initialCoaching={coaching}
+        />
+      )}
 
       <button type="button" onClick={onNew} className={secondaryButtonClass}>
         Debrief another call
