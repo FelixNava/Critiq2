@@ -405,7 +405,7 @@ Trade-off flag: YES — Felix's review queue: (a) transcription QUALITY on real 
 Phase: 16/three-pillar-scoring
 Date: 2026-06-18 (aggressive-auto run)
 Type: trade-off (the ledger gave one line — "SPIN/Voss/Navarro definitions, locked methodology block, scoring prompt"; the rubric weights, model, output mechanism, and engine shape were mine)
-Context: Phase 16 = the value engine's second half (scoring), built unattended under the relaxed aggressive gate (build + types + unit green = merge to review-for-main). First Anthropic-API phase. ANTHROPIC_API_KEY already provisioned. PR #__, squash __.
+Context: Phase 16 = the value engine's second half (scoring), built unattended under the relaxed aggressive gate (build + types + unit green = merge to review-for-main). First Anthropic-API phase. ANTHROPIC_API_KEY already provisioned. PR #21, squash <pending>.
 Chosen:
   - RUBRIC (locked weights from /critiq-context "What Critiq Is"): SPIN 35 / Voss 35 / Navarro 30 = 100, split into 12 named sub-dimensions (`src/lib/scoring/rubric.ts` is the single source of truth for the prompt, the output contract, the aggregate math, and the DB columns). `assertRubricIntegrity()` runs at import so a weight drift is a build/test failure. The exact sub-dimension split + behavioral criteria are MINE and FLAGGED for the expert coach to validate.
   - MODEL: `claude-sonnet-4-6`. The /critiq-context tech-stack table explicitly names "Anthropic Claude Sonnet 4.x" for scoring/coaching/summaries — the established plan governs over the claude-api skill's generic opus-4-8 default (source-of-truth hierarchy: critiq-context #1).
