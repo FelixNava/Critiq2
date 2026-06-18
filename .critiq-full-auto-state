@@ -17,8 +17,37 @@ BUILD_PHASE_TOKEN_BUDGET=800000
 PHASE_CURRENT=
 PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
-# NEXT = 24 (Phase 22 email-drafting is DEFERRED post-launch; 23 done this firing).
-PHASE_NEXT=24/semantic-memory-rep-consolidation
+# NEXT = 25 (Phase 22 email-drafting is DEFERRED post-launch; 24 done this firing).
+PHASE_NEXT=25/working-memory-assembly
+# Phase 24 DONE 2026-06-18 (aggressive-auto, relaxed gate): Semantic Memory — Rep
+# Consolidation (Block 4, BACKEND, no UI). The REP side of the semantic tier and the
+# mirror-image of Phase 23: a PRIVATE running profile of how a rep sells (strengths,
+# recurring habits, growth areas), regenerated on the locked EVERY-10-DEBRIEFS cadence
+# (not every debrief) from the rep's OWN completed debriefs across every account. Rep
+# IDENTITY IS allowed (vs the rep-agnostic account summary); the profile is NOT written
+# back to any shared field (rep-side data isolated). Table rep_summaries (mig 0016, one
+# row/rep UNIQUE user_id; narrative + headline + traits jsonb {text,lens,sourceDebriefId}
+# SOURCE-ATTRIBUTED + debriefCount/consolidatedThroughAt; CAS-claim/attempts-cap-3/
+# stale-reclaim like account_summaries, keyed on the rep). Every-10 mechanic:
+# repConsolidationThreshold(n)=floor(n/10)*10; debriefCount STORES the threshold, so it
+# regenerates exactly at 10/20/30, never in-between (and the coarse threshold makes the
+# count↔read race immune — Phase 23's Math.max guard not needed). src/lib/repconsolidation/
+# (types/prompt/anthropic/store/runner): fetch claude-sonnet-4-6, adaptive thinking, no
+# SDK, ONE cached methodology layer (rep-agnostic — no static-intake layer); observational-
+# not-prescriptive contract (advice=Phase 21); parse DROPS traits citing an unknown debrief
+# label + empty-result rejection; cross-account (each debrief block carries its account
+# name). Two paths: /api/cron/consolidate-reps (CRON_SECRET, 8-59/10 vercel.json) =
+# guaranteed; debrief route SECOND after() = best-effort, no-ops cheaply (no Claude call)
+# unless the rep crosses a new multiple of 10. verify-phase24 68/68 + Phase 23 regression
+# green + throwaway real-PG+real-Claude probe (below-threshold@5 → completed@10 →
+# skipped@14 → re-consolidated@20; 2 grounded cross-account traits all traceable to real
+# debrief ids; rep-private no write-back; idempotency; work-list; cascade). High-effort
+# /code-review (3 angles) → P0/P1:0; 2 P2 comment fixes. NO UI → no /design-critique. NO
+# DEVICE GATE. Merged review-for-main (PR #28, squash 432d986). DEC-038. FLAGGED for Felix
+# + expert coach: rep-consolidation prompt + trait/narrative QUALITY + the observational-
+# not-prescriptive boundary; calibration on real multi-account histories; no caching yet
+# (methodology under the Sonnet min-prefix); debrief-only (scores not folded in); the
+# profile is STORED-BUT-DORMANT until Phase 25 (working memory) surfaces it.
 # Phase 23 DONE 2026-06-18 (aggressive-auto, relaxed gate): Semantic Memory — Account
 # Consolidation (Block 4, BACKEND, no UI). The ACCOUNT side of the semantic tier:
 # after every debrief a background job regenerates a single SHARED, rep-agnostic
@@ -180,8 +209,8 @@ PHASE_NEXT=24/semantic-memory-rep-consolidation
 # telemetry is log-only (no dashboard yet); rep-intake cache layer is tested but
 # has no live consumer until coaching/working-memory (18-21, 25). Merged
 # review-for-main (PR #22, squash abb912a).
-PHASE_LAST_COMPLETED=23/account-consolidation
-PHASE_LAST_COMPLETED_AT=2026-06-18T16:30:00-04:00
+PHASE_LAST_COMPLETED=24/rep-consolidation
+PHASE_LAST_COMPLETED_AT=2026-06-18T18:05:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -250,9 +279,22 @@ UI_VERIFY_PENDING=
 # consolidation engine but rep-scoped + rep-private, and IS allowed rep identity). Then
 # 25 (working memory) + 26 (hallucination guard — gets scrutinized; it CONSUMES Phase
 # 23's source-tagged facts).
-SESSION_LAST_HEARTBEAT=2026-06-18T16:30:00-04:00
-SESSION_TOKEN_BUDGET_USED=470000
-SESSION_ID=fullauto-aggressive-phase23-2026-06-18
+# Phase 24 DONE 2026-06-18 (aggressive-auto run, scheduled task critiq-fullauto-
+# aggressive-15-26). Rep Consolidation (Block 4, backend) merged to review-for-main
+# (PR #28, squash 432d986) → review-for-main now holds Phases 2-21 + 23 + 24. Mirror of
+# Phase 23 rep-scoped + rep-private + every-10-debriefs cadence. Built directly by the
+# orchestrator (fully-specified backend phase, DEC-037/004/013/030.. precedent), the
+# cleanest unattended-cron window. Relaxed gate (build+types+unit) + a real-PG+real-Claude
+# probe; high-effort /code-review (3 angles) P0/P1:0, 2 P2 comment fixes. NO UI → no
+# /design-critique; NO device gate. NEXT = Phase 25 (Working Memory Assembly — the THIRD
+# semantic-memory tier: a prompt builder that loads rep profile [Phase 24] + account
+# summary [Phase 23] + last 3 raw interactions + the rubric into the working set, with a
+# per-call token budget). Then 26 (hallucination guard — gets scrutinized; it CONSUMES the
+# source-tagged facts/traits from Phase 23 + 24). The rep-profile QUALITY is FLAGGED for
+# Felix + the expert coach (not blocking the relaxed gate).
+SESSION_LAST_HEARTBEAT=2026-06-18T18:05:00-04:00
+SESSION_TOKEN_BUDGET_USED=300000
+SESSION_ID=fullauto-aggressive-phase24-2026-06-18
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL
