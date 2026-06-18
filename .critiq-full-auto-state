@@ -17,7 +17,28 @@ BUILD_PHASE_TOKEN_BUDGET=800000
 PHASE_CURRENT=
 PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
-PHASE_NEXT=18/pre-call-brief
+PHASE_NEXT=19/script-generation
+# Phase 18 DONE 2026-06-18 (aggressive-auto, relaxed gate): Pre-Call Brief Flow —
+# the interaction loop's prep step (PRD Step 03). Rep narrates account context +
+# call goal (text; voice = Phase 2) -> Critiq returns a diagnostic brief
+# (diagnosis + approach + objections + quick-read summary) + the call objective.
+# OBJECTIVE HANDOFF = HARD RULE (resolveObjectiveMode, unit-tested): rep sets on
+# interactions 1-2, Critiq recommends on 3+, rep can override (deviation recorded);
+# mode is server-derived, a signal brief with no recommendation FAILS CLOSED.
+# Script generation w/ delivery cues is Phase 19 (kept out). pre_call_briefs table
+# (migration 0011, additive, dev Neon). src/lib/precall (objective/prompt/anthropic/
+# repProfile/store/generate) — FIRST live consumer of the two-layer prompt cache
+# (methodology forever + rep intake per rep) via Phase 17's buildCachedSystem.
+# Routes POST/GET /api/accounts/[id]/pre-call + PATCH .../[briefId] (override +
+# 1-5 rating). UI /accounts/[id]/pre-call + PreCallBriefPanel + account-card CTA;
+# /accounts added to PROTECTED_PREFIXES. /design-critique P0:0 + 4 P1 fixed (44px
+# touch targets, slate accent, badge parity, submit spinner). /code-review P0:0,
+# P1s+P2s fixed. verify-phase18 58/58; throwaway real-PG+real-Claude probes 17/17
+# + 6/6 (incl. an evidence-grounded sample brief). NO DEVICE GATE. Merged
+# review-for-main (PR #23, squash 50506f0). DEC-033. FLAGGED for Felix + expert
+# coach: prep prompt + brief structure quality; field-context calibration;
+# interaction-count is a proxy until Phase 20+; voice = Phase 2; live auth UI walk
+# + <3-min timing need a reachable preview.
 # Phase 17 DONE 2026-06-18 (aggressive-auto, relaxed gate): Anthropic prompt
 # caching wiring + cache telemetry. Reusable layer src/lib/ai/cache.ts —
 # buildCachedSystem places cache_control breakpoints across ordered most-stable-
@@ -37,8 +58,8 @@ PHASE_NEXT=18/pre-call-brief
 # telemetry is log-only (no dashboard yet); rep-intake cache layer is tested but
 # has no live consumer until coaching/working-memory (18-21, 25). Merged
 # review-for-main (PR #22, squash abb912a).
-PHASE_LAST_COMPLETED=17/prompt-caching
-PHASE_LAST_COMPLETED_AT=2026-06-18T07:30:00-04:00
+PHASE_LAST_COMPLETED=18/pre-call-brief
+PHASE_LAST_COMPLETED_AT=2026-06-18T09:15:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -83,16 +104,16 @@ ENV_READY=true
 UI_VERIFY_PENDING=
 
 # --- SESSION HEARTBEAT ---
-# Phase 17 DONE 2026-06-18 (aggressive-auto run, scheduled task critiq-fullauto-
-# aggressive-15-26). Prompt caching wiring + telemetry merged to review-for-main
-# (PR #22, squash abb912a) -> review-for-main now holds Phases 2-17. The value
-# engine (15 Deepgram, 16 scoring, 17 caching) is complete. NEXT = Phase 18
-# (pre-call brief) — Block 3, the interaction loop (UI + AI): auto-build + the
-# /design-critique pass is REQUIRED before merge (UI phase) + best-effort Chrome
-# MCP smoke. Relaxed gate (build+types+unit) still applies; device gates are done.
-SESSION_LAST_HEARTBEAT=2026-06-18T07:30:00-04:00
-SESSION_TOKEN_BUDGET_USED=400000
-SESSION_ID=fullauto-aggressive-phase17-2026-06-18
+# Phase 18 DONE 2026-06-18 (aggressive-auto run, scheduled task critiq-fullauto-
+# aggressive-15-26). Pre-Call Brief Flow (Block 3, the interaction loop, UI+AI)
+# merged to review-for-main (PR #23, squash 50506f0) -> review-for-main now holds
+# Phases 2-18. /design-critique pass run (P0:0, P1s fixed) per the UI-phase rule.
+# NEXT = Phase 19 (script generation with delivery cues + style mode) — also Block
+# 3 / UI+AI, so the /design-critique pass is REQUIRED again. Relaxed gate
+# (build+types+unit) applies; no device gates remain.
+SESSION_LAST_HEARTBEAT=2026-06-18T09:15:00-04:00
+SESSION_TOKEN_BUDGET_USED=520000
+SESSION_ID=fullauto-aggressive-phase18-2026-06-18
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL

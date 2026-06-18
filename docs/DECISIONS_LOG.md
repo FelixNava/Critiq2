@@ -439,6 +439,27 @@ Trade-off flag: YES — Felix's review queue: (a) the 2048-vs-1024 doc discrepan
 
 ---
 
+## DEC-033 — Phase 18 design (pre-call brief: objective HARD RULE, scope line vs Phase 19, two-layer cache, interaction-count proxy, fail-closed)
+Phase: 18/pre-call-brief
+Date: 2026-06-18 (aggressive-auto run)
+Type: trade-off (the ledger gave one line — "rep narrates context, objective setting logic"; the brief structure, the AI engine, and the scope line were mine)
+Context: Phase 18 = the interaction loop's prep step (Signal PRD Step 03), built unattended under the relaxed aggressive gate (build + types + unit green = merge to review-for-main). UI + AI phase → a /design-critique pass was required before merge. PR #23, squash 50506f0.
+Chosen:
+  - SCOPE LINE vs Phase 19: the PRD splits "pre-call" into Step 03 (brief: narrate context + objective + account diagnosis) and Step 04 (script generation with inline delivery cues). Phase 18 = Step 03 ONLY; the delivery-cued script + style mode is Phase 19. Phase 18's AI output = the brief (diagnosis + strategic approach + anticipated objections + summary) + the objective — NOT a line-by-line script. Keeps the two phases cleanly separable.
+  - OBJECTIVE HANDOFF as a HARD RULE (PRD §07: "must be implemented as a rule, not a vague AI judgment"): `resolveObjectiveMode(interactionNumber)` → rep on 1–2, signal on 3+ (threshold 3). Pure + unit-tested. Mode is ALWAYS server-derived from the account's completed-brief count and recomputed authoritatively in the POST (the client can't force it); the model only RECOMMENDS the objective text when the rule says it leads. Override flips source→'rep' + records the deviation; an accepted recommendation stays non-overridden; reverting to the recommendation verbatim clears the flag (non-sticky — the learning loop must not read a false deviation).
+  - TWO-LAYER PROMPT CACHE — FIRST live consumer of Phase 17's `buildCachedSystem([methodology, repIntake])`. The locked prep-methodology block (the SPIN/Voss/Navarro lens applied to PREP, distinct from the Phase 16 scoring rubric) caches forever; the rep profile (formatted from intake, deterministic ordering → byte-stable) caches per rep; the account summary + narration are volatile (user message). Cold reps drop the second layer.
+  - ENGINE mirrors Phase 16: fetch `AnthropicBriefGenerator` (claude-sonnet-4-6, adaptive thinking, NO SDK, NO structured outputs — JSON shape in the prompt + defensive parse), DI generator, pure prompt/parse units. `pre_call_briefs` table (migration 0011, additive). Generated SYNCHRONOUSLY in the rep's request → no cron, no CAS claim, fresh row per prep (unlike the transcript/score sweepers).
+  - HONESTY CONTRACT (conservative, sets up Phase 26): the prompt forbids inventing names/history/personal details — use only narrated/summarized facts; cold-start → say so, stay general. The real-Claude sample held to this (every claim traced to the rep's narration).
+  - INTERACTION COUNT = completed pre_call_briefs for the account (across all reps — account intelligence is shared). A documented PROXY for a real call count until the debrief/recording→account linkage (Phase 20+); read in one place so a later phase swaps the source without touching callers (DEC-018/027 precedent).
+  - FAIL-CLOSED on the rule: a signal-mode generation that returns no recommendation is a FAILURE (failBrief → 502), never persisted as a "completed" objective-less brief (code-review P1 fix). PATCH 409s a non-completed brief (code-review P1 fix).
+  - DEFENSE-IN-DEPTH: `/accounts` added to PROTECTED_PREFIXES (pages already self-guard; this gates at the edge too).
+Review: /design-critique (static-artifact mode; preview SSO-walled) → P0:0, 4 P1 fixed pre-merge (rating buttons 40→44px touch targets, indigo → slate accent, objective-badge parity for the rep-set case, submit spinner + locked inputs) + focus-visible rings. High-effort /code-review → P0:0; P1s fixed (signal-null fail-closed; PATCH non-completed 409) + P2s fixed (non-sticky override; POST returns the brief by id not "latest").
+Verification: typecheck + build clean; verify-phase18.ts 58/58 (pure logic); throwaway real-Postgres + real-Claude probes 17/17 + 6/6 (store/generate, mode transition at interaction 3, override deviation, fail-closed, evidence-grounded sample). The brief QUALITY + the prep prompt + the <3-min timing are FLAGGED for Felix + the expert coach (the relaxed gate doesn't block on them).
+Iterability: high (the rule threshold + input limits are constants; the engine is DI; the prompt is localized; the interaction-count source is swappable; the brief section shape is prompt-derived).
+Trade-off flag: YES — Felix + expert coach's review queue: (a) the prep-methodology prompt + brief section structure need expert validation (the PRD leaves the rendered brief open — this fills the gap); (b) calibration on real field context; (c) the interaction-count proxy until Phase 20+ gives a true call count; (d) voice narration is Phase 2; a live authenticated UI walk + the <3-min target need a reachable preview.
+
+---
+
 ## End-of-build summary
 
 This section is filled by the master orchestrator at the end of every Full Auto run. It surfaces:

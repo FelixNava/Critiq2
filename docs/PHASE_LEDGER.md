@@ -465,9 +465,23 @@ Cache locked methodology + rep intake. Verify hit rate.
 
 **⚑ FINDING flagged for Felix:** the claude-api docs state a **2048-token** minimum cacheable prefix for `claude-sonnet-4-6`, but the **live API cached the 1567-token methodology block** (created→read confirmed). The doc over-warns; `MIN_CACHEABLE_TOKENS["claude-sonnet-4-6"]` is set to **1024** (the documented floor, consistent with observation) so the advisory doesn't false-warn. Production logic never gates on it. **NO UI** (no design-critique) and **NO schema change** (no migration, zero data-loss risk) — additive only. See DEC-032.
 
-## Phase 18 — Pre-Call Brief Flow ☐ Planned
+## Phase 18 — Pre-Call Brief Flow ✅ DONE (review-for-main, PR #23, squash 50506f0)
 
 `/accounts/[id]/pre-call`, rep narrates context, objective setting logic (rep-set 1-2 / Signal-recommended 3+).
+
+**Built 2026-06-18 (aggressive-auto, relaxed gate).** The interaction loop's prep step (Signal PRD Step 03). A rep narrates account context + call goal (TEXT for beta; voice is Phase 2) and Critiq returns a diagnostic brief — `diagnosis` (where the account stands) + `approach` (how to play the call, SPIN/Voss/Navarro lens) + anticipated `objections` + a quick-read `summary` — plus the call objective. **Script generation with delivery cues is Phase 19 — deliberately out of scope** (PRD Step 03 vs Step 04 line).
+
+**Objective handoff = a HARD RULE, not AI judgment** (`src/lib/precall/objective.ts`, `resolveObjectiveMode`, unit-tested): interactions 1–2 → the REP sets the objective; interaction 3+ → Critiq RECOMMENDS, the rep can override (the deviation is recorded). Mode is always server-derived from the account's completed-brief count; the client can't force it. A signal-mode brief that returns no recommendation **fails closed** (never persists a ruleless completed brief).
+
+- **Schema** `pre_call_briefs` — migration **0011**, additive, applied to dev Neon. Cascades on account + user delete.
+- **`src/lib/precall/`** — pure `objective.ts`/`prompt.ts`, fetch `anthropic.ts` (`claude-sonnet-4-6`, adaptive thinking, defensive JSON parse — no SDK, mirrors Phase 16), `repProfile.ts`, `store.ts`, `generate.ts`. **First live consumer of the two-layer prompt cache** (methodology forever + rep intake per rep) via Phase 17's `buildCachedSystem`.
+- **Routes** `POST`/`GET /api/accounts/[id]/pre-call`, `PATCH …/[briefId]` (objective override + 1–5 usefulness rating). Owner-gated.
+- **UI** `/accounts/[id]/pre-call` + `PreCallBriefPanel` (narration draft in localStorage, rule-driven objective control, diagnosis/approach/objections/quick-read cards, rating) + a "Prepare for a call" CTA on the account card. `/accounts` added to `PROTECTED_PREFIXES`.
+- **Honesty contract** (sets up Phase 26): the brief uses only narrated/summarized facts, never fabricates; cold-start aware.
+
+**Verify (relaxed gate, all green):** typecheck + build clean; `verify-phase18.ts` **58/58** (objective rule, prompt/contract, both cache layers, JSON parse, brief normalization, rep-profile formatter). Throwaway real-Postgres + real-Claude probes 17/17 + 6/6 (store/generate path, mode transition at interaction 3, override deviation, HARD-RULE fail-closed, a strong evidence-grounded sample brief). **`/design-critique`** P0:0, 4 P1 fixed (44px touch targets, slate accent, badge parity, submit spinner + locked inputs). High-effort **`/code-review`** P0:0; P1s fixed (signal-null fails closed; PATCH 409s a non-completed brief) + P2s fixed (non-sticky override, return-by-id). See **DEC-033**.
+
+**FLAGGED for Felix + the expert coach (quality, not blocking the relaxed gate):** (1) the prep-methodology prompt + brief section shape need expert validation (the PRD leaves the rendered brief open); (2) calibration on real field context (one strong sample ≠ proven); (3) interaction count is a PROXY (completed briefs) until the debrief/recording→account linkage (Phase 20+) gives a true call count; (4) voice narration is Phase 2; a live authenticated UI walk + the <3-min timing target need Felix on a reachable preview.
 
 ## Phase 19 — Script Generation with Delivery Cues ☐ Planned
 
