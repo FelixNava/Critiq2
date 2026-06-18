@@ -17,7 +17,32 @@ BUILD_PHASE_TOKEN_BUDGET=800000
 PHASE_CURRENT=
 PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
-PHASE_NEXT=19/script-generation
+PHASE_NEXT=20/debrief-reporter-mode
+# Phase 19 DONE 2026-06-18 (aggressive-auto, relaxed gate): Script Generation with
+# Delivery Cues + Style Modes (Block 3, the interaction loop, UI+AI) — PRD Step 04.
+# Turn a COMPLETED Phase 18 brief into a delivery-cued conversation framework in a
+# chosen style mode. TWO style modes (Assertive/Relational, PRD §06; baseline seam
+# resolveBaselineStyleMode -> default Relational, overridable per call, persists via
+# localStorage). Inline cues per line: emphasis|pace|pause|register|silence (PRD §04).
+# Email draft (PRD Step 04 "if needed") = Phase 22, EXCLUDED. call_scripts table
+# (migration 0012, additive, dev Neon); one row/generation; objective SNAPSHOTTED at
+# gen time. src/lib/script/ (style/prompt/anthropic/store/generate) mirrors Phase
+# 16/18: fetch claude-sonnet-4-6, adaptive thinking, no SDK, defensive parse + cue/
+# section coercion + empty-script rejection; styleMode from the rule not the model
+# echo; synchronous (no cron/CAS). Reuses Phase 17 buildCachedSystem + Phase 18
+# buildRepProfileBlock. Routes POST/GET/PATCH /api/accounts/[id]/pre-call/[briefId]/
+# script (owner-gated; PATCH=1-5 rating). UI CallScriptPanel below the brief
+# (RadioCardGroup chooser, Write/Rewrite, opener/sections+cue pills/closing/delivery
+# notes, mode+objective header, rating). /design-critique P1 fixed (reuse
+# RadioCardGroup). /code-review high-effort P1 fixed (getLatestScriptForBrief filters
+# completed so a failed rewrite can't bury the last good script) + P2s (drop wasted
+# rep-profile query; PATCH validates account segment; surface script mode+objective).
+# verify-phase19 65/65; throwaway real-PG+real-Claude probes 18/18 (both modes, valid
+# cues, snapshot, guards). NO DEVICE GATE. Merged review-for-main (PR #24, squash
+# 658f148). DEC-034. FLAGGED for Felix + expert coach: script prompt/cue structure +
+# style-mode definitions quality; field calibration; baseline is a default-only seam
+# until intake carries a style signal; caching needs a real rep-profile prefix; live
+# authenticated UI walk needs a reachable preview.
 # Phase 18 DONE 2026-06-18 (aggressive-auto, relaxed gate): Pre-Call Brief Flow —
 # the interaction loop's prep step (PRD Step 03). Rep narrates account context +
 # call goal (text; voice = Phase 2) -> Critiq returns a diagnostic brief
@@ -58,8 +83,8 @@ PHASE_NEXT=19/script-generation
 # telemetry is log-only (no dashboard yet); rep-intake cache layer is tested but
 # has no live consumer until coaching/working-memory (18-21, 25). Merged
 # review-for-main (PR #22, squash abb912a).
-PHASE_LAST_COMPLETED=18/pre-call-brief
-PHASE_LAST_COMPLETED_AT=2026-06-18T09:15:00-04:00
+PHASE_LAST_COMPLETED=19/script-generation
+PHASE_LAST_COMPLETED_AT=2026-06-18T11:30:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -104,16 +129,16 @@ ENV_READY=true
 UI_VERIFY_PENDING=
 
 # --- SESSION HEARTBEAT ---
-# Phase 18 DONE 2026-06-18 (aggressive-auto run, scheduled task critiq-fullauto-
-# aggressive-15-26). Pre-Call Brief Flow (Block 3, the interaction loop, UI+AI)
-# merged to review-for-main (PR #23, squash 50506f0) -> review-for-main now holds
-# Phases 2-18. /design-critique pass run (P0:0, P1s fixed) per the UI-phase rule.
-# NEXT = Phase 19 (script generation with delivery cues + style mode) — also Block
-# 3 / UI+AI, so the /design-critique pass is REQUIRED again. Relaxed gate
-# (build+types+unit) applies; no device gates remain.
-SESSION_LAST_HEARTBEAT=2026-06-18T09:15:00-04:00
-SESSION_TOKEN_BUDGET_USED=520000
-SESSION_ID=fullauto-aggressive-phase18-2026-06-18
+# Phase 19 DONE 2026-06-18 (aggressive-auto run, scheduled task critiq-fullauto-
+# aggressive-15-26). Script Generation with Delivery Cues + Style Modes (Block 3,
+# the interaction loop, UI+AI) merged to review-for-main (PR #24, squash 658f148)
+# -> review-for-main now holds Phases 2-19. /design-critique pass run (P0:0, P1
+# fixed) per the UI-phase rule. NEXT = Phase 20 (Post-Call Debrief: Reporter Mode)
+# — also Block 3 / UI+AI, so the /design-critique pass is REQUIRED again. Relaxed
+# gate (build+types+unit) applies; no device gates remain.
+SESSION_LAST_HEARTBEAT=2026-06-18T11:30:00-04:00
+SESSION_TOKEN_BUDGET_USED=300000
+SESSION_ID=fullauto-aggressive-phase19-2026-06-18
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL
