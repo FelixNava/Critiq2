@@ -10,6 +10,7 @@ import {
 } from "@/lib/recording/segmentedRecorder";
 import { ChunkUploader, type ChunkUploadState } from "@/lib/recording/uploader";
 import { recoverOrphanedRecordings } from "@/lib/recording/recovery";
+import { clearRecording } from "@/lib/recording/chunkStore";
 import {
   SessionKeepAlive,
   type KeepAliveLayers,
@@ -67,10 +68,14 @@ export interface UseRecorder {
   gapCount: number;
   /** Fraction of the session actually captured (1 = no gaps). */
   coverage: number;
+  /** True when auto-recovery is exhausted and we're asking the rep to keep/discard. */
+  captureLost: boolean;
   error: string | null;
   busy: boolean;
   start: () => Promise<void>;
   stop: () => Promise<void>;
+  /** Discard the partial recording (rep declined to keep it after a lost mic). */
+  discard: () => Promise<void>;
   runSelfTest: () => Promise<void>;
 }
 
@@ -147,6 +152,7 @@ export function useRecorder(): UseRecorder {
   const [recoveryEvents, setRecoveryEvents] = useState<RecoveryEvent[]>([]);
   const [recoveredNote, setRecoveredNote] = useState<string | null>(null);
   const [interrupted, setInterrupted] = useState<boolean>(false);
+  const [captureLost, setCaptureLost] = useState<boolean>(false);
   const [gapMs, setGapMs] = useState<number>(0);
   const [gapCount, setGapCount] = useState<number>(0);
   const [elapsedMs, setElapsedMs] = useState<number>(0);
@@ -291,6 +297,7 @@ export function useRecorder(): UseRecorder {
     setRecoveryTier(0);
     setRecoveryEvents([]);
     setInterrupted(false);
+    setCaptureLost(false);
     setGapMs(0);
     setGapCount(0);
     setElapsedMs(0);
@@ -367,6 +374,8 @@ export function useRecorder(): UseRecorder {
           setElapsedMs(s.elapsedMs);
           gapMsRef.current = s.gapMs;
           gapCountRef.current = s.gapCount;
+          // Capture resumed on its own (the mic came back) → clear the prompt.
+          if (s.status === "recording") setCaptureLost(false);
           monitorRef.current?.update({
             status: s.status,
             heartbeat: s.heartbeat,
@@ -374,6 +383,7 @@ export function useRecorder(): UseRecorder {
           });
         },
         onTrackEnded: () => monitorRef.current?.signalTrackEnded(),
+        onCaptureLost: () => setCaptureLost(true),
         onError: (err) =>
           setError(
             err instanceof Error
@@ -382,13 +392,11 @@ export function useRecorder(): UseRecorder {
           ),
         onRecovery: (event) =>
           setRecoveryEvents((prev) => [...prev.slice(-9), event]),
-        onAutoStop: (reason) => {
-          setRecoveredNote(
-            reason === "hard-cap"
-              ? "Reached the 75-minute limit — saved and stopped."
-              : "Lost the microphone and couldn't reconnect — saved what we had and stopped.",
-          );
-          void finalize(reason === "hard-cap" ? "completed" : "failed");
+        onAutoStop: () => {
+          // Only the deliberate 75-min hard cap auto-stops now; a lost mic asks
+          // the rep (onCaptureLost) instead of auto-saving-and-killing.
+          setRecoveredNote("Reached the 75-minute limit — saved and stopped.");
+          void finalize("completed");
         },
       });
       recorderRef.current = recorder;
@@ -435,6 +443,39 @@ export function useRecorder(): UseRecorder {
       setBusy(false);
     }
   }, [busy, finalize]);
+
+  // Rep declined to keep a partial after a lost mic: stop, soft-delete the row,
+  // and drop the local chunks (so resume-after-tab-kill won't re-upload them).
+  // Never auto-invoked — only the rep's "Discard" calls this.
+  const discard = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      finalizedRef.current = true; // ensure this session is never also saved
+      await recorderRef.current?.stop();
+      recorderRef.current = null;
+      monitorRef.current?.reset();
+      monitorRef.current = null;
+      await keepAliveRef.current?.stop();
+      keepAliveRef.current = null;
+      const id = recordingIdRef.current;
+      if (id) {
+        await fetch("/api/recording/discard", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ recordingId: id }),
+        }).catch(() => {});
+        await clearRecording(id).catch(() => {});
+      }
+      setCaptureLost(false);
+      setStatus("stopped");
+      setRecoveredNote("Discarded — nothing was saved.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not discard.");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy]);
 
   const runSelfTest = useCallback(async () => {
     if (busy || recorderRef.current) return;
@@ -492,10 +533,12 @@ export function useRecorder(): UseRecorder {
     gapMs,
     gapCount,
     coverage,
+    captureLost,
     error,
     busy,
     start,
     stop,
+    discard,
     runSelfTest,
   };
 }

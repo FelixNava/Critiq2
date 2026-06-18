@@ -259,12 +259,16 @@ async function main() {
     const fe = makeFakeEngine();
     const events: { tier: number; ok: boolean }[] = [];
     let autoStop: AutoStopReason | null = null;
+    let captureLost: boolean = false;
     const rec = new SegmentedRecorder(
       {
         onChunk: () => {},
         onRecovery: (e) => events.push({ tier: e.tier, ok: e.ok }),
         onAutoStop: (r) => {
           autoStop = r;
+        },
+        onCaptureLost: () => {
+          captureLost = true;
         },
       },
       {
@@ -308,26 +312,32 @@ async function main() {
     ok(rec.getState().recoveryTier === 2, "recovery: dead track → Tier 2 (re-acquire stream)");
     await timers.advance(1000); // still dead → Tier 3
     ok(rec.getState().recoveryTier === 3, "recovery: still down → Tier 3 (re-prompt mic)");
-    await timers.advance(1000); // still dead → Tier 4 → notify + autoStop('fatal')
-    ok(rec.getState().recoveryTier === 4, "recovery: still down → Tier 4 (notify)");
+    await timers.advance(1000); // still dead → Tier 4 → onCaptureLost (NOT auto-kill)
+    ok(rec.getState().recoveryTier === 4, "recovery: still down → Tier 4");
     ok(
       events.some((e) => e.tier === 4 && e.ok === false),
       "recovery: Tier 4 fires an 'exhausted' recovery event",
     );
     ok(
-      autoStop === "fatal",
-      "recovery: Tier 4 finalizes via onAutoStop('fatal') — no leaked session/keep-alive",
+      captureLost,
+      "recovery: Tier 4 asks the rep (onCaptureLost) — keep what was captured?",
+    );
+    ok(
+      autoStop === null,
+      "recovery: Tier 4 does NOT auto-stop/kill the session",
     );
     ok(
       rec.getStatus() === "error",
-      "recovery: Tier 4 leaves a terminal 'error' status (not a clean 'stopped')",
+      "recovery: Tier 4 status is 'error' but the session stays ALIVE",
     );
-    // Session is stopped after Tier 4: further beats do nothing (no runaway).
+    // Mic comes back while the rep is deciding → capture auto-resumes (the
+    // "keep trying in the background" path) — no data lost, no manual restart.
     fe.setTrackLive(true);
-    await timers.advance(5000);
+    fe.current().emit(); // a fresh healthy chunk
+    await timers.advance(1000);
     ok(
-      rec.getState().recoveryTier === 4,
-      "recovery: caps at Tier 4 — stopped, no runaway escalation",
+      rec.getState().recoveryTier === 0 && rec.getStatus() === "recording",
+      "recovery: mic returns → auto-resumes (tier 0, recording)",
     );
     await rec.stop();
   }

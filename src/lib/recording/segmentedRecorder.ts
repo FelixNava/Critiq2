@@ -260,6 +260,10 @@ export interface SegmentedRecorderCallbacks {
    *  Phase 14 turns this into the immediate interruption notification. Redundant
    *  with the heartbeat's trackLive=false detection, just faster. */
   onTrackEnded?: () => void;
+  /** Fired when auto-recovery is exhausted (Tier 4). The session is kept ALIVE
+   *  (the heartbeat keeps retrying, so capture auto-resumes if the mic returns) —
+   *  the caller asks the rep whether to keep what was captured. Never auto-kills. */
+  onCaptureLost?: () => void;
 }
 
 /**
@@ -609,13 +613,13 @@ export class SegmentedRecorder {
           at,
         );
       } else {
-        // Tier 4 — auto-recovery exhausted. Notify, then save what we have and
-        // stop (release the keep-alive + close the session row) rather than leak
-        // resources on a session that can't continue. The chime/banner/Web-Push
-        // notification UX is Phase 14.
-        this.report(tier, "Couldn't recover — saved and stopped", false, at);
+        // Tier 4 — auto-recovery exhausted. DON'T kill the session: keep it ALIVE
+        // so the heartbeat keeps retrying (capture auto-resumes if the mic frees
+        // up) and ASK the rep whether to keep what's captured. Never finalize or
+        // discard capture without the user's call (Felix, 2026-06-18).
+        this.report(tier, "Lost the microphone — your call", false, at);
         this.setStatus("error");
-        await this.autoStop("fatal");
+        this.callbacks.onCaptureLost?.();
       }
     } finally {
       this.recoveryInFlight = false;

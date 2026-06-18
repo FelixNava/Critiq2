@@ -161,10 +161,12 @@ export default function RecordingLabPanel() {
     gapMs,
     gapCount,
     coverage,
+    captureLost,
     error,
     busy,
     start,
     stop,
+    discard,
     runSelfTest,
   } = useRecorder();
   const push = usePushAlerts();
@@ -238,35 +240,70 @@ export default function RecordingLabPanel() {
         </div>
       )}
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        {isRecording ? (
-          <button
-            type="button"
-            onClick={() => void stop()}
-            disabled={busy}
-            className={buttonClass}
-          >
-            Stop
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => void start()}
-            disabled={busy}
-            className={buttonClass}
-          >
-            Start recording
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => void runSelfTest()}
-          disabled={busy || isRecording}
-          className={secondaryButtonClass}
+      {captureLost && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm ring-1 ring-red-200"
         >
-          Run upload self-test
-        </button>
-      </div>
+          <p className="font-semibold text-red-800">Lost the microphone</p>
+          <p className="mt-0.5 text-red-700">
+            We couldn&apos;t reconnect. We&apos;re still trying in the background —
+            recording resumes on its own if the mic frees up. Keep what
+            you&apos;ve recorded so far?
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void stop()}
+              disabled={busy}
+              className={buttonClass}
+            >
+              Keep &amp; stop
+            </button>
+            <button
+              type="button"
+              onClick={() => void discard()}
+              disabled={busy}
+              className={secondaryButtonClass}
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!captureLost && (
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          {isRecording ? (
+            <button
+              type="button"
+              onClick={() => void stop()}
+              disabled={busy}
+              className={buttonClass}
+            >
+              Stop
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void start()}
+              disabled={busy}
+              className={buttonClass}
+            >
+              Start recording
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => void runSelfTest()}
+            disabled={busy || isRecording}
+            className={secondaryButtonClass}
+          >
+            Run upload self-test
+          </button>
+        </div>
+      )}
       <p className="mt-2 text-xs text-slate-400">
         Start recording asks for your microphone. The self-test saves a couple of
         placeholder clips instead, so you can check that uploading works without a
