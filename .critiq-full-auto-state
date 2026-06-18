@@ -26,7 +26,7 @@ PHASE_CURRENT_PR=
 # in ONE useEffect (refs + data-* hooks) with full prefers-reduced-motion gating; CTAs → /login
 # + /signup; metrics/testimonial code-flagged as ILLUSTRATIVE placeholders to swap pre-master.
 # Branch phase-33/marketing-landing-redesign off review-for-main; merged review-for-main (PR
-# #__PR__, squash __SQUASH__). /design-critique (design-reviewer) → 3 P0 fixed (focus-visible
+# #30, squash 44f9666). /design-critique (design-reviewer) → 3 P0 fixed (focus-visible
 # ring, --faint AA contrast bump, <main> landmark) + P1/P2 (input semantics, aria-hidden
 # decoratives, scroll-margin-top, RM hover). VERIFIED live in real Chrome across all 9 sections
 # (full-page screenshots in the review packet); typecheck+build green, / prerenders static;
@@ -349,7 +349,7 @@ UI_VERIFY_PENDING=
 # trim/scope) is FLAGGED for Felix + the expert coach; the builder is built-but-not-yet-wired into
 # the AI consumers (the real payoff, a flagged follow-up).
 # Phase 33 DONE 2026-06-18 (aggressive-auto, scheduled task critiq-fullauto-aggressive-15-26).
-# Marketing Landing Redesign merged to review-for-main (PR #__PR__) → review-for-main now holds
+# Marketing Landing Redesign merged to review-for-main (PR #30) → review-for-main now holds
 # Phases 2-21 + 23 + 24 + 25 + 33. The IMMEDIATE-NEXT scope item (built before resuming the
 # numbered order; Phase 25 was already done). Cinematic prototype ported into real Next.js/React
 # (CSS module + next/font), /design-critique P0/P1 addressed, verified live across all 9 sections.
