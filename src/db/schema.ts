@@ -753,6 +753,84 @@ export const callDebriefs = pgTable(
   ],
 );
 
+/**
+ * Call coaching (Phase 21 — the Coaching Output Layer). This is the FIRST surface
+ * that combines the two halves of a finished call: the Phase 20 debrief (the rep's
+ * subjective Reporter-Mode account, deliberately neutral) and — when the call was
+ * recorded and scored — the Phase 16 call_score (the objective three-pillar
+ * evaluation). From those, Critiq produces ADVICE: a small set of high-leverage
+ * coaching priorities, what to reinforce, and one concrete next step. This is where
+ * Critiq is finally allowed to advise (the debrief withholds advice on purpose so
+ * coaching and scoring don't double-count judgment).
+ *
+ * Generated FROM a completed debrief (mirrors a script generated from a brief). One
+ * row per generation — a rep can re-coach, so a debrief may have several; the UI
+ * shows the latest completed. Generated synchronously in the rep's request (the rep
+ * is waiting) → no cron/CAS, like the brief/script/debrief.
+ *
+ * The objective score is SNAPSHOTTED at generation time (`scoreSnapshot`,
+ * `recordingId`, `scoreId`): the coaching and the score it was based on are one
+ * coherent artifact, so a later re-score can't silently make the displayed score
+ * disagree with the advice. `recordingId`/`scoreId` are SET NULL (provenance, not a
+ * hard dependency — most beta debriefs are of un-recorded calls and carry no score).
+ * Cascades on debrief + account + user delete.
+ */
+export const callCoaching = pgTable(
+  "call_coaching",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    // The completed debrief this coaching was generated from (the subjective input).
+    debriefId: text("debrief_id")
+      .notNull()
+      .references(() => callDebriefs.id, { onDelete: "cascade" }),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accountsTbl.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // Provenance of the objective half (null when the call wasn't recorded/scored).
+    // SET NULL so deleting the recording/score never erases the coaching.
+    recordingId: text("recording_id").references(() => recordings.id, {
+      onDelete: "set null",
+    }),
+    scoreId: text("score_id").references(() => callScores.id, {
+      onDelete: "set null",
+    }),
+    status: text("status").notNull().default("pending"), // pending | processing | completed | failed
+    provider: text("provider").notNull().default("anthropic"),
+    model: text("model").notNull().default("claude-sonnet-4-6"),
+    attempts: integer("attempts").notNull().default(0),
+    // AI coaching output (null until status = completed).
+    priorities: jsonb("priorities"), // [{ focus, lens, action }] what to work on next
+    reinforce: jsonb("reinforce"), // [{ focus, lens, note }] what worked — keep doing
+    nextStep: text("next_step"), // the single concrete recommended next action
+    summary: text("summary"), // one-line plain-language takeaway
+    // The three-pillar score this coaching was built against, snapshotted at gen
+    // time: { overall, spin, voss, navarro, partialJudgement }. Null when no
+    // recorded/scored call was linked (coaching ran on the debrief alone).
+    scoreSnapshot: jsonb("score_snapshot"),
+    // The rep's 1–5 usefulness rating (PRD beta metric). Null until rated.
+    usefulnessRating: integer("usefulness_rating"),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("call_coaching_debrief_id_idx").on(t.debriefId),
+    index("call_coaching_account_id_idx").on(t.accountId),
+    index("call_coaching_user_id_idx").on(t.userId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
@@ -783,3 +861,5 @@ export type CallScript = typeof callScripts.$inferSelect;
 export type NewCallScript = typeof callScripts.$inferInsert;
 export type CallDebrief = typeof callDebriefs.$inferSelect;
 export type NewCallDebrief = typeof callDebriefs.$inferInsert;
+export type CallCoaching = typeof callCoaching.$inferSelect;
+export type NewCallCoaching = typeof callCoaching.$inferInsert;
