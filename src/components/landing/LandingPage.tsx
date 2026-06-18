@@ -408,6 +408,7 @@ export function LandingPage() {
         </nav>
       </header>
 
+      <main>
       {/* HERO */}
       <section className={cx(styles.hero, styles.wrap)}>
         <div>
@@ -485,7 +486,7 @@ export function LandingPage() {
                   <b>SPIN · Structure</b>
                   <span>82</span>
                 </div>
-                <div className={styles.track}>
+                <div className={styles.track} aria-hidden="true">
                   <div className={styles.fill} data-fill data-w="82" />
                 </div>
               </div>
@@ -494,7 +495,7 @@ export function LandingPage() {
                   <b>Voss · Mechanics</b>
                   <span>74</span>
                 </div>
-                <div className={styles.track}>
+                <div className={styles.track} aria-hidden="true">
                   <div className={styles.fill} data-fill data-w="74" />
                 </div>
               </div>
@@ -503,14 +504,14 @@ export function LandingPage() {
                   <b>Navarro · Relationship</b>
                   <span>80</span>
                 </div>
-                <div className={styles.track}>
+                <div className={styles.track} aria-hidden="true">
                   <div className={styles.fill} data-fill data-w="80" />
                 </div>
               </div>
             </div>
             <div className={styles.insight}>
               <span className={styles.ic}>✦</span>
-              <span ref={typedRef} className={styles.typed} />
+              <span ref={typedRef} className={styles.typed} aria-hidden="true" />
             </div>
           </div>
           <div className={cx(styles.floatBadge, styles.fb1)}>
@@ -565,7 +566,7 @@ export function LandingPage() {
         </div>
         <div className={cx(styles.loop, styles.stagger, styles.reveal)} data-reveal data-stagger>
           <div className={styles.step}>
-            <div className={styles.glyph}>🎯</div>
+            <div className={styles.glyph} aria-hidden="true">🎯</div>
             <div className={styles.n}>01 — PREP</div>
             <h3>Walk in ready</h3>
             <p>
@@ -574,7 +575,7 @@ export function LandingPage() {
             </p>
           </div>
           <div className={styles.step}>
-            <div className={styles.glyph}>🎙️</div>
+            <div className={styles.glyph} aria-hidden="true">🎙️</div>
             <div className={styles.n}>02 — CALL</div>
             <h3>Just sell</h3>
             <p>
@@ -583,7 +584,7 @@ export function LandingPage() {
             </p>
           </div>
           <div className={styles.step}>
-            <div className={styles.glyph}>💬</div>
+            <div className={styles.glyph} aria-hidden="true">💬</div>
             <div className={styles.n}>03 — DEBRIEF</div>
             <h3>Talk it out</h3>
             <p>
@@ -592,7 +593,7 @@ export function LandingPage() {
             </p>
           </div>
           <div className={styles.step}>
-            <div className={styles.glyph}>📈</div>
+            <div className={styles.glyph} aria-hidden="true">📈</div>
             <div className={styles.n}>04 — COACHING</div>
             <h3>Fix the right things</h3>
             <p>
@@ -601,7 +602,7 @@ export function LandingPage() {
             </p>
           </div>
           <div className={styles.step}>
-            <div className={styles.glyph}>🧠</div>
+            <div className={styles.glyph} aria-hidden="true">🧠</div>
             <div className={styles.n}>05 — MEMORY</div>
             <h3>Get sharper</h3>
             <p>
@@ -629,7 +630,7 @@ export function LandingPage() {
         </div>
         <div className={cx(styles.pillars, styles.stagger, styles.reveal)} data-reveal data-stagger>
           <div className={styles.pillar}>
-            <div className={styles.ring} />
+            <div className={styles.ring} aria-hidden="true" />
             <div className={styles.pts}>35 POINTS</div>
             <h3>SPIN</h3>
             <div className={styles.who}>Call structure</div>
@@ -644,7 +645,7 @@ export function LandingPage() {
             </ul>
           </div>
           <div className={styles.pillar}>
-            <div className={styles.ring} />
+            <div className={styles.ring} aria-hidden="true" />
             <div className={styles.pts}>35 POINTS</div>
             <h3>Voss</h3>
             <div className={styles.who}>The human mechanics</div>
@@ -659,7 +660,7 @@ export function LandingPage() {
             </ul>
           </div>
           <div className={styles.pillar}>
-            <div className={styles.ring} />
+            <div className={styles.ring} aria-hidden="true" />
             <div className={styles.pts}>30 POINTS</div>
             <h3>Navarro</h3>
             <div className={styles.who}>The long game</div>
@@ -760,7 +761,7 @@ export function LandingPage() {
         </div>
         <div className={cx(styles.bento, styles.stagger, styles.reveal)} data-reveal data-stagger>
           <div className={cx(styles.cell, styles.cellFeature)}>
-            <div className={styles.miniScore}>
+            <div className={styles.miniScore} aria-hidden="true">
               <div className={styles.msBar}>
                 <i style={{ height: "78%" }} />
               </div>
@@ -784,27 +785,27 @@ export function LandingPage() {
             </p>
           </div>
           <div className={styles.cell}>
-            <div className={styles.gl}>🎯</div>
+            <div className={styles.gl} aria-hidden="true">🎯</div>
             <h3>Pre-call briefs</h3>
             <p>Know the account cold before you dial.</p>
           </div>
           <div className={styles.cell}>
-            <div className={styles.gl}>📝</div>
+            <div className={styles.gl} aria-hidden="true">📝</div>
             <h3>Delivery-cued scripts</h3>
             <p>Word-for-word, with cues for pace, emphasis, and silence.</p>
           </div>
           <div className={styles.cell}>
-            <div className={styles.gl}>🔒</div>
+            <div className={styles.gl} aria-hidden="true">🔒</div>
             <h3>Private to you</h3>
             <p>Your style, your habits, your data. Yours alone.</p>
           </div>
           <div className={styles.cell}>
-            <div className={styles.gl}>📱</div>
+            <div className={styles.gl} aria-hidden="true">📱</div>
             <h3>Laptop or phone</h3>
             <p>Built for desk reps and field reps alike.</p>
           </div>
           <div className={cx(styles.cell, styles.cellWide)}>
-            <div className={styles.gl}>♟️</div>
+            <div className={styles.gl} aria-hidden="true">♟️</div>
             <h3>Accounts that get smarter</h3>
             <p>
               A shared, living memory of every account — so the intelligence survives even
@@ -812,7 +813,7 @@ export function LandingPage() {
             </p>
           </div>
           <div className={styles.cell}>
-            <div className={styles.gl}>✓</div>
+            <div className={styles.gl} aria-hidden="true">✓</div>
             <h3>Grounded, never invented</h3>
             <p>If Critiq says it, it can show you where you said it.</p>
           </div>
@@ -908,7 +909,14 @@ export function LandingPage() {
             actually sounds like.
           </p>
           <form className={styles.capture} onSubmit={goSignup}>
-            <input ref={emailRef} type="email" placeholder="you@company.com" aria-label="Email" />
+            <input
+              ref={emailRef}
+              type="email"
+              name="email"
+              autoComplete="email"
+              placeholder="you@company.com"
+              aria-label="Your work email"
+            />
             <button
               className={cx(styles.btn, styles.btnPrimary, styles.btnLg)}
               type="submit"
@@ -920,6 +928,7 @@ export function LandingPage() {
           <div className={styles.fine}>No credit card. Your data stays yours. Cancel anytime.</div>
         </div>
       </section>
+      </main>
 
       {/* FOOTER */}
       <footer>

@@ -13,7 +13,7 @@
   --bg2: #080a18;
   --ink: #eef0fb;
   --muted: #969db9;
-  --faint: #6b7194;
+  --faint: #868dad;
   --line: rgba(255, 255, 255, 0.08);
   --glass: rgba(255, 255, 255, 0.035);
   --v1: #8b5cff;
@@ -37,7 +37,22 @@
   font-weight: 450;
   width: 100%;
 }
-.root *{ms-overflow-style: auto;box-sizing: border-box;}
+.root * {
+  box-sizing: border-box;
+}
+.root section[id] {
+  scroll-margin-top: 86px; /* fixed 70px nav — anchor jumps clear the header */
+}
+
+/* a11y — keyboard focus visibility (design-critique P0 #1). The custom .btn /
+   anchor / input controls otherwise show no focus ring on the near-black bg. */
+.root a:focus-visible,
+.btn:focus-visible,
+.capture input:focus-visible {
+  outline: 2px solid var(--v3);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
 
 /* ---------- atmospheric background ---------- */
 .bgWrap {
@@ -1113,6 +1128,13 @@
   .reveal,
   .stagger > * {
     opacity: 1;
+    transform: none;
+  }
+  /* no abrupt hover position jumps when motion is reduced */
+  .btnPrimary:hover,
+  .pillar:hover,
+  .cell:hover,
+  .whoCard:hover {
     transform: none;
   }
 }
