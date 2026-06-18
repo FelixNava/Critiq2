@@ -622,6 +622,62 @@ export const preCallBriefs = pgTable(
   ],
 );
 
+/**
+ * Call scripts (Phase 19). A delivery-cued conversation framework generated FROM a
+ * completed pre-call brief (Signal PRD Step 04). One row per generation — a rep can
+ * regenerate in a different style mode, so a brief may have several scripts; the UI
+ * shows the latest. The objective is snapshotted at generation time so a later
+ * objective edit on the brief doesn't silently rewrite a script the rep already read.
+ * Generated synchronously in the rep's request (like the brief) → no cron/CAS.
+ */
+export const callScripts = pgTable(
+  "call_scripts",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    // The completed brief this script was generated from (objective + approach).
+    briefId: text("brief_id")
+      .notNull()
+      .references(() => preCallBriefs.id, { onDelete: "cascade" }),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accountsTbl.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // 'assertive' | 'relational' — the chosen style mode for this script (PRD §06).
+    styleMode: text("style_mode").notNull().default("relational"),
+    // The in-force call objective at generation time (snapshot from the brief).
+    objective: text("objective"),
+    status: text("status").notNull().default("pending"), // pending | processing | completed | failed
+    provider: text("provider").notNull().default("anthropic"),
+    model: text("model").notNull().default("claude-sonnet-4-6"),
+    attempts: integer("attempts").notNull().default(0),
+    // AI script output (null until status = completed).
+    opener: text("opener"), // how to open the call
+    sections: jsonb("sections"), // [{ label, purpose, lines: [{ say, cues: [{ kind, note }] }] }]
+    closing: text("closing"), // how to drive toward the objective + secure the next step
+    deliveryNotes: jsonb("delivery_notes"), // string[] of call-level delivery coaching
+    // The rep's 1–5 usefulness rating (PRD beta metric: script adoption). Null until rated.
+    usefulnessRating: integer("usefulness_rating"),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("call_scripts_brief_id_idx").on(t.briefId),
+    index("call_scripts_account_id_idx").on(t.accountId),
+    index("call_scripts_user_id_idx").on(t.userId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
@@ -648,3 +704,5 @@ export type CallScore = typeof callScores.$inferSelect;
 export type NewCallScore = typeof callScores.$inferInsert;
 export type PreCallBrief = typeof preCallBriefs.$inferSelect;
 export type NewPreCallBrief = typeof preCallBriefs.$inferInsert;
+export type CallScript = typeof callScripts.$inferSelect;
+export type NewCallScript = typeof callScripts.$inferInsert;

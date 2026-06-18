@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import AppHeader from "@/components/AppHeader";
 import StageBadge from "@/components/accounts/StageBadge";
+import { type InitialScript } from "@/components/precall/CallScriptPanel";
 import PreCallBriefPanel, {
   type InitialBrief,
 } from "@/components/precall/PreCallBriefPanel";
@@ -11,6 +12,8 @@ import {
   getAccountInteractionCount,
   getLatestBriefForAccount,
 } from "@/lib/precall/store";
+import { resolveBaselineStyleMode } from "@/lib/script/style";
+import { getLatestScriptForBrief } from "@/lib/script/store";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +53,30 @@ export default async function PreCallPage({
         }
       : null;
 
+  // Phase 19: the rep's baseline style mode (seam — DEFAULT for beta; a later phase
+  // derives it from intake and reads the profile THEN, not here) + the latest script
+  // for the loaded brief, so a returning rep sees their script already there.
+  const baselineStyleMode = resolveBaselineStyleMode(null);
+
+  const latestScriptRow = initialBrief
+    ? await getLatestScriptForBrief(userId, initialBrief.id)
+    : null;
+  const initialScript: InitialScript | null =
+    latestScriptRow && latestScriptRow.status === "completed"
+      ? {
+          id: latestScriptRow.id,
+          styleMode: latestScriptRow.styleMode,
+          objective: latestScriptRow.objective,
+          opener: latestScriptRow.opener,
+          sections:
+            (latestScriptRow.sections as InitialScript["sections"]) ?? [],
+          closing: latestScriptRow.closing,
+          deliveryNotes:
+            (latestScriptRow.deliveryNotes as string[]) ?? [],
+          usefulnessRating: latestScriptRow.usefulnessRating,
+        }
+      : null;
+
   return (
     <div className="min-h-dvh bg-slate-50">
       <AppHeader backHref={`/accounts/${id}`} backLabel={account.name} />
@@ -73,6 +100,9 @@ export default async function PreCallPage({
           objectiveMode={objectiveMode}
           hasSummary={Boolean(account.summary && account.summary.trim())}
           initialBrief={initialBrief}
+          baselineStyleMode={baselineStyleMode}
+          initialScript={initialScript}
+          initialScriptBriefId={initialBrief?.id ?? null}
         />
       </main>
     </div>
