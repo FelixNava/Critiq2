@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRecorder, type ChunkView } from "@/hooks/useRecorder";
 import { usePushAlerts } from "@/hooks/usePushAlerts";
 import {
@@ -170,6 +171,7 @@ export default function RecordingLabPanel() {
     runSelfTest,
   } = useRecorder();
   const push = usePushAlerts();
+  const transcribe = useTranscribe(recordingId);
 
   const isRecording = status === "recording" || status === "recovering";
   const s = statusLabel(status);
@@ -473,6 +475,48 @@ export default function RecordingLabPanel() {
         )}
       </div>
 
+      {recordingId && !isRecording && uploaded > 0 && (
+        <div className="mt-6 border-t border-slate-100 pt-6">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm font-semibold text-slate-900">Transcript</p>
+            <button
+              type="button"
+              onClick={() => void transcribe.run()}
+              disabled={transcribe.busy}
+              className={secondaryButtonClass}
+            >
+              {transcribe.busy
+                ? "Transcribing…"
+                : transcribe.text != null
+                  ? "Re-transcribe"
+                  : "Transcribe"}
+            </button>
+          </div>
+          <p className="mt-1 text-sm text-slate-500">
+            Turn this recording into text. Long recordings are transcribed in
+            parts and stitched together.
+          </p>
+          {transcribe.error && (
+            <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
+              {transcribe.error}
+            </p>
+          )}
+          {transcribe.text != null && (
+            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              {transcribe.text.trim() ? (
+                <p className="whitespace-pre-wrap text-sm text-slate-700">
+                  {transcribe.text}
+                </p>
+              ) : (
+                <p className="text-sm text-slate-400">
+                  No speech was detected in this recording.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {recordingId && (
         <p className="mt-4 text-xs text-slate-300">
           Session {recordingId.slice(0, 8)}
@@ -480,4 +524,39 @@ export default function RecordingLabPanel() {
       )}
     </div>
   );
+}
+
+interface TranscriptApiResponse {
+  error?: string;
+  transcript?: { transcript?: { text?: string | null } };
+}
+
+/** Minimal lab-only hook: POST the transcribe trigger and surface the text. */
+function useTranscribe(recordingId: string | null) {
+  const [busy, setBusy] = useState(false);
+  const [text, setText] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run() {
+    if (!recordingId || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/recording/${recordingId}/transcribe`, {
+        method: "POST",
+      });
+      const data = (await res.json().catch(() => ({}))) as TranscriptApiResponse;
+      if (!res.ok) {
+        setError(data.error ?? "Couldn't transcribe this recording.");
+        return;
+      }
+      setText(data.transcript?.transcript?.text ?? "");
+    } catch {
+      setError("Couldn't reach the server. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return { busy, text, error, run };
 }
