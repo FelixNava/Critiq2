@@ -27,7 +27,7 @@ Each phase has a status indicator:
 
 ## Status snapshot (auto-updated by Full Auto)
 
-- Last updated: 2026-06-18 (aggressive-auto — Phase 25 Working Memory Assembly merged to review-for-main, PR #29, squash c2496bf; review-for-main now holds Phases 2–21 + 23 + 24 + 25; master holds 2–13). NEXT = Phase 26 (Hallucination Guard — gets scrutinized; it CONSUMES the source-tagged facts/traits from Phases 23 + 24 and the working set from Phase 25). Phase 22 (email drafting) deferred post-launch.
+- Last updated: 2026-06-18 (aggressive-auto — **Phase 33 Marketing Landing Redesign** merged to review-for-main, PR #__PR__, squash __SQUASH__; review-for-main now holds Phases 2–21 + 23 + 24 + 25 + 33; master holds 2–13). The cinematic landing port (Felix-approved prototype → Next.js 16 + React + CSS module + next/font) replaces the Phase 4 landing at `/`. Built FIRST per the reordered scope (Phase 25 was already done). NEXT = Phase 26 (Hallucination Guard — gets scrutinized; it CONSUMES the source-tagged facts/traits from Phases 23 + 24 and the working set from Phase 25). Phase 22 (email drafting) deferred post-launch.
 - Mode: Phases 2–5 **supervised (direct)**; Phase 6 **via /critiq-full-auto orchestrator (Gate-1 ✅)**; Phase 7 **autonomously via the scheduled-task cron (Gate-2 ✅)**; Phase 8 **live/supervised in-session**; Phases 9, 10 & 11 **autonomously via the hourly cron (`critiq-fullauto-9-10-11`)**; Phase 11a **interactive/supervised via /critiq-full-auto (Felix ran the device gate)**.
 - Done: Phase 2 (DB) ✅, Phase 3 (auth) ✅, Phase 4 (landing) ✅, Phase 5 (rate-limit) ✅, Phase 6 (intake S1) ✅, Phase 7 (intake S2) ✅, Phase 8 (Life Context) ✅, Phase 9 (account domain) ✅, Phase 10 (account intelligence card) ✅, Phase 11 (recording layers 1-3) ✅, **Phase 11a (lock-screen audio fix) ✅** — recording stack **promoted `recording-staging` → `review-for-main`** (PR #13, merge d3060e5), **device-verified** (neutral "Critiq" lock-screen widget confirmed on iPhone 2026-06-06).
 - Current phase: none. **🟢 Phases 2–13 SHIPPED to `master`** (PR #1, merge `3c2e198`, 2026-06-09, Felix's explicit command) — first real production deploy; **prod VERIFIED HEALTHY at `critiq2.vercel.app`** (200s on landing/login/signup, `/dashboard` 307 = auth runs, zero prod runtime errors). Prod fully provisioned (Felix added the Blob token; Claude added a fresh AUTH_SECRET + RESEND/AUTH_RESEND/EMAIL_FROM/ANTHROPIC/CRON). **Phase 14 ✅ BUILT by the headless cron → OPEN PR #18** (`recording-staging`), NOT merged — awaits Felix's iPhone device gate + VAPID keys to Vercel (DEC-028). ⚠️ Prod shares ONE Neon DB + Blob store with dev/preview → SEPARATE prod DB/store before real beta reps (memory `project_critiq_prelaunch_checks`; DEC-029).
@@ -611,6 +611,28 @@ Public `/beta` sign-up form, manual approval queue, onboarding email sequence vi
 ## Phase 32 — Pre-Launch Verification Sweep ☐ Planned
 
 Drive every flow end-to-end. Document known limitations. Final test pass.
+
+---
+
+## Phase 33 — Marketing Landing Redesign ✅ DONE (review-for-main, PR #__PR__, squash __SQUASH__)
+
+> Felix-approved 2026-06-18 ("this is perfect"). Replaces the Phase 4 landing (`/`) with the cinematic, high-conversion design Felix signed off on. Highest design-fidelity item in the run — Felix WILL scrutinize it on the preview. Built FIRST (before resuming Phases 25/26 per the reordered scope; Phase 25 was already done). Branch `phase-33/marketing-landing-redesign` off `review-for-main`; PR base `review-for-main` (NEVER master). VERIFIED live in a real browser across all 9 sections (full-page screenshots in the PR review packet). /design-critique pass run (3 P0 fixed + P1/P2). DEC-040.
+
+**Authoritative spec:** `docs/design/landing-prototype.html` (committed copy of `critiq-marketing/prototype-critiq-home.html`; live cross-check `critiq-marketing.vercel.app`).
+
+**What was built — a proper port (NOT a raw-HTML drop-in / NOT an iframe):**
+- `src/components/landing/LandingPage.tsx` — single `"use client"` component reproducing all 9 sections in order: (1) HERO (kinetic gradient headline + live "call analysis" panel — animated 0→100 gauge, three pillar bars, self-typing insight, two float badges, cursor-reactive constellation canvas + aurora/grain bg, dual CTA + trust strip); (2) TENSION; (3) THE LOOP (5 steps); (4) THE THREE PILLARS (SPIN 35 / Voss 35 / Navarro 30); (5) IT LEARNS YOU (rising relevance curve); (6) BENTO (8 cells incl. live mini-score feature cell); (7) WHO IT'S FOR (2 ICPs); (8) PROOF (3 metrics + testimonial); (9) FINAL CTA (email → /signup) + footer. Prototype's vanilla JS re-expressed as one `useEffect` driving refs + `data-*` hooks; full `prefers-reduced-motion` gating (renders final states, no heavy motion).
+- `src/components/landing/landing.module.css` — faithful CSS port; design tokens on `.root`; every bare element/`*` selector scoped under `.root` (no global leakage to the light-themed app); toggled state (`is-in`/`scrolled`) via `:global()`; fonts via next/font CSS vars.
+- `src/app/layout.tsx` — added Space Grotesk (display) + Inter (body) via `next/font/google` as CSS vars (app default `--font-sans` stays Geist).
+- `src/app/globals.css` — `html{scroll-behavior:smooth}` for anchor nav.
+- `src/app/page.tsx` — renders `<LandingPage />`; dev/preview-only recording-lab banner preserved.
+- CTAs route to the real app: "Sign in" → /login, every "Start free" → /signup (final email field prefills `/signup?email=` — does NOT capture, so copy stays honest). Footer Privacy/Terms → /privacy /terms.
+
+**PLACEHOLDERS (code-commented):** the 3 metrics (+27% / 3.5× / 9-of-10) and the testimonial (Alex N. · Commercial Sales Rep · Beta) are ILLUSTRATIVE — Felix swaps real beta data before promotion to master.
+
+**Verify:** `pnpm typecheck` + `pnpm build` clean (`/` prerenders static `○`). /design-critique pass + Chrome/Preview MCP desktop+mobile smoke + before/after screenshots → REVIEW PACKET. DEC-040.
+
+**Depends on:** Phase 4 (replaces its landing).
 
 ---
 
