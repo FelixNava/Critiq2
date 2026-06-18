@@ -14,10 +14,12 @@ BUILD_TOTAL_TOKEN_BUDGET=4000000
 BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
-PHASE_CURRENT=14/interruption-detection-notification
-PHASE_CURRENT_STATUS=building
+PHASE_CURRENT=
+PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
 PHASE_NEXT=15/deepgram-transcription
+# Phase 14 BUILT to OPEN PR #18 (base recording-staging) by the cron 2026-06-08;
+# NOT merged, awaiting Felix's iPhone device gate (UI_VERIFY_PENDING=14 below).
 PHASE_LAST_COMPLETED=13/auto-segmentation-heartbeat-recovery
 PHASE_LAST_COMPLETED_AT=2026-06-08T04:15:00-04:00
 
@@ -48,7 +50,15 @@ ENV_READY=true
 #   Recording stack (11 + 11a) promoted recording-staging -> review-for-main (PR #13).
 #   CLEARED 2026-06-07: Phase 12 DEVICE-GATE PASSED on iPhone (capture, keep-alive,
 #   offline-recover-on-reconnect) -> merged to recording-staging (PR #14, c7cb620).
-UI_VERIFY_PENDING=
+# 2026-06-08 (Phase 14 cron build): interruption detection + multi-channel
+#   notification (chime + tab-flash + Web Push + in-app banner) BUILT to OPEN
+#   PR #18 (base recording-staging). Headless cron = baseline only (build/types/
+#   unit, 32 assertions). Awaits Felix's iPhone DEVICE GATE: chime + tab-flash +
+#   Web Push + banner on a real mic-grab, branding-only on the lock screen, then
+#   recover-clears-all. VAPID keypair generated -> add to Vercel for runtime push
+#   (PR #18 body has the keys). Do NOT merge until the gate passes; then merge to
+#   recording-staging + promote to review-for-main per Felix.
+UI_VERIFY_PENDING=14
 
 # --- SESSION HEARTBEAT ---
 # Phase 13 DONE + DEVICE-VERIFIED (segmentation + heartbeat + Tier 1-4 recovery +
@@ -58,8 +68,8 @@ UI_VERIFY_PENDING=
 # 905d35f) THEN promoted to review-for-main (PR #17, merge 0fa2d78) by Felix's command.
 # review-for-main now holds Phases 2-13; build clean on the merged result. DEC-027.
 # NEXT (Block 1): Phase 14 (interruption detection + Web Push) off recording-staging.
-SESSION_LAST_HEARTBEAT=2026-06-08T20:07:00-04:00
-SESSION_TOKEN_BUDGET_USED=0
+SESSION_LAST_HEARTBEAT=2026-06-08T20:40:00-04:00
+SESSION_TOKEN_BUDGET_USED=420000
 SESSION_ID=cron-phase14-interruption-notification-2026-06-08
 
 # --- CRON SCHEDULE ---
@@ -92,15 +102,22 @@ CRON_SCHEDULE_LABEL=critiq-fullauto-9-10-11-COMPLETE-self-disabling
 # (NextAuth REQUIRES it -> auth dead), RESEND_API_KEY, AUTH_RESEND_KEY, EMAIL_FROM,
 # BLOB_READ_WRITE_TOKEN. DATABASE_URL/_UNPOOLED have SEPARATE Production entries (distinct
 # from Preview) -> likely a different Neon branch that is UNMIGRATED (0001-0004 applied to the
-# dev Neon only). UNBLOCK CHECKLIST: (1) ✅ DONE 2026-06-08 — Claude added a FRESH prod AUTH_SECRET
-# via `vercel env add`. (2) ✅ DONE — added prod RESEND_API_KEY + AUTH_RESEND_KEY + EMAIL_FROM (reused
-# the preview values) + ANTHROPIC_API_KEY + CRON_SECRET. So prod now has all runtime vars EXCEPT the
-# Blob token. REMAINING (Felix): (3) add a Production scope to BLOB_READ_WRITE_TOKEN — it's Sensitive →
-# dashboard-only, Claude can't read/mint it (+ decide separate prod store). (4) apply migrations
-# 0001-0005 to the prod Neon DB (the prod DATABASE_URL entries exist; additive = zero data-loss; a
-# deliberate prod-DB action — Claude will run scripts/migrate.ts if given the prod DATABASE_URL_UNPOOLED,
-# else Felix runs it). Then say "merge master" -> land PR #1 -> verify prod (200 not 500). Also in the PR #1 comment.
-BLOCKER_REASON=master-merge-paused: prod PARTIALLY provisioned 2026-06-08 (Claude added AUTH_SECRET/RESEND/AUTH_RESEND/EMAIL_FROM/ANTHROPIC/CRON to Production). REMAINING: BLOB_READ_WRITE_TOKEN prod scope (Felix dashboard) + prod Neon migration 0001-0005. Then "merge master". See checklist above + PR #1 comment + DEC-026.
+# dev Neon only). [RESOLVED 2026-06-08] PROD ENV FULLY PROVISIONED + PROD DB SCHEMA PRESENT:
+# (1) ✅ Claude added a FRESH prod AUTH_SECRET. (2) ✅ Claude added prod RESEND_API_KEY + AUTH_RESEND_KEY
+# + EMAIL_FROM + ANTHROPIC_API_KEY + CRON_SECRET (reused preview values). (3) ✅ Felix added
+# BLOB_READ_WRITE_TOKEN to Production. (4) ✅ Migration vs the prod DB ran (Claude, via
+# `vercel env pull --environment=production` + scripts/migrate.ts): ALL 0000-0005 already applied ->
+# prod schema READY. ⚠️ FINDING: prod DATABASE_URL points to the SAME Neon DB as dev/preview (endpoint
+# ep-restless-field-apvp3l79; prod = the direct endpoint, dev = the -pooler endpoint of the same DB) ->
+# ALL environments share ONE database (incl. the existing p8verify/rs-test test data + Phase 12-13 test
+# recordings). Fine PRE-LAUNCH (no real data), but BEFORE real beta users provision a SEPARATE prod Neon
+# (else preview testing reads/writes prod data — the ApexTrust lesson, see memory feedback_apex_branch_preview_db).
+# NOT a merge blocker. ✅ MASTER MERGED 2026-06-09 (PR #1, merge 3c2e198) by Felix's explicit command:
+# Phases 2-13 SHIPPED to master = first prod deploy; PROD VERIFIED HEALTHY at critiq2.vercel.app (200s on
+# landing/login/signup; /dashboard 307 = auth runs; zero prod runtime errors; DB = the shared migrated DB).
+# Prod fully provisioned. BEFORE REAL BETA REPS: separate prod Neon DB + separate prod blob store (prod
+# currently shares ONE DB/store with dev+preview; see memory project_critiq_prelaunch_checks). DEC-029.
+BLOCKER_REASON=
 BLOCKER_SET_AT=2026-06-08T03:21:00-04:00
 
 # --- EMAIL CHANNEL ---

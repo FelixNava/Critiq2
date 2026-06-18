@@ -348,6 +348,35 @@ Review: high-effort /code-review (4 finder angles) before PR → 7 correctness f
 Iterability: high (params in DEFAULT_CONFIG; tier behavior localized).
 Trade-off flag: YES — (1) Tier-4 auto-stop vs keep-trying — revisit with Phase 14's notify UX; (2) segment_index is forward-looking for Phase 15; (3) MAX_UPLOAD_ATTEMPTS drops a chunk after 10 fails (bounded loss vs infinite loop). DEVICE GATE (Felix, iPhone) is the real proof.
 
+## DEC-029 — Master merge done (Phases 2-13 → master) + prod provisioned + verified; prod shares one DB (separate prod DB logged for before-real-reps)
+Phase: post-13 / master-promotion
+Date: 2026-06-09 00:35 ET
+Type: obvious (Felix's explicit in-session command, executed after full verification)
+Context: DEC-026 paused the master merge for missing prod env. This session (2026-06-09) Felix provisioned prod + commanded the merge (path A). Prod env completed: Claude added a FRESH prod AUTH_SECRET + RESEND_API_KEY/AUTH_RESEND_KEY/EMAIL_FROM/ANTHROPIC_API_KEY/CRON_SECRET (reused) via `vercel env add`; Felix added BLOB_READ_WRITE_TOKEN to Production (dashboard). Migration check vs the prod DB (Claude, `vercel env pull --environment=production` + scripts/migrate.ts): all 0000-0005 already applied -> prod schema ready.
+Chosen: merged PR #1 (review-for-main -> master) via `gh pr merge 1 --merge` on Felix's explicit "merge master". Phases 2-13 SHIPPED to master = first real production deploy. VERIFIED prod healthy: critiq2.vercel.app returns 200 on / /login /signup and 307 on /dashboard (auth middleware runs = AUTH_SECRET works), ZERO errors/warnings in the production runtime logs. (The live signup-WRITE smoke was blocked by the sandbox's credential-POST heuristic -> verified instead via page-loads + auth-redirect + clean runtime logs + the known-good shared DB; honest caveat.)
+FINDING (flagged, not a blocker): prod DATABASE_URL points to the SAME Neon DB as dev/preview (endpoint ep-restless-field-apvp3l79; prod = direct, dev = -pooler of the same DB) -> ALL environments share ONE database (+ one Blob store). Fine pre-launch. BEFORE REAL BETA REPS: separate prod Neon DB + separate prod Blob store so real rep data never mixes with test/preview (path B). Logged to memory project_critiq_prelaunch_checks at Felix's explicit request; ApexTrust lesson (feedback_apex_branch_preview_db).
+Iterability: high (revert the merge commit if needed; separate prod DB is a deliberate later step).
+Trade-off flag: YES — path B (separate prod DB/store) before real reps. Still open: dedicated Anthropic/Resend keys (DEC-002); SENTRY_DSN; consent (28) + privacy/ToS (30) before any real recording.
+Note: Phase 14's DEC-028 lives on the phase-14 branch / PR #18 (not yet on review-for-main); it lands when PR #18 promotes.
+
+---
+
+## DEC-028 — Phase 14 design (interruption detection model + 4 channels + the immediate track.onended seam + privacy contract)
+
+Type: trade-off (the ledger named the channels; the detection model + implementation shape were mine)
+Context: Phase 14 = interruption detection + multi-channel notification, built headless by the cron on top of Phase 13. The plan listed the four channels (chime, tab-flash, Web Push, banner) + "branding-only" but not the detection policy or wiring. Built to OPEN PR #18 (base `recording-staging`); NOT merged — device gate pending.
+Chosen:
+  - DETECTION POLICY: an interruption = recorder status `error`, OR `recovering` with a DEAD track (`heartbeat.trackLive===false` — the audio session was grabbed / mic revoked). A `recovering` state with a LIVE track (a Tier-1 recorder hiccup) is deliberately NOT surfaced as an interruption — it auto-restarts within a beat and alarming the rep would cry wolf. (The existing health UI still shows those.)
+  - IMMEDIATE SEAM: added an OPTIONAL `onTrackEnded` callback to SegmentedRecorder + an OPTIONAL `MicStream.onEnded?` method (BrowserMicStream attaches `track.addEventListener('ended', …, {once:true})`), wired in `start()` + the Tier-2/3 re-acquire. Gives a 0–5s-faster alert than the heartbeat; OPTIONAL so Phase 13's fake-engine tests are untouched and the heartbeat stays the reliable fallback. A `trackEnded` latch in the monitor holds the alert raised until a genuinely-healthy recording beat (or clean stop) confirms recovery.
+  - ARMED GATE: the monitor only alerts after it has seen a `recording` status, so an initial failure (denied mic → requesting→error, never recorded) raises NO alert (nothing to interrupt yet).
+  - PRIVACY CONTRACT (hard): every lock-screen/notification surface is BRANDING-ONLY — Web Push payload `{title:"Critiq", body:"Critiq needs your attention."}`, tab title `⚠ Critiq needs you`, SW `showNotification` — never the word "recording", never call content. The in-app banner (behind auth, on the recording screen) is allowed to be descriptive. Unit-asserted.
+  - WEB PUSH ARCHITECTURE: client-detected → the monitor's push channel POSTs `/api/push/notify` → server sends a branding-only push to the rep's OWN devices (to reach a backgrounded PWA where the in-page channels can't run). `push_subscriptions` table (migration 0006, additive, dev Neon). VAPID keypair GENERATED by the cron → surfaced in the PR for Felix to add to Vercel; the build/runtime tolerate the keys' absence (push cleanly no-ops; the other 3 channels still work). Honest limit: only fires while the page still gets a tick; a durable server-side gap-detector that can push to a fully-suspended device is a later phase (this wires the path it'll reuse).
+  - CHIME: singleton AudioContext created/resumed inside the Start gesture (iOS-unlock); honest limit — a LOCKED iPhone screen suspends Web Audio, so that case is Web Push's job.
+  - Injectable channels + pure predicate → deterministic unit tests (verify-phase14.ts 32/32) with fake channels + a fake clock + a fake document.
+Review: high-effort `/code-review` (7 finder angles + verify). P1s FIXED: chime gesture-unlock + per-session leak; push channel gated on `Notification.permission==='granted'` (no hot-path POST when not enabled); `isPushConfigured` de-memoized (warm-lambda VAPID-rotation safety); `/api/push/notify` cross-site (`Sec-Fetch-Site`) guard; dead `last_used_at` now stamped; dead `support` field removed.
+Iterability: high (detection policy localized in deriveInterrupted; channels injectable; params are constants).
+Trade-off flag: YES — DEFERRED P2s for Felix's review: (1) `trackEnded` re-edge flap is ≤5s and self-correcting but could be folded into the heartbeat predicate; (2) a lock-screen Web Push lingers after a brief auto-recovery (no SW-close on resume) — product call; (3) tab-title restores a stale snapshot if `document.title` changes mid-flash (single-page lab, low prob). DEVICE GATE (Felix, iPhone) is the real proof.
+
 ---
 
 ## End-of-build summary
