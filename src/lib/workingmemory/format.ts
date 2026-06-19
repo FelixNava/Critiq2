@@ -63,6 +63,15 @@ export function formatRepProfileFromSummary(summary: RepSummary): string | null 
 }
 
 /**
+ * The header that introduces the account semantic-summary block. Shared so the Phase-23
+ * formatted block (formatAccountSummaryBlock) and the pre-consolidation fallback in
+ * forConsumer.ts render the SAME header for the same account — no drift between the two paths.
+ */
+export function accountSummaryHeader(accountName: string): string {
+  return `WHAT CRITIQ KNOWS ABOUT THIS ACCOUNT (${accountName}) — shared running intelligence:`;
+}
+
+/**
  * Format the account semantic summary (account_summaries, Phase 23) into the account block.
  * Returns null when there's no usable narrative/facts. Rep-agnostic by construction (the
  * stored summary carries no rep identity). The source-debrief ids are intentionally NOT
@@ -77,9 +86,7 @@ export function formatAccountSummaryBlock(
   const facts = coerceAttributed(summary.facts);
   if (!narrative && !headline && facts.length === 0) return null;
 
-  const lines: string[] = [
-    `WHAT CRITIQ KNOWS ABOUT THIS ACCOUNT (${accountName}) — shared running intelligence:`,
-  ];
+  const lines: string[] = [accountSummaryHeader(accountName)];
   if (headline) lines.push("", headline);
   if (narrative) lines.push("", narrative);
   if (facts.length > 0) {

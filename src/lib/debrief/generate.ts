@@ -8,7 +8,6 @@
 import { getAccountForUser } from "@/lib/accounts";
 import { formatCacheUsage, type CacheUsageSummary } from "@/lib/ai/cache";
 import { AnthropicDebriefGenerator } from "./anthropic";
-import { buildRepProfileBlock } from "@/lib/precall/repProfile";
 import { buildConsumerWorkingMemory } from "@/lib/workingmemory/forConsumer";
 import { hasNarrative } from "./reporter";
 import { createDebrief, failDebrief, finishDebrief } from "./store";
@@ -51,24 +50,25 @@ export async function generateDebriefForAccount(
 
   // Phase 35c — wire in working memory (richer rep profile + the volatile memory context).
   // The memory context is BACKGROUND for organizing the report; the reporter's honesty rules
-  // still bind the recap to what the rep reported for THIS call.
-  const wm = await buildConsumerWorkingMemory(input.userId, input.accountId);
-  const repProfile = wm?.repProfile ?? (await buildRepProfileBlock(input.userId));
-  if (wm) {
-    console.log(
-      `[debrief] wm rep=${wm.repProfileSource} ` +
-        `raw=${wm.manifest.rawInteractionsIncluded} ` +
-        `ctxChars=${wm.memoryContext.length} within=${wm.manifest.withinBudget}`,
-    );
-  }
+  // still bind the recap to what the rep reported for THIS call. The rep is already authorized
+  // (account check above), so the account is passed in.
+  const wm = await buildConsumerWorkingMemory(input.userId, input.accountId, {
+    name: account.name,
+    summary: account.summary,
+  });
+  console.log(
+    `[debrief] wm rep=${wm.repProfileSource} ` +
+      `raw=${wm.manifest.rawInteractionsIncluded} ` +
+      `ctxChars=${wm.memoryContext.length} within=${wm.manifest.withinBudget}`,
+  );
 
   const context: DebriefContext = {
     accountName: account.name,
     accountStage: account.stage,
     accountSummary: account.summary,
-    memoryContext: wm?.memoryContext ?? null,
+    memoryContext: wm.memoryContext,
     report: input.report,
-    repProfile,
+    repProfile: wm.repProfile,
   };
 
   const debriefId = await createDebrief(

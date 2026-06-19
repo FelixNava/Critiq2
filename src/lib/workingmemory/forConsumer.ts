@@ -23,16 +23,20 @@
  * (buildGroundedSources), so injecting it never causes a false redaction. Only coaching runs the
  * guard; the other three consumers have no guard wired in (unchanged here).
  *
- * SAFETY: returns null only when the rep isn't assigned to the account (the access boundary — the
- * caller keeps its prior behaviour). When the account is cold (no summary, no interactions, no
- * context) memoryContext is "" and renderAccountKnowledge reproduces the consumer's pre-35c
- * prompt byte-for-byte. Reads only; writes nothing; no schema change.
+ * ACCESS BOUNDARY: the CALLER must have already authorized the rep for this (userId, accountId)
+ * pair — every consumer's generate() calls getAccountForUser first and returns 'not-found' when
+ * the rep isn't assigned, and it holds the resulting account. So this adapter takes the account's
+ * name + summary as input rather than re-fetching the row (and its contacts) a second time. The
+ * underlying readers are themselves rep-scoped (raw interactions) or shared-account reads on an
+ * already-authorized account. When the account is cold (no summary, no interactions, no context)
+ * memoryContext is "" and renderAccountKnowledge reproduces the consumer's pre-35c prompt
+ * byte-for-byte. Reads only; writes nothing; no schema change.
  */
 
-import { getAccountForUser } from "@/lib/accounts";
 import { getAccountContext, getRepContext } from "@/lib/context";
 import { assembleWorkingMemory } from "./assemble";
 import { DEFAULT_MAX_RAW_INTERACTIONS } from "./budget";
+import { accountSummaryHeader } from "./format";
 import {
   getRecentRawInteractionsForAccount,
   resolveAccountSummary,
@@ -48,6 +52,13 @@ import type { RepProfileSource, WorkingMemoryManifest } from "./types";
  * carried; if a rep types a pathological wall of text the consumer's model context still bounds it.
  */
 export const CONSUMER_MEMORY_BUDGET = 5000;
+
+/** The already-authorized account the caller holds (from its own getAccountForUser gate). */
+export interface ConsumerAccount {
+  name: string;
+  /** account_records.summary — the shared running narrative, or null at cold start. */
+  summary: string | null;
+}
 
 /** What a consumer needs to wire working memory into its prompt. */
 export interface ConsumerWorkingMemory {
@@ -88,17 +99,15 @@ function renderContextBlocks(
 }
 
 /**
- * Build the working-memory pieces a consumer injects, for a rep working an account. Returns null
- * when the rep isn't assigned to the account (the access boundary). Independent reads run together.
+ * Build the working-memory pieces a consumer injects, for a rep working an account the caller has
+ * ALREADY authorized (see the access-boundary note above). Independent reads run together.
  */
 export async function buildConsumerWorkingMemory(
   userId: string,
   accountId: string,
+  account: ConsumerAccount,
   options: { maxRawInteractions?: number; tokenBudget?: number } = {},
-): Promise<ConsumerWorkingMemory | null> {
-  const account = await getAccountForUser(userId, accountId);
-  if (!account) return null;
-
+): Promise<ConsumerWorkingMemory> {
   const maxRaw = options.maxRawInteractions ?? DEFAULT_MAX_RAW_INTERACTIONS;
 
   const [repProfile, accountSummaryBlock, raw, repCtx, accountCtx] =
@@ -117,7 +126,7 @@ export async function buildConsumerWorkingMemory(
   const accountSummary =
     accountSummaryBlock ??
     (account.summary?.trim()
-      ? `WHAT CRITIQ KNOWS ABOUT THIS ACCOUNT (${account.name}) — shared running intelligence:\n\n${account.summary.trim()}`
+      ? `${accountSummaryHeader(account.name)}\n\n${account.summary.trim()}`
       : null);
 
   // Assemble the budgeted volatile tail (account summary + raw interactions). methodology + rep

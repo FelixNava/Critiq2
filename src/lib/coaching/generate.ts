@@ -17,7 +17,6 @@ import { getDebriefForUser } from "@/lib/debrief/store";
 import type {
   DebriefObservation,
 } from "@/lib/debrief/types";
-import { buildRepProfileBlock } from "@/lib/precall/repProfile";
 import { buildConsumerWorkingMemory } from "@/lib/workingmemory/forConsumer";
 import { getScoreForRecording } from "@/lib/scoring/store";
 import { AnthropicGuardVerifier } from "@/lib/hallucinationguard/anthropic";
@@ -134,22 +133,23 @@ export async function generateCoachingForDebrief(
   // Phase 35c — wire in working memory (richer rep profile + the volatile memory context).
   // Every reference the memory context can introduce is already in the Phase 26 grounded
   // corpus (buildGroundedSources reads the same tiers + context), so the guard below never
-  // falsely redacts it.
-  const wm = await buildConsumerWorkingMemory(input.userId, input.accountId);
-  const repProfile = wm?.repProfile ?? (await buildRepProfileBlock(input.userId));
-  if (wm) {
-    console.log(
-      `[coaching] wm rep=${wm.repProfileSource} ` +
-        `raw=${wm.manifest.rawInteractionsIncluded} ` +
-        `ctxChars=${wm.memoryContext.length} within=${wm.manifest.withinBudget}`,
-    );
-  }
+  // falsely redacts it. The rep is already authorized (account check above), so the account
+  // is passed in.
+  const wm = await buildConsumerWorkingMemory(input.userId, input.accountId, {
+    name: account.name,
+    summary: account.summary,
+  });
+  console.log(
+    `[coaching] wm rep=${wm.repProfileSource} ` +
+      `raw=${wm.manifest.rawInteractionsIncluded} ` +
+      `ctxChars=${wm.memoryContext.length} within=${wm.manifest.withinBudget}`,
+  );
 
   const context: CoachingContext = {
     accountName: account.name,
     accountStage: account.stage,
     accountSummary: account.summary,
-    memoryContext: wm?.memoryContext ?? null,
+    memoryContext: wm.memoryContext,
     debrief: {
       recap: debrief.recap,
       observations: (debrief.observations as DebriefObservation[]) ?? [],
@@ -158,7 +158,7 @@ export async function generateCoachingForDebrief(
       summary: debrief.summary,
     },
     score: scoreInput,
-    repProfile,
+    repProfile: wm.repProfile,
   };
 
   const coachingId = await createCoaching(
