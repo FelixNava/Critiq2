@@ -14,9 +14,26 @@ BUILD_TOTAL_TOKEN_BUDGET=4000000
 BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
-PHASE_CURRENT=34d/wire-recording-coaching
-PHASE_CURRENT_STATUS=building
+PHASE_CURRENT=
+PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
+# 2026-06-19 (critiq-fullauto-34-35 firing #2): Phase 34d WIRE recording -> coaching
+# DONE -> merged review-for-main (PR #34, squash df96913). NO schema change (every
+# linkage column pre-existed). Pre-warm pipeline (src/lib/recording/process.ts:
+# processRecordingForScore chains idempotent transcription->scoring, never throws)
+# fired post-response (after()) on assign of a COMPLETED recording to a non-null
+# account (assign-account route) so the score is ready by debrief time; transcribe/
+# score crons stay the net. Debrief route accepts optional recordingId validated by
+# the access boundary (rep owns AND assigned to THIS account; invalid->400).
+# listAssignedRecordingsForAccount + optional "Was this call recorded?" picker in
+# DebriefPanel (renders only when the account has recordings; selection persists).
+# Shared inbox formatters de-duped into recordingUi. Value path CLOSED: coaching
+# reads the score for debrief.recordingId + snapshots it (Phase 21 path; Phase 26
+# guard intact). typecheck+build clean; verify-phase20/21/25/26 no-regression +
+# verify-phase34d 27/27; high-effort code-review (3 fixes in-branch); /design-critique
+# (1 P1 fixed). DEC-046..048. Phase 34 now FULLY DONE (34a/b/c + 34d). NEXT = Phase 35.
+# FLAGGED (UI_VERIFY_PENDING=34d): live UI drive + on-device capture->assign->score->
+# coach pass; AI quality of recording-driven coaching (Felix + expert coach).
 # 2026-06-19 (critiq-fullauto-34-35 firing #1): Phase 34 ADDITIVE parts 34a/b/c
 # DONE -> merged review-for-main (PR #33, squash 0e55638). Quick-record (/record +
 # RecordingPanel reusing useRecorder) + recordings inbox (/recordings,
@@ -56,7 +73,7 @@ PHASE_CURRENT_PR=
 # critiq-fullauto-34-35 builds Phase 34 (quick-record + recordings inbox + manual assign + wire
 # recording→coaching) then Phase 35 (add context + import transcripts + wire working-memory→coaching)
 # → review-for-main, then self-stops. Specs in docs/PHASE_LEDGER.md (Phase 34/35 entries).
-PHASE_NEXT=34d/wire-recording-coaching
+PHASE_NEXT=35/add-context-import-wire-working-memory
 # Phase 33 DONE 2026-06-18 (aggressive-auto, relaxed gate + mandatory /design-critique):
 # Marketing Landing Redesign — replaced the Phase 4 landing at `/` with the Felix-approved
 # cinematic prototype, ported into Next.js 16 + React (one "use client" LandingPage component
@@ -294,8 +311,8 @@ PHASE_NEXT=34d/wire-recording-coaching
 # block ~929 tok sits under the Sonnet 1024 cacheable floor on its own (caches once per-rep layer
 # extends the prefix); confirm the rep-private raw scope is intended; the ~4-chars/tok estimate is a
 # heuristic not a tokenizer; WIRING the consumers onto the builder is the real payoff + is NOT done.
-PHASE_LAST_COMPLETED=34abc/quick-record-inbox-assign
-PHASE_LAST_COMPLETED_AT=2026-06-19T11:30:00-04:00
+PHASE_LAST_COMPLETED=34d/wire-recording-coaching
+PHASE_LAST_COMPLETED_AT=2026-06-19T13:05:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -337,7 +354,7 @@ ENV_READY=true
 # CLEARED 2026-06-18: Phase 14 device gate PASSED (notifications on iPhone; coverage
 # session b47ea693 ~91%, gap_ms=10005 persisted). VAPID + Deepgram keys provisioned.
 # Phase 14 merged (PR #18, c517ce7) + promoted to review-for-main.
-UI_VERIFY_PENDING=
+UI_VERIFY_PENDING=34d
 
 # --- SESSION HEARTBEAT ---
 # Phase 21 DONE 2026-06-18 (aggressive-auto run, scheduled task critiq-fullauto-
@@ -407,7 +424,7 @@ UI_VERIFY_PENDING=
 # expert coach with sample outputs in the review packet — NOT gated. 🎯 SCOPE COMPLETE: the marketing
 # landing redesign + Phase 25 + Phase 26 are ALL built+merged → the scheduled task self-disables
 # (update_scheduled_task enabled=false). Nothing further to build in this task's scope.
-SESSION_LAST_HEARTBEAT=2026-06-19T12:45:00-04:00
+SESSION_LAST_HEARTBEAT=2026-06-19T13:05:00-04:00
 SESSION_TOKEN_BUDGET_USED=700000
 SESSION_ID=fullauto-34-35-phase34abc-quick-record-2026-06-19
 

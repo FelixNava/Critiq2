@@ -664,6 +664,38 @@ Rationale: preserves the cold-start hierarchy; avoids two competing primary CTAs
 Iterability: high.
 Trade-off flag: no.
 
+## DEC-046 — Pre-warm the score on assign via a post-response `after()` trigger (cron remains the net)
+Phase: 34d/wire-recording-coaching
+Date: 2026-06-19 (scheduled task `critiq-fullauto-34-35`, firing #2)
+Type: trade-off
+Context: 34d must get a recording transcribed+scored so the score is ready by the time the rep debriefs. The transcribe/score crons already process ALL completed recordings, so a trigger is a latency optimization, not a new source of truth. Where to fire it: synchronously in the assign request (rep waits ~84s+) vs. post-response vs. cron-only.
+Chosen: a new `processRecordingForScore` (chains the two idempotent runners) fired via Vercel `after()` in the assign-account route, only when a **completed** recording is assigned to a **non-null** account. The response returns immediately; the runners swallow their own errors; the crons stay the reliability net.
+Alternatives: synchronous in-request (rejected — makes assign a multi-minute wait); cron-only (rejected — the score wouldn't be ready for a rep who assigns then immediately debriefs).
+Rationale: best latency/safety balance; zero added blocking work on the assign path; fully idempotent so a duplicate/cron overlap is harmless.
+Iterability: high (it's one `after()` callback; removing it falls back to cron-only with no data change).
+Trade-off flag: minor — on a rep assigning an already-scored recording the pipeline re-enters and the idempotent runners no-op (two cheap DB checks, no Deepgram/Claude); judged not worth a pre-schedule guard query.
+
+## DEC-047 — Link the recording at DEBRIEF time (not at coaching time), gated by the assignment access boundary
+Phase: 34d/wire-recording-coaching
+Date: 2026-06-19
+Type: obvious
+Context: The coaching generator already snapshots the score when `debrief.recordingId` is set — the only gap was that nothing ever set it. Where should the rep choose the recording: on the debrief, or on the coaching step?
+Chosen: accept an optional `recordingId` on `POST /api/accounts/[id]/debrief`, validated as **rep-owned AND assigned to THIS account** (an explicitly-supplied-but-invalid id ⇒ 400; omitting it keeps the un-recorded path unchanged). Coaching then consumes it unchanged.
+Rationale: the debrief is where the rep is recounting the specific call, so it's the natural place to say "this is that call"; the assignment is already the access boundary, and re-using it guarantees the snapshotted score belongs to this account's call. The un-recorded flow (most beta debriefs) is byte-for-byte unchanged → no regression.
+Iterability: high.
+Trade-off flag: no.
+
+## DEC-048 — The debrief picker lists ONLY recordings already assigned to this account
+Phase: 34d/wire-recording-coaching
+Date: 2026-06-19
+Type: trade-off
+Context: The "Was this call recorded?" picker could (a) list only recordings already assigned to the account, or (b) also surface the rep's unassigned recordings and assign-on-attach.
+Chosen: (a) — `listAssignedRecordingsForAccount` returns only this account's recordings; assignment stays the inbox's job (34c). The picker renders only when that list is non-empty, so a cold-start rep sees the un-recorded form untouched.
+Alternatives: (b) assign-on-attach (rejected this firing — broadens the access boundary into the debrief route and muddies "the assignment IS the access boundary"; it's the deferred Phase 36 auto-detect direction).
+Rationale: keeps the access model clean and the surface small; matches the locked "manual-assign first" decision.
+Iterability: high.
+Trade-off flag: YES — a rep who recorded but hasn't assigned won't see it on the debrief; confirm that's the right flow vs. an inline assign-on-attach (flagged for Felix's device pass).
+
 ---
 
 ## End-of-build summary
