@@ -1,17 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import { useRecorder } from "@/hooks/useRecorder";
 import { usePushAlerts } from "@/hooks/usePushAlerts";
-import {
-  buttonClass,
-  cardClass,
-  secondaryButtonClass,
-} from "@/components/onboarding/ui";
+import { buttonClass, secondaryButtonClass } from "@/components/onboarding/ui";
 import {
   toneClass,
   statusLabel,
-  chunkTone,
   keepAliveTone,
   keepAliveLabel,
   heartbeatTone,
@@ -19,12 +14,19 @@ import {
   fmtAge,
   recoveryTone,
   recoveryLabel,
-  fmtBytes,
   KEEPALIVE_ROWS,
   Row,
 } from "@/components/recording/recordingUi";
 
-export default function RecordingLabPanel() {
+/**
+ * Rep-facing capture surface (Phase 34a). Reuses the same useRecorder engine the
+ * dev Recording Lab drives — segmented capture, keep-alive, tiered recovery,
+ * interruption alerts — but with rep copy (no self-test, no "this is only a
+ * check"). A quick-record always starts UNASSIGNED; once it's saved the rep
+ * assigns it to an account from their recordings, which is where the coaching
+ * comes from.
+ */
+export default function RecordingPanel() {
   const {
     status,
     recordingId,
@@ -46,10 +48,8 @@ export default function RecordingLabPanel() {
     start,
     stop,
     discard,
-    runSelfTest,
   } = useRecorder();
   const push = usePushAlerts();
-  const transcribe = useTranscribe(recordingId);
 
   const isRecording = status === "recording" || status === "recovering";
   const s = statusLabel(status);
@@ -57,11 +57,14 @@ export default function RecordingLabPanel() {
   const showHealth = segment.count > 0 || isRecording;
   const coveragePct = Math.round(coverage * 100);
   const gapSeconds = Math.round(gapMs / 1000);
+  // A finished capture the rep can now act on (saved at least one clip and isn't
+  // mid-session). Drives the "saved — assign it" hand-off to the recordings inbox.
+  const saved = !isRecording && !captureLost && uploaded > 0;
 
   return (
-    <div className={cardClass}>
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-base font-semibold text-slate-900">Audio capture</h2>
+        <h2 className="text-base font-semibold text-slate-900">Record a call</h2>
         <span
           className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${toneClass[s.tone]}`}
         >
@@ -69,18 +72,24 @@ export default function RecordingLabPanel() {
         </span>
       </div>
       <p className="mt-1 text-sm text-slate-500">
-        Confirm this device can capture audio and save it reliably. Nothing here
-        is part of a live call; it is only a check.
+        Capture a conversation and Critiq turns it into coaching. You can record
+        now and assign it to an account afterward.
       </p>
 
-      <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm ring-1 ring-amber-200">
+      <div className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm ring-1 ring-slate-200">
+        <p className="font-medium text-slate-700">
+          Make sure everyone on the call knows they&apos;re being recorded.
+        </p>
+      </div>
+
+      <div className="mt-3 rounded-lg bg-amber-50 px-4 py-3 text-sm ring-1 ring-amber-200">
         <p className="font-semibold text-amber-900">
           On a phone, keep Critiq open with the screen on
         </p>
         <p className="mt-0.5 text-amber-800">
           Phones pause the microphone the moment you lock the screen or switch
-          apps, so anything said while you&apos;re away isn&apos;t recorded. For a
-          full, reliable recording, use a laptop.
+          apps, so anything said while you&apos;re away isn&apos;t recorded. For
+          a full, reliable recording, use a laptop.
         </p>
       </div>
 
@@ -128,8 +137,8 @@ export default function RecordingLabPanel() {
         >
           <p className="font-semibold text-red-800">Lost the microphone</p>
           <p className="mt-0.5 text-red-700">
-            We couldn&apos;t reconnect. We&apos;re still trying in the background —
-            recording resumes on its own if the mic frees up. Keep what
+            We couldn&apos;t reconnect. We&apos;re still trying in the background
+            — recording resumes on its own if the mic frees up. Keep what
             you&apos;ve recorded so far?
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -137,7 +146,7 @@ export default function RecordingLabPanel() {
               type="button"
               onClick={() => void stop()}
               disabled={busy}
-              className={buttonClass}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50"
             >
               Keep &amp; stop
             </button>
@@ -145,7 +154,7 @@ export default function RecordingLabPanel() {
               type="button"
               onClick={() => void discard()}
               disabled={busy}
-              className={secondaryButtonClass}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
             >
               Discard
             </button>
@@ -153,8 +162,26 @@ export default function RecordingLabPanel() {
         </div>
       )}
 
+      {/* Saved hand-off → assign it to an account in the recordings inbox. */}
+      {saved && (
+        <div className="mt-6 rounded-lg bg-emerald-50 px-4 py-3 text-sm ring-1 ring-emerald-200">
+          <p className="font-semibold text-emerald-900">
+            Recording saved{uploaded > 0 ? ` · ${uploaded} clip${uploaded === 1 ? "" : "s"}` : ""}
+          </p>
+          <p className="mt-0.5 text-emerald-800">
+            Assign it to an account to turn it into coaching.
+          </p>
+          <Link
+            href="/recordings"
+            className="mt-3 inline-flex items-center gap-1 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+          >
+            Go to your recordings →
+          </Link>
+        </div>
+      )}
+
       {!captureLost && (
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <div className="mt-6">
           {isRecording ? (
             <button
               type="button"
@@ -162,7 +189,7 @@ export default function RecordingLabPanel() {
               disabled={busy}
               className={buttonClass}
             >
-              Stop
+              Stop recording
             </button>
           ) : (
             <button
@@ -171,23 +198,14 @@ export default function RecordingLabPanel() {
               disabled={busy}
               className={buttonClass}
             >
-              Start recording
+              {saved ? "Record another" : "Start recording"}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => void runSelfTest()}
-            disabled={busy || isRecording}
-            className={secondaryButtonClass}
-          >
-            Run upload self-test
-          </button>
         </div>
       )}
       <p className="mt-2 text-xs text-slate-400">
-        Start recording asks for your microphone. The self-test saves a couple of
-        placeholder clips instead, so you can check that uploading works without a
-        mic. Long sessions are saved in ~10-minute parts so nothing is lost.
+        Starting asks for your microphone. Long sessions are saved in
+        ~10-minute parts so nothing is lost.
       </p>
 
       {error && (
@@ -237,43 +255,16 @@ export default function RecordingLabPanel() {
         </div>
       )}
 
-      <div className="mt-6">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-slate-900">Clips</p>
-          <p className="text-xs text-slate-500">
-            {uploaded} saved{pending > 0 ? ` · ${pending} waiting` : ""}
-          </p>
+      {(isRecording || pending > 0) && (
+        <div className="mt-6">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-slate-900">Clips</p>
+            <p className="text-xs text-slate-500">
+              {uploaded} saved{pending > 0 ? ` · ${pending} waiting` : ""}
+            </p>
+          </div>
         </div>
-        {chunks.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-400">
-            No clips yet. Start a recording or run the self-test.
-          </p>
-        ) : (
-          <ul className="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-200">
-            {chunks.map((c) => {
-              const t = chunkTone(c.state);
-              return (
-                <li
-                  key={c.index}
-                  className="flex items-center justify-between gap-4 px-4 py-2.5"
-                >
-                  <span className="text-sm text-slate-700">
-                    Clip {c.index + 1}
-                    <span className="ml-2 text-xs text-slate-400">
-                      {fmtBytes(c.sizeBytes)}
-                    </span>
-                  </span>
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${toneClass[t.tone]}`}
-                  >
-                    {t.label}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+      )}
 
       <div className="mt-6">
         <p className="text-sm font-semibold text-slate-900">While recording</p>
@@ -281,7 +272,14 @@ export default function RecordingLabPanel() {
           {KEEPALIVE_ROWS.map((row) => {
             const value = keepAlive[row.key];
             const tone = keepAliveTone(value);
-            return <Row key={row.key} title={row.title} value={keepAliveLabel(value)} tone={tone} />;
+            return (
+              <Row
+                key={row.key}
+                title={row.title}
+                value={keepAliveLabel(value)}
+                tone={tone}
+              />
+            );
           })}
         </div>
       </div>
@@ -301,9 +299,9 @@ export default function RecordingLabPanel() {
         </div>
         <p className="mt-1 text-sm text-slate-500">
           If you leave Critiq while recording, capture pauses — so it plays a
-          chime and shows a banner to tell you to come back. Turn on notifications
-          for a best-effort lock-screen nudge (a fully locked phone can&apos;t
-          always be reached).
+          chime and shows a banner to tell you to come back. Turn on
+          notifications for a best-effort lock-screen nudge (a fully locked phone
+          can&apos;t always be reached).
         </p>
 
         {push.state === "checking" && (
@@ -344,68 +342,14 @@ export default function RecordingLabPanel() {
         )}
         {push.state === "unsupported" && (
           <p className="mt-3 text-sm text-slate-500">
-            This browser can&apos;t show lock-screen alerts. The chime, tab flash,
-            and on-screen banner still work.
+            This browser can&apos;t show lock-screen alerts. The chime, tab
+            flash, and on-screen banner still work.
           </p>
         )}
         {push.message && (
           <p className="mt-2 text-xs text-slate-500">{push.message}</p>
         )}
       </div>
-
-      {recordingId && !isRecording && uploaded > 0 && (
-        <div className="mt-6 border-t border-slate-100 pt-6">
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-sm font-semibold text-slate-900">Transcript</p>
-            <button
-              type="button"
-              onClick={() => void transcribe.run()}
-              disabled={transcribe.busy}
-              className={secondaryButtonClass}
-            >
-              {transcribe.busy
-                ? "Transcribing…"
-                : transcribe.text != null
-                  ? "Re-transcribe"
-                  : "Transcribe"}
-            </button>
-          </div>
-          <p className="mt-1 text-sm text-slate-500">
-            Turn this recording into text. Long recordings are transcribed in
-            parts and stitched together.
-          </p>
-          {transcribe.error && (
-            <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
-              {transcribe.error}
-            </p>
-          )}
-          {transcribe.transcriptStatus === "partial" && (
-            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 ring-1 ring-amber-200">
-              Part of this recording couldn&apos;t be transcribed — the text
-              below is incomplete.
-            </p>
-          )}
-          {transcribe.text != null && (
-            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-              {transcribe.text.trim() ? (
-                <p className="whitespace-pre-wrap text-sm text-slate-700">
-                  {transcribe.text}
-                </p>
-              ) : transcribe.transcriptStatus === "partial" ||
-                transcribe.transcriptStatus === "failed" ? (
-                <p className="text-sm text-slate-500">
-                  This recording couldn&apos;t be transcribed. Try again in a
-                  moment.
-                </p>
-              ) : (
-                <p className="text-sm text-slate-400">
-                  No speech was detected in this recording.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
 
       {recordingId && (
         <p className="mt-4 text-xs text-slate-300">
@@ -414,43 +358,4 @@ export default function RecordingLabPanel() {
       )}
     </div>
   );
-}
-
-interface TranscriptApiResponse {
-  error?: string;
-  transcript?: {
-    transcript?: { text?: string | null; status?: string | null };
-  };
-}
-
-/** Minimal lab-only hook: POST the transcribe trigger and surface the text. */
-function useTranscribe(recordingId: string | null) {
-  const [busy, setBusy] = useState(false);
-  const [text, setText] = useState<string | null>(null);
-  const [transcriptStatus, setTranscriptStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function run() {
-    if (!recordingId || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/recording/${recordingId}/transcribe`, {
-        method: "POST",
-      });
-      const data = (await res.json().catch(() => ({}))) as TranscriptApiResponse;
-      if (!res.ok) {
-        setError(data.error ?? "Couldn't transcribe this recording.");
-        return;
-      }
-      setText(data.transcript?.transcript?.text ?? "");
-      setTranscriptStatus(data.transcript?.transcript?.status ?? null);
-    } catch {
-      setError("Couldn't reach the server. Try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return { busy, text, transcriptStatus, error, run };
 }

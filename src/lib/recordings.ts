@@ -8,9 +8,16 @@
  * best-effort onUploadCompleted callback without double-inserting.
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { recordings, recordingChunks, type Recording } from "@/db/schema";
+import {
+  recordings,
+  recordingChunks,
+  recordingTranscripts,
+  callScores,
+  accountsTbl,
+  type Recording,
+} from "@/db/schema";
 
 export const RECORDING_STATUSES = [
   "recording",
@@ -100,6 +107,104 @@ export async function recordChunkUploaded(input: {
         uploadedAt: new Date(),
       },
     });
+}
+
+/**
+ * A row in the rep's recordings inbox (Phase 34b). Joins the recording with its
+ * (optional) account name and the derived transcript + score state so the inbox
+ * can show, at a glance, where each capture is in the pipeline without the list
+ * page assembling it. Owner-scoped; the bytes/chunks aren't needed here.
+ */
+export type RecordingListItem = {
+  id: string;
+  title: string | null;
+  status: string;
+  startedAt: Date;
+  durationMs: number | null;
+  gapMs: number | null;
+  gapCount: number | null;
+  chunkCount: number;
+  accountId: string | null;
+  /** Null when unassigned OR the assigned account was soft-deleted. */
+  accountName: string | null;
+  transcriptStatus: string | null;
+  scoreStatus: string | null;
+  overallScore: number | null;
+};
+
+/**
+ * List a rep's recordings (newest first), with the assigned account name and the
+ * transcript/score state folded in. Owner-scoped (the rep owns the recording)
+ * and excludes soft-deleted/discarded captures. The account join is guarded by
+ * the account's own soft-delete so a deleted account reads as "unassigned"
+ * rather than surfacing a dangling name. The transcript + score tables are
+ * UNIQUE per recording, so the LEFT JOINs never multiply rows.
+ */
+export async function listRecordingsForUser(
+  userId: string,
+): Promise<RecordingListItem[]> {
+  const rows = await db
+    .select({
+      id: recordings.id,
+      title: recordings.title,
+      status: recordings.status,
+      startedAt: recordings.startedAt,
+      durationMs: recordings.durationMs,
+      gapMs: recordings.gapMs,
+      gapCount: recordings.gapCount,
+      chunkCount: recordings.chunkCount,
+      accountId: recordings.accountId,
+      accountName: accountsTbl.name,
+      transcriptStatus: recordingTranscripts.status,
+      scoreStatus: callScores.status,
+      overallScore: callScores.overallScore,
+    })
+    .from(recordings)
+    .leftJoin(
+      accountsTbl,
+      and(
+        eq(accountsTbl.id, recordings.accountId),
+        isNull(accountsTbl.deletedAt),
+      ),
+    )
+    .leftJoin(
+      recordingTranscripts,
+      eq(recordingTranscripts.recordingId, recordings.id),
+    )
+    .leftJoin(callScores, eq(callScores.recordingId, recordings.id))
+    .where(and(eq(recordings.userId, userId), isNull(recordings.deletedAt)))
+    .orderBy(desc(recordings.startedAt));
+
+  return rows;
+}
+
+/**
+ * Manually assign (or re-assign / clear) a recording's account, and optionally
+ * set its title (Phase 34c). Rep-owned (the WHERE scopes to userId), so a rep
+ * can't touch another rep's recording. The CALLER must already have verified the
+ * rep has access to the target account (getAccountForUser) when accountId is
+ * non-null — this layer only enforces recording ownership. Passing accountId
+ * null clears the assignment. Returns false if the recording isn't found/owned.
+ */
+export async function setRecordingAccount(
+  userId: string,
+  recordingId: string,
+  accountId: string | null,
+  title?: string | null,
+): Promise<boolean> {
+  const set: {
+    accountId: string | null;
+    updatedAt: Date;
+    title?: string | null;
+  } = { accountId, updatedAt: new Date() };
+  if (title !== undefined) set.title = title;
+
+  const result = await db
+    .update(recordings)
+    .set(set)
+    .where(and(eq(recordings.id, recordingId), eq(recordings.userId, userId)))
+    .returning({ id: recordings.id });
+  return result.length > 0;
 }
 
 /** Mark a recording finished (rep-owned). Returns false if not found/owned. */

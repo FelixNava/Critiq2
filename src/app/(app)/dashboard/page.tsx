@@ -59,6 +59,26 @@ export default async function DashboardPage() {
           Welcome, {name}.
         </h1>
 
+        {/* Quick capture — record now, assign to an account afterward (Phase 34). */}
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <Link
+            href="/record"
+            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
+          >
+            <span
+              aria-hidden
+              className="inline-block h-2 w-2 rounded-full bg-red-400"
+            />
+            Record a call
+          </Link>
+          <Link
+            href="/recordings"
+            className="text-sm font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
+          >
+            Your recordings
+          </Link>
+        </div>
+
         {/* PRIMARY: the rep's workspace — accounts are where the product lives. */}
         {!hasAccounts ? (
           <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
