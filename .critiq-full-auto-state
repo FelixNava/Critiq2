@@ -14,14 +14,23 @@ BUILD_TOTAL_TOKEN_BUDGET=4000000
 BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
-PHASE_CURRENT=34/quick-record-inbox-assign
-PHASE_CURRENT_STATUS=building
+PHASE_CURRENT=
+PHASE_CURRENT_STATUS=
 PHASE_CURRENT_PR=
-# 2026-06-19 (critiq-fullauto-34-35 firing): building Phase 34 ADDITIVE parts only
-# (34a quick-record + 34b recordings inbox + 34c manual assign-to-account) on
-# branch phase-34/quick-record-inbox-assign off review-for-main. Per the build
-# discipline (additive-first; split a large phase across firings), 34d (WIRE
-# recording -> coaching, the riskiest part) is DEFERRED to the next firing.
+# 2026-06-19 (critiq-fullauto-34-35 firing #1): Phase 34 ADDITIVE parts 34a/b/c
+# DONE -> merged review-for-main (PR #33, squash 0e55638). Quick-record (/record +
+# RecordingPanel reusing useRecorder) + recordings inbox (/recordings,
+# listRecordingsForUser) + manual assign-to-account (POST /api/recording/[id]/
+# assign-account, double-guarded) + nullable recordings.title (mig 0017) + shared
+# recordingUi helpers + mobile-first input/touch classes. typecheck+build clean;
+# verify-phase 12/13/14/15/16/20/21/25/26 all green (no regression); throwaway
+# real-PG probe 16/16; new routes 307->/login. code-review P0/P1:0; /design-critique
+# P0+P1 addressed in-branch. DEC-042..045. FLAGGED for Felix: live authenticated UI
+# eyeball + audio-capture device test (not driven this autonomous run; SSO-walled
+# preview + no connected browser). Per DEC-042 (additive-first build discipline),
+# 34d (WIRE recording->coaching: transcription+scoring on assign, then set
+# call_debriefs.recordingId so Phase 21 coaching consumes the score; keep the
+# un-recorded path + Phase 26 guard intact) is DEFERRED to firing #2.
 # Phase 26 DONE 2026-06-18 (aggressive-auto, relaxed gate + high-effort code review). Hallucination
 # Guard — the conservative pre-output validator (the locked credibility guardrail). src/lib/
 # hallucinationguard/ (types/policy/detect/prompt/anthropic/guard/sources): a PURE LLM-free
@@ -47,7 +56,7 @@ PHASE_CURRENT_PR=
 # critiq-fullauto-34-35 builds Phase 34 (quick-record + recordings inbox + manual assign + wire
 # recording→coaching) then Phase 35 (add context + import transcripts + wire working-memory→coaching)
 # → review-for-main, then self-stops. Specs in docs/PHASE_LEDGER.md (Phase 34/35 entries).
-PHASE_NEXT=34/quick-record-inbox-assign
+PHASE_NEXT=34d/wire-recording-coaching
 # Phase 33 DONE 2026-06-18 (aggressive-auto, relaxed gate + mandatory /design-critique):
 # Marketing Landing Redesign — replaced the Phase 4 landing at `/` with the Felix-approved
 # cinematic prototype, ported into Next.js 16 + React (one "use client" LandingPage component
@@ -285,8 +294,8 @@ PHASE_NEXT=34/quick-record-inbox-assign
 # block ~929 tok sits under the Sonnet 1024 cacheable floor on its own (caches once per-rep layer
 # extends the prefix); confirm the rep-private raw scope is intended; the ~4-chars/tok estimate is a
 # heuristic not a tokenizer; WIRING the consumers onto the builder is the real payoff + is NOT done.
-PHASE_LAST_COMPLETED=26/hallucination-guard
-PHASE_LAST_COMPLETED_AT=2026-06-18T21:30:00-04:00
+PHASE_LAST_COMPLETED=34abc/quick-record-inbox-assign
+PHASE_LAST_COMPLETED_AT=2026-06-19T11:30:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -398,9 +407,9 @@ UI_VERIFY_PENDING=
 # expert coach with sample outputs in the review packet — NOT gated. 🎯 SCOPE COMPLETE: the marketing
 # landing redesign + Phase 25 + Phase 26 are ALL built+merged → the scheduled task self-disables
 # (update_scheduled_task enabled=false). Nothing further to build in this task's scope.
-SESSION_LAST_HEARTBEAT=2026-06-18T21:30:00-04:00
-SESSION_TOKEN_BUDGET_USED=520000
-SESSION_ID=fullauto-aggressive-phase26-hallucination-guard-2026-06-18
+SESSION_LAST_HEARTBEAT=2026-06-19T11:30:00-04:00
+SESSION_TOKEN_BUDGET_USED=700000
+SESSION_ID=fullauto-34-35-phase34abc-quick-record-2026-06-19
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL

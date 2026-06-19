@@ -655,7 +655,13 @@ Drive every flow end-to-end. Document known limitations. Final test pass.
 
 ---
 
-## Phase 34 — Quick-Record from the Dashboard + Recordings Inbox + Manual Account Assignment ☐ Planned
+## Phase 34 — Quick-Record from the Dashboard + Recordings Inbox + Manual Account Assignment ◑ 34a/b/c DONE · 34d PENDING
+
+> **STATUS (2026-06-19, scheduled task `critiq-fullauto-34-35`):** the **additive parts 34a/b/c are DONE → merged `review-for-main`** (PR [#33](https://github.com/FelixNava/Critiq2/pull/33), squash `0e55638`). Per the additive-first build discipline (DEC-042), **34d (WIRE recording → coaching) is DEFERRED to the next firing** — it's the only part touching the live debrief/coaching loop and gets its own reviewable increment. **NEXT = 34d**, then Phase 35.
+>
+> **34a/b/c shipped:** `/record` rep-facing capture surface (`RecordingPanel`, reuses `useRecorder`) + dashboard "Record a call" CTA (gated on `hasAccounts`, DEC-045); `/recordings` inbox (`listRecordingsForUser` — account name + transcript/score pipeline state + duration + coverage, owner-scoped); `POST /api/recording/[id]/assign-account` (double-guarded: recording owner + `getAccountForUser`) + assign/re-assign/clear picker with optional title + inline new-account path; additive nullable `recordings.title` (mig 0017, DEC-043); shared `recordingUi.tsx` helpers (de-dup the lab panel) + mobile-first input/touch classes (DEC-044). Verify: typecheck+build clean; verify-phase 12/13/14/15/16/20/21/25/26 all green (no regression); throwaway real-PG probe 16/16 (inbox joins, assign/clear, title, ownership boundary); new routes 307→/login. Code-review P0/P1:0. /design-critique P0+P1 addressed in-branch. **FLAGGED for Felix:** live authenticated UI eyeball + audio-capture device test (not driven this autonomous run — SSO-walled preview, no connected browser); see PR #33.
+>
+> **34d (next firing) — WIRE recording → coaching:** on assign/on-demand run transcription→scoring (both built), then light up the documented-dormant score path — let a debrief on that account reference the recording (`call_debriefs.recordingId`) so Phase 21 coaching consumes the objective score (the ScoreCard). Recording stays OPTIONAL — never regress the un-recorded debrief→coaching flow; keep the Phase 26 guard in the path; run verify-phase20/21/25/26 before merge.
 
 > Felix-approved 2026-06-19 ("broader plan approved, full auto it"). DECISIONS: manual-assign FIRST (AI auto-detect of the account from the transcript is a deferred fast-follow = Phase 36, NOT in 34); WIRE THE VALUE THROUGH (a recording must visibly drive coaching, not just sit in storage).
 

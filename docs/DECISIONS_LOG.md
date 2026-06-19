@@ -623,6 +623,49 @@ Trade-off flag: YES — (1) the VERIFIER PROMPT + grounding judgment need expert
 
 ---
 
+## DEC-042 — Split Phase 34 across firings: ship the additive parts (34a/b/c) first, defer the recording→coaching wiring (34d)
+Phase: 34/quick-record-inbox-assign
+Date: 2026-06-19 (scheduled task `critiq-fullauto-34-35`)
+Type: obvious
+Context: Phase 34 bundles four sub-parts; 34d (wire a recording's transcript→score into the debrief/coaching loop by setting `call_debriefs.recordingId`) is the only part that touches the LIVE interaction loop, and the task's build discipline explicitly says "ship the additive parts before the wiring; landing the additive part first, then the wiring next firing, is GOOD."
+Chosen: This firing built ONLY 34a (quick-record), 34b (recordings inbox), 34c (manual assign) — all additive (new files + one nullable column) — and merged them. 34d is deferred to the next firing as its own reviewable increment.
+Rationale: smaller, safer, lower-regression PR; the riskiest change (34d) gets its own firing with full regression focus, rather than mixing it with a UI build.
+Iterability: high (34d is the next queued item).
+Trade-off flag: no — directly sanctioned by the task's build discipline.
+
+## DEC-043 — Additive `recordings.title` column for rep-named recordings
+Phase: 34/quick-record-inbox-assign
+Date: 2026-06-19
+Type: obvious
+Context: The inbox would otherwise show bare timestamps; the ledger spec allows "at most a small column (e.g., recording title)."
+Chosen: nullable `recordings.title text` (migration 0017, dev Neon), settable at assign time (optional). Inbox falls back to a date label when absent.
+Rationale: materially better inbox UX; fully additive, zero data-loss, one column.
+Iterability: high.
+Trade-off flag: no.
+
+## DEC-044 — Adopt a mobile-first input/touch convention for the recording surfaces (text-base sm:text-sm + 44px inline buttons)
+Phase: 34/quick-record-inbox-assign
+Date: 2026-06-19
+Type: trade-off
+Context: The repo's shared inputs are uniformly `text-sm` (14px) with no iOS-zoom-dodge convention; reps use these recording surfaces primarily on phones, where a <16px focused input forces a viewport zoom and sub-44px controls are hard to tap (raised by /design-critique P0).
+Chosen: new shared classes in `onboarding/ui.ts` — `mobileInputClass` (`text-base sm:text-sm`, 16px on phones / 14px desktop), `inlineButtonClass`/`inlineSecondaryButtonClass` (`min-h-[44px]` + focus-visible rings) — applied to the new recording controls only. Did NOT retrofit the convention repo-wide.
+Alternatives: keep `text-sm` everywhere (rejected — bad mobile UX on the exact device reps use); retrofit globally now (rejected — out of scope, larger surface/regression risk).
+Rationale: fixes the mobile P0 where it matters without a global refactor.
+Iterability: high (the classes are shared; a global retrofit is a future cleanup).
+Trade-off flag: YES — confirm with Felix whether to adopt `text-base sm:text-sm` for inputs app-wide.
+
+## DEC-045 — Dashboard "Record a call" CTA shown only once the rep has accounts
+Phase: 34/quick-record-inbox-assign
+Date: 2026-06-19
+Type: obvious
+Context: The Phase 27 dashboard deliberately leads a brand-new (zero-account) rep with "add your first account"; a quick-record can't be usefully assigned until an account exists (raised by /design-critique P2).
+Chosen: gate the record-strip on `hasAccounts`; zero-account reps still see only the get-started CTA. `/record` remains reachable by URL.
+Rationale: preserves the cold-start hierarchy; avoids two competing primary CTAs for new users.
+Iterability: high.
+Trade-off flag: no.
+
+---
+
 ## End-of-build summary
 
 This section is filled by the master orchestrator at the end of every Full Auto run. It surfaces:
