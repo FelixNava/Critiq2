@@ -23,6 +23,7 @@
  * the rep did not state. A thin report yields a short honest debrief, not a padded one.
  */
 
+import { renderAccountKnowledge } from "@/lib/workingmemory/consumerPrompt";
 import { OBSERVATION_LENSES, type DebriefContext } from "./types";
 import { assembleReportNarration } from "./reporter";
 
@@ -92,7 +93,6 @@ export function buildOutputFormatSpec(): string {
  * report. Volatile → never cached.
  */
 export function buildUserPrompt(ctx: DebriefContext): string {
-  const summary = ctx.accountSummary?.trim();
   const narration =
     assembleReportNarration(ctx.report) || "(the rep did not add details)";
 
@@ -103,9 +103,7 @@ export function buildUserPrompt(ctx: DebriefContext): string {
     "PIPELINE STAGE: " + ctx.accountStage,
     "",
     "WHAT CRITIQ ALREADY KNOWS ABOUT THIS ACCOUNT (shared running summary):",
-    summary && summary.length > 0
-      ? summary
-      : "(nothing yet — this is a cold-start account with no logged history)",
+    renderAccountKnowledge(ctx.memoryContext, ctx.accountSummary),
     "",
     "THE REP'S REPORT OF THE CALL THEY JUST FINISHED:",
     narration,

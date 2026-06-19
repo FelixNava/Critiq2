@@ -22,6 +22,7 @@
  * 26's hallucination guard). Fewer, sharper priorities beat a padded list.
  */
 
+import { renderAccountKnowledge } from "@/lib/workingmemory/consumerPrompt";
 import { COACHING_LENSES, type CoachingContext } from "./types";
 
 /**
@@ -156,7 +157,6 @@ function renderScore(ctx: CoachingContext): string {
  * Volatile → never cached.
  */
 export function buildUserPrompt(ctx: CoachingContext): string {
-  const summary = ctx.accountSummary?.trim();
   return [
     "Coach the rep on the call below. Return only the structured JSON result.",
     "",
@@ -164,9 +164,7 @@ export function buildUserPrompt(ctx: CoachingContext): string {
     "PIPELINE STAGE: " + ctx.accountStage,
     "",
     "WHAT CRITIQ ALREADY KNOWS ABOUT THIS ACCOUNT (shared running summary):",
-    summary && summary.length > 0
-      ? summary
-      : "(nothing yet — this is a cold-start account with no logged history)",
+    renderAccountKnowledge(ctx.memoryContext, ctx.accountSummary),
     "",
     "THE DEBRIEF OF THE CALL THE REP JUST FINISHED:",
     renderDebrief(ctx),

@@ -4,6 +4,15 @@
  */
 
 export { buildWorkingMemory } from "./build";
+export {
+  buildConsumerWorkingMemory,
+  CONSUMER_MEMORY_BUDGET,
+  type ConsumerWorkingMemory,
+} from "./forConsumer";
+export {
+  renderAccountKnowledge,
+  COLD_START_ACCOUNT_NOTE,
+} from "./consumerPrompt";
 export { assembleWorkingMemory } from "./assemble";
 export { buildMethodologyBlock, METHODOLOGY_BLOCK } from "./methodology";
 export {

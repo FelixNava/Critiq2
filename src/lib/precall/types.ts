@@ -54,8 +54,15 @@ export interface BriefContext {
    * builds the brief AROUND this rather than recommending one.
    */
   repObjective: string | null;
-  /** A stable, formatted rep-profile block (from intake), or null if none. */
+  /** A stable, formatted rep-profile block (learned/intake), or null if none. */
   repProfile: string | null;
+  /**
+   * Phase 35c — the assembled working-memory context (rep + account free-text context + the
+   * account semantic summary + recent raw interactions). When present it supersedes the bare
+   * `accountSummary` in the prompt's account-knowledge section; null/absent keeps the pre-35c
+   * prompt unchanged. Volatile → never cached.
+   */
+  memoryContext?: string | null;
 }
 
 /** A generator that turns a BriefContext into a BriefResult (DI seam for tests). */

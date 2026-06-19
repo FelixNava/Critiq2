@@ -17,7 +17,7 @@ import {
   resolveObjectiveMode,
   type ObjectiveMode,
 } from "./objective";
-import { buildRepProfileBlock } from "./repProfile";
+import { buildConsumerWorkingMemory } from "@/lib/workingmemory/forConsumer";
 import {
   createBrief,
   failBrief,
@@ -64,17 +64,29 @@ export async function generateBriefForAccount(
   const interactionNumber = nextInteractionNumber(priorInteractions);
   const mode = resolveObjectiveMode(interactionNumber);
 
-  const repProfile = await buildRepProfileBlock(input.userId);
+  // Phase 35c — assemble working memory (richer rep profile + the volatile memory context:
+  // rep/account free-text context + account summary + recent raw interactions). The rep is
+  // already authorized (account check above), so the account is passed in (no re-fetch).
+  const wm = await buildConsumerWorkingMemory(input.userId, input.accountId, {
+    name: account.name,
+    summary: account.summary,
+  });
+  console.log(
+    `[precall] wm rep=${wm.repProfileSource} ` +
+      `raw=${wm.manifest.rawInteractionsIncluded} ` +
+      `ctxChars=${wm.memoryContext.length} within=${wm.manifest.withinBudget}`,
+  );
 
   const context: BriefContext = {
     accountName: account.name,
     accountStage: account.stage,
     accountSummary: account.summary,
+    memoryContext: wm.memoryContext,
     narration: input.narration,
     interactionNumber,
     objectiveMode: mode,
     repObjective: mode === "rep" ? input.repObjective : null,
-    repProfile,
+    repProfile: wm.repProfile,
   };
 
   const briefId = await createBrief(
