@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { auth } from "@/auth";
 import { getAccountForUser } from "@/lib/accounts";
+import { getRecordingForUser } from "@/lib/recordings";
 import { generateDebriefForAccount } from "@/lib/debrief/generate";
 import { hasNarrative, normalizeReport } from "@/lib/debrief/reporter";
 import {
@@ -59,10 +60,31 @@ export async function POST(
     );
   }
 
+  // Phase 34d — optionally link the recorded call. When the rep attaches a
+  // recording, the coaching step (Phase 21) consumes its objective three-pillar
+  // score. The link is OPTIONAL — most beta debriefs are of un-recorded calls and
+  // omit it. When present it MUST be the rep's OWN recording AND already assigned
+  // to THIS account (the assignment is the access boundary, and it guarantees the
+  // score the coaching snapshots actually belongs to this account's call). An
+  // explicitly-supplied-but-invalid id is a 400 (don't silently drop a link the
+  // rep asked for); omitting it keeps the un-recorded path exactly as before.
+  let recordingId: string | null = null;
+  if (typeof b.recordingId === "string" && b.recordingId.length > 0) {
+    const recording = await getRecordingForUser(userId, b.recordingId);
+    if (!recording || recording.accountId !== accountId) {
+      return NextResponse.json(
+        { error: "That recording isn't available for this account." },
+        { status: 400 },
+      );
+    }
+    recordingId = recording.id;
+  }
+
   const outcome = await generateDebriefForAccount({
     userId,
     accountId,
     report,
+    recordingId,
   });
 
   if (outcome.status === "not-found") {

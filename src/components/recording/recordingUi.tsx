@@ -115,6 +115,68 @@ export function fmtBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/* --------- Recording list/picker formatters (shared by the inbox + the --------- *
+ * --------- Phase 34d debrief attach-a-recording picker) ----------------------- */
+
+/** The pipeline fields any recording list row carries. */
+export type RecordingPipelineInfo = {
+  status: string;
+  transcriptStatus: string | null;
+  scoreStatus: string | null;
+  overallScore: number | null;
+};
+
+/** Where a recording is in the capture → transcript → score pipeline. */
+export function pipelineState(r: RecordingPipelineInfo): {
+  label: string;
+  tone: Tone;
+} {
+  if (r.status === "recording") return { label: "In progress", tone: "warn" };
+  if (r.scoreStatus === "completed") {
+    return {
+      label: r.overallScore != null ? `Scored · ${r.overallScore}` : "Scored",
+      tone: "on",
+    };
+  }
+  if (r.transcriptStatus === "completed" || r.transcriptStatus === "partial") {
+    return { label: "Transcribed", tone: "on" };
+  }
+  if (r.transcriptStatus === "processing" || r.transcriptStatus === "pending") {
+    return { label: "Transcribing", tone: "warn" };
+  }
+  if (r.scoreStatus === "processing" || r.scoreStatus === "pending") {
+    return { label: "Scoring", tone: "warn" };
+  }
+  return { label: "Saved", tone: "off" };
+}
+
+export function fmtDuration(ms: number | null): string {
+  if (ms == null || ms <= 0) return "—";
+  const total = Math.round(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  if (m === 0) return `${s}s`;
+  return `${m}m ${s.toString().padStart(2, "0")}s`;
+}
+
+export function fmtRecordingDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/** Title if the rep named it, else a "Recording · <date>" fallback. */
+export function recordingLabel(r: {
+  title: string | null;
+  startedAt: string;
+}): string {
+  return r.title?.trim() ? r.title : `Recording · ${fmtRecordingDate(r.startedAt)}`;
+}
+
 export const KEEPALIVE_ROWS: { key: keyof KeepAliveLayers; title: string }[] = [
   { key: "wakeLock", title: "Screen stays awake" },
   { key: "silentAudio", title: "Keeps running in the background" },

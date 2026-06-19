@@ -1,9 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { auth } from "@/auth";
 import { getRecordingForUser, setRecordingAccount } from "@/lib/recordings";
 import { getAccountForUser } from "@/lib/accounts";
+import { processRecordingForScore } from "@/lib/recording/process";
 
 export const dynamic = "force-dynamic";
+// Assigning a completed recording kicks off transcription→scoring AFTER the
+// response (Phase 34d) so the objective score is ready by the time the rep
+// debriefs. That background work is a full Deepgram + Claude pass — give the
+// invocation room; the response is already sent, so this ceiling only bounds the
+// post-response work. The transcribe/score crons are the net if it's cut short.
+export const maxDuration = 300;
 
 const MAX_TITLE = 200;
 
@@ -71,6 +78,31 @@ export async function POST(
         { status: 404 },
       );
     }
+
+    // Phase 34d — wire recording → coaching. Assigning a FINISHED recording to an
+    // account means the rep wants it to count, so bring it to a scored state in
+    // the background (transcription→scoring, both idempotent) ahead of the debrief.
+    // Only on assign (non-null account) of a completed capture — never on clear,
+    // and never for a still-recording/aborted session. Best-effort: the runners
+    // swallow their own errors and the cron sweepers are the reliability net, so a
+    // failure here never affects the assign response. The recording stays OPTIONAL
+    // to coaching — this only pre-warms the score; nothing downstream requires it.
+    if (accountId !== null && recording.status === "completed") {
+      after(async () => {
+        try {
+          const outcome = await processRecordingForScore(recordingId);
+          console.log(
+            `[assign-account] ${recordingId} pre-warm transcript=${outcome.transcript} score=${outcome.score}`,
+          );
+        } catch (e) {
+          console.error(
+            `[assign-account] pre-warm failed for ${recordingId}:`,
+            e,
+          );
+        }
+      });
+    }
+
     return NextResponse.json({ ok: true, accountId });
   } catch (err) {
     console.error("recording assign-account failed", err);

@@ -4,9 +4,11 @@ import AppHeader from "@/components/AppHeader";
 import StageBadge from "@/components/accounts/StageBadge";
 import type { InitialCoaching } from "@/components/coaching/CoachingPanel";
 import DebriefPanel, {
+  type DebriefRecordingOption,
   type InitialDebrief,
 } from "@/components/debrief/DebriefPanel";
 import { getAccountForUser } from "@/lib/accounts";
+import { listAssignedRecordingsForAccount } from "@/lib/recordings";
 import { getLatestCoachingForDebrief } from "@/lib/coaching/store";
 import type {
   CoachingPriority,
@@ -30,6 +32,22 @@ export default async function DebriefPage({
   const { id } = await params;
   const account = await getAccountForUser(userId, id);
   if (!account) notFound();
+
+  // Recordings the rep can attach to this debrief (Phase 34d) — already scoped to
+  // this account + owner on the server. Serialize Dates to ISO for the client.
+  const accountRecordings = await listAssignedRecordingsForAccount(userId, id);
+  const recordingOptions: DebriefRecordingOption[] = accountRecordings.map(
+    (r) => ({
+      id: r.id,
+      title: r.title,
+      startedAt: r.startedAt.toISOString(),
+      durationMs: r.durationMs,
+      status: r.status,
+      transcriptStatus: r.transcriptStatus,
+      scoreStatus: r.scoreStatus,
+      overallScore: r.overallScore,
+    }),
+  );
 
   const latest = await getLatestDebriefForAccount(userId, id);
   const initialDebrief: InitialDebrief | null = latest
@@ -83,6 +101,7 @@ export default async function DebriefPage({
         <DebriefPanel
           accountId={id}
           hasSummary={Boolean(account.summary && account.summary.trim())}
+          recordings={recordingOptions}
           initialDebrief={initialDebrief}
           initialCoaching={initialCoaching}
         />
