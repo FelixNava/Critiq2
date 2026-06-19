@@ -14,6 +14,7 @@ import { getAccountForUser } from "@/lib/accounts";
 import { formatCacheUsage, type CacheUsageSummary } from "@/lib/ai/cache";
 import { getBriefForUser } from "@/lib/precall/store";
 import { buildRepProfileBlock } from "@/lib/precall/repProfile";
+import { buildConsumerWorkingMemory } from "@/lib/workingmemory/forConsumer";
 import { AnthropicScriptGenerator } from "./anthropic";
 import { coerceStyleMode, type StyleMode } from "./style";
 import { createScript, failScript, finishScript } from "./store";
@@ -71,12 +72,23 @@ export async function generateScriptForBrief(
   }
 
   const styleMode = coerceStyleMode(input.styleMode);
-  const repProfile = await buildRepProfileBlock(input.userId);
+
+  // Phase 35c — wire in working memory (richer rep profile + the volatile memory context).
+  const wm = await buildConsumerWorkingMemory(input.userId, input.accountId);
+  const repProfile = wm?.repProfile ?? (await buildRepProfileBlock(input.userId));
+  if (wm) {
+    console.log(
+      `[script] wm rep=${wm.repProfileSource} ` +
+        `raw=${wm.manifest.rawInteractionsIncluded} ` +
+        `ctxChars=${wm.memoryContext.length} within=${wm.manifest.withinBudget}`,
+    );
+  }
 
   const context: ScriptContext = {
     accountName: account.name,
     accountStage: account.stage,
     accountSummary: account.summary,
+    memoryContext: wm?.memoryContext ?? null,
     objective,
     diagnosis: brief.diagnosis,
     approach:

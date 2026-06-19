@@ -70,8 +70,15 @@ export interface ScriptContext {
   objections: { objection: string; response: string }[];
   /** The chosen style mode. */
   styleMode: StyleMode;
-  /** A stable, formatted rep-profile block (from intake), or null if none. */
+  /** A stable, formatted rep-profile block (learned/intake), or null if none. */
   repProfile: string | null;
+  /**
+   * Phase 35c — the assembled working-memory context (rep + account free-text context + the
+   * account semantic summary + recent raw interactions). Supersedes the bare `accountSummary`
+   * in the account-knowledge section when present; null/absent keeps the pre-35c prompt.
+   * Volatile → never cached.
+   */
+  memoryContext?: string | null;
 }
 
 /** A generator that turns a ScriptContext into a ScriptResult (DI seam for tests). */

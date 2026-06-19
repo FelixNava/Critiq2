@@ -19,6 +19,7 @@
  * start (no summary, thin narration) it says so plainly instead of fabricating.
  */
 
+import { renderAccountKnowledge } from "@/lib/workingmemory/consumerPrompt";
 import type { BriefContext } from "./types";
 
 /**
@@ -77,7 +78,6 @@ export function buildOutputFormatSpec(): string {
  * 3+). Volatile → never cached.
  */
 export function buildUserPrompt(ctx: BriefContext): string {
-  const summary = ctx.accountSummary?.trim();
   const narration = ctx.narration.trim() || "(the rep did not add any notes)";
 
   const objectiveInstruction =
@@ -102,9 +102,7 @@ export function buildUserPrompt(ctx: BriefContext): string {
     "PIPELINE STAGE: " + ctx.accountStage,
     "",
     "WHAT CRITIQ KNOWS ABOUT THIS ACCOUNT (shared running summary):",
-    summary && summary.length > 0
-      ? summary
-      : "(nothing yet — this is a cold-start account with no logged history)",
+    renderAccountKnowledge(ctx.memoryContext, ctx.accountSummary),
     "",
     "THE REP'S NOTES FOR THIS CALL (history, relationship, last meeting, goal):",
     narration,

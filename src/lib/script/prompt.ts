@@ -16,6 +16,7 @@
  * personal details. The lines are SUGGESTIONS the rep adapts in their own voice.
  */
 
+import { renderAccountKnowledge } from "@/lib/workingmemory/consumerPrompt";
 import { STYLE_MODE_LABELS } from "./style";
 import type { ScriptContext } from "./types";
 
@@ -102,7 +103,6 @@ export function buildOutputFormatSpec(): string {
  * brief, and the chosen style mode. Volatile → never cached.
  */
 export function buildUserPrompt(ctx: ScriptContext): string {
-  const summary = ctx.accountSummary?.trim();
   const diagnosis = ctx.diagnosis?.trim();
 
   const approachLines =
@@ -128,9 +128,7 @@ export function buildUserPrompt(ctx: ScriptContext): string {
     "PIPELINE STAGE: " + ctx.accountStage,
     "",
     "WHAT CRITIQ KNOWS ABOUT THIS ACCOUNT (shared running summary):",
-    summary && summary.length > 0
-      ? summary
-      : "(nothing yet — this is a cold-start account with no logged history)",
+    renderAccountKnowledge(ctx.memoryContext, ctx.accountSummary),
     "",
     "CRITIQ'S READ ON THE ACCOUNT (from the pre-call brief):",
     diagnosis && diagnosis.length > 0 ? diagnosis : "(no diagnosis available)",

@@ -66,8 +66,16 @@ export interface DebriefContext {
   accountSummary: string | null;
   /** The rep's guided report of the call. */
   report: DebriefReport;
-  /** A stable, formatted rep-profile block (from intake), or null if none. */
+  /** A stable, formatted rep-profile block (learned/intake), or null if none. */
   repProfile: string | null;
+  /**
+   * Phase 35c — the assembled working-memory context (rep + account free-text context + the
+   * account semantic summary + recent raw interactions). Supersedes the bare `accountSummary`
+   * in the account-knowledge section when present; null/absent keeps the pre-35c prompt. It is
+   * BACKGROUND for organizing the current report — the reporter's honesty rules still bind the
+   * recap to what the rep reported for THIS call. Volatile → never cached.
+   */
+  memoryContext?: string | null;
 }
 
 /** A generator that turns a DebriefContext into a DebriefResult (DI seam for tests). */

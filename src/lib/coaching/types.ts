@@ -99,8 +99,16 @@ export interface CoachingContext {
   debrief: CoachingDebriefInput;
   /** The objective score, or null when the call wasn't recorded/scored. */
   score: CoachingScoreInput | null;
-  /** A stable, formatted rep-profile block (from intake), or null if none. */
+  /** A stable, formatted rep-profile block (learned/intake), or null if none. */
   repProfile: string | null;
+  /**
+   * Phase 35c — the assembled working-memory context (rep + account free-text context + the
+   * account semantic summary + recent raw interactions). Supersedes the bare `accountSummary`
+   * in the account-knowledge section when present; null/absent keeps the pre-35c prompt. Every
+   * reference it can introduce is in the Phase 26 grounded corpus, so the guard never falsely
+   * redacts it. Volatile → never cached.
+   */
+  memoryContext?: string | null;
 }
 
 /** A generator that turns a CoachingContext into a CoachingResult (DI seam). */

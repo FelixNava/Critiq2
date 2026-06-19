@@ -18,6 +18,7 @@ import type {
   DebriefObservation,
 } from "@/lib/debrief/types";
 import { buildRepProfileBlock } from "@/lib/precall/repProfile";
+import { buildConsumerWorkingMemory } from "@/lib/workingmemory/forConsumer";
 import { getScoreForRecording } from "@/lib/scoring/store";
 import { AnthropicGuardVerifier } from "@/lib/hallucinationguard/anthropic";
 import { formatGuardManifest } from "@/lib/hallucinationguard/guard";
@@ -130,12 +131,25 @@ export async function generateCoachingForDebrief(
     if (scoreInput && score) scoreId = score.id;
   }
 
-  const repProfile = await buildRepProfileBlock(input.userId);
+  // Phase 35c — wire in working memory (richer rep profile + the volatile memory context).
+  // Every reference the memory context can introduce is already in the Phase 26 grounded
+  // corpus (buildGroundedSources reads the same tiers + context), so the guard below never
+  // falsely redacts it.
+  const wm = await buildConsumerWorkingMemory(input.userId, input.accountId);
+  const repProfile = wm?.repProfile ?? (await buildRepProfileBlock(input.userId));
+  if (wm) {
+    console.log(
+      `[coaching] wm rep=${wm.repProfileSource} ` +
+        `raw=${wm.manifest.rawInteractionsIncluded} ` +
+        `ctxChars=${wm.memoryContext.length} within=${wm.manifest.withinBudget}`,
+    );
+  }
 
   const context: CoachingContext = {
     accountName: account.name,
     accountStage: account.stage,
     accountSummary: account.summary,
+    memoryContext: wm?.memoryContext ?? null,
     debrief: {
       recap: debrief.recap,
       observations: (debrief.observations as DebriefObservation[]) ?? [],
