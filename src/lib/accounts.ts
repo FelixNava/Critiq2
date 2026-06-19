@@ -147,6 +147,8 @@ export type AccountDetail = {
   stage: string;
   /** Shared running intelligence summary; null at cold start. */
   summary: string | null;
+  /** Shared, human-entered context about this account (Phase 35a); null if unset. */
+  context: string | null;
   /** The viewing rep's role on this account ('owner' | 'collaborator'). */
   role: string;
   createdAt: Date;
@@ -177,6 +179,7 @@ export async function getAccountForUser(
       name: accountsTbl.name,
       stage: accountsTbl.stage,
       summary: accountsTbl.summary,
+      context: accountsTbl.context,
       role: accountRepJoins.role,
       createdAt: accountsTbl.createdAt,
       updatedAt: accountsTbl.updatedAt,

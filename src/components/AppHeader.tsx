@@ -39,6 +39,13 @@ export default function AppHeader({
           </Link>
         )}
       </div>
+      <div className="flex items-center gap-4">
+        <Link
+          href="/profile"
+          className="rounded-md text-sm font-medium text-slate-500 transition hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+        >
+          Profile
+        </Link>
       <form
         action={async () => {
           "use server";
@@ -52,6 +59,7 @@ export default function AppHeader({
           Sign out
         </button>
       </form>
+      </div>
     </header>
   );
 }

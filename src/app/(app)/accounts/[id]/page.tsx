@@ -3,11 +3,13 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import AppHeader from "@/components/AppHeader";
 import StageBadge from "@/components/accounts/StageBadge";
+import ContextEditor from "@/components/context/ContextEditor";
 import {
   getAccountForUser,
   getLearningProgress,
   type AccountContact,
 } from "@/lib/accounts";
+import { MAX_ACCOUNT_CONTEXT } from "@/lib/context";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +83,25 @@ export default async function AccountDetailPage({
           </span>
         </Link>
 
+        {/* Tertiary action — bring in a call that happened before Critiq */}
+        <Link
+          href={`/accounts/${account.id}/import`}
+          className="mt-3 flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm transition hover:bg-slate-50"
+        >
+          <span>
+            <span className="block text-sm font-semibold">
+              Import a past call
+            </span>
+            <span className="mt-0.5 block text-sm text-slate-500">
+              Already had calls with this account? Paste your notes or a
+              transcript and Critiq folds them into its memory.
+            </span>
+          </span>
+          <span aria-hidden className="text-lg text-slate-400">
+            →
+          </span>
+        </Link>
+
         {/* Learning indicator */}
         <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
@@ -124,6 +145,25 @@ export default async function AccountDetailPage({
               deal stands — and shows it here.
             </ColdStart>
           )}
+        </Card>
+
+        {/* What the rep has told Critiq about this account (Phase 35a) — shared,
+            human-entered context, distinct from the auto-generated summary above. */}
+        <Card title="What you've told Critiq">
+          <p className="-mt-1 mb-4 text-sm leading-relaxed text-slate-500">
+            Add anything Critiq should know about this account — who the players
+            are, the history, what they care about, where the deal really stands.
+            Everyone on this account sees and shares this.
+          </p>
+          <ContextEditor
+            endpoint={`/api/accounts/${account.id}/context`}
+            initialContext={account.context}
+            max={MAX_ACCOUNT_CONTEXT}
+            emptyHint="Nothing here yet. Jot down what you know about this account and Critiq factors it into your prep and coaching."
+            placeholder="e.g. Family-run contractor, 30+ crew. Dana (ops) is our champion; her GM Marcus controls budget and is cost-driven. Burned by a competitor's peeling job two years ago — quality and warranty matter more than price to them."
+            ctaLabel="Add context"
+            editLabel="Edit"
+          />
         </Card>
 
         {/* Last interaction */}

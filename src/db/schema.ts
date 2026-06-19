@@ -165,6 +165,35 @@ export const repIntakeProgress = pgTable(
 );
 
 /**
+ * Rep-level free-text context (Phase 35a) — "what should Critiq know about how you
+ * sell?". One row per rep (UNIQUE user_id, upsert target), REP-PRIVATE (rep-side data
+ * is isolated per the locked privacy model). This is distinct from the structured
+ * intake (rep_intake_responses): it's a single open-ended block the rep can edit any
+ * time. It feeds the rep-profile / working-memory layers (the consumer wiring lands in
+ * Phase 35c) and is treated as grounded by the hallucination guard (synthetic source
+ * tag "rep-context"). Cascades on user delete.
+ */
+export const repContext = pgTable(
+  "rep_context",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    context: text("context").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("rep_context_user_id_key").on(t.userId)],
+);
+
+/**
  * Accounts — the FIRST-CLASS entity in Critiq. Account intelligence is SHARED
  * across reps (single source-of-truth `summary`), so continuity survives a rep
  * transition (OQ-04 #2 in the locked privacy model). The `summary` is the
@@ -184,6 +213,11 @@ export const accountsTbl = pgTable(
     // Shared running intelligence summary (regenerated in a later phase). Null
     // until enough interactions exist (cold start).
     summary: text("summary"),
+    // Shared, human-entered context about this account (Phase 35a) — "what Critiq
+    // should know about this account" the rep can fill in directly. Distinct from
+    // `summary` (which Phase 23 regenerates automatically): `context` is only ever
+    // written by a rep. Shared across reps like the rest of account intelligence.
+    context: text("context"),
     createdBy: text("created_by").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -973,6 +1007,8 @@ export type RepIntakeResponse = typeof repIntakeResponses.$inferSelect;
 export type NewRepIntakeResponse = typeof repIntakeResponses.$inferInsert;
 export type RepIntakeProgress = typeof repIntakeProgress.$inferSelect;
 export type NewRepIntakeProgress = typeof repIntakeProgress.$inferInsert;
+export type RepContext = typeof repContext.$inferSelect;
+export type NewRepContext = typeof repContext.$inferInsert;
 export type Account = typeof accountsTbl.$inferSelect;
 export type NewAccount = typeof accountsTbl.$inferInsert;
 export type AccountRepJoin = typeof accountRepJoins.$inferSelect;
