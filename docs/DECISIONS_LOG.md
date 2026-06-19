@@ -696,6 +696,48 @@ Rationale: keeps the access model clean and the surface small; matches the locke
 Iterability: high.
 Trade-off flag: YES — a rep who recorded but hasn't assigned won't see it on the debrief; confirm that's the right flow vs. an inline assign-on-attach (flagged for Felix's device pass).
 
+## DEC-049 — Split Phase 35 across firings: ship 35a/b (context + import, additive) first; defer 35c (working-memory wiring)
+Phase: 35/add-context-import
+Date: 2026-06-19 (scheduled task `critiq-fullauto-34-35`, firing #3)
+Type: obvious
+Context: Phase 35 bundles three parts; 35c (wire Phase 25 working memory into pre-call/script/debrief/coaching) is the only part that touches the LIVE interaction loop, and the task's build discipline explicitly says ship the additive parts before the wiring, splitting across firings is GOOD.
+Chosen: this firing built ONLY 35a (free-text context) + 35b (import past calls) — all additive (two new tables/columns, new files, no consumer change) — and merged them. 35c is its own next-firing increment with full regression focus.
+Rationale: smaller, safer, reviewable PR; the riskiest change (35c, touching all four AI consumers) gets its own firing rather than mixing it with a UI/schema build. Mirrors the Phase 34 a/b/c → d split (DEC-042).
+Iterability: high (35c is the next queued item).
+Trade-off flag: no — directly sanctioned by the task's build discipline.
+
+## DEC-050 — Account context = one SHARED column on account_records; rep context = a dedicated rep-private table
+Phase: 35/add-context-import
+Date: 2026-06-19
+Type: trade-off
+Context: The ledger allowed either a new table or a column for each context surface. Account intelligence is SHARED (the account is the first-class entity); rep data is ISOLATED.
+Chosen: account context = an additive nullable `account_records.context` column (shared, last-writer-wins like `summary`, which it sits beside but is distinct from — `context` is rep-entered, `summary` is Phase-23-generated). Rep context = a new `rep_context` table, one row/rep (UNIQUE user_id), rep-private.
+Alternatives: an `account_context_notes` table (rejected — multi-note history is beta-unnecessary complexity; the shared-single-field model matches `summary` and the locked "one shared summary per account" philosophy); extending the rep intake table (rejected — free-text context is a different shape from the structured Q&A intake).
+Rationale: minimal additive surface, matches the shared-vs-private privacy model exactly.
+Iterability: medium (a column→table migration later is additive; the table is already isolated).
+Trade-off flag: YES — confirm the shared account-context field (last-writer-wins across reps) is acceptable vs. per-rep notes; for beta (≈one owner/account) it's fine.
+
+## DEC-051 — Context is grounded (never redactable) via synthetic source tags fed to the Phase 26 guard
+Phase: 35/add-context-import
+Date: 2026-06-19
+Type: obvious
+Context: The ledger spec requires each context block to carry a synthetic source tag so the Phase 26 hallucination guard treats it as grounded, not redactable — otherwise a true detail the rep typed would be stripped from coaching.
+Chosen: `buildGroundedSources` reads rep + account context and pushes them as grounded sources with stable ids `rep-context` / `account-context` (new `GroundedSourceKind`s — kind is only a verifier-prompt label, so the union extension is safe). Done in 35a so that when 35c injects context into prompts, the guard already honors it.
+Rationale: directly implements the locked decision; additive and low-risk (no observable effect until 35c, but prevents a future false-redaction).
+Iterability: high.
+Trade-off flag: YES (AI-safety, for the expert coach) — rep context is account-AGNOSTIC, so a concrete value a rep types into their profile (a $ figure, a name) grounds in EVERY account's coaching. The `/profile` copy steers reps toward style-not-specifics; revisit in 35c whether rep context should flow into per-account prompts at all (vs. only account context).
+
+## DEC-052 — An imported past call IS a Phase 20 debrief (no new pipeline), with a larger input cap
+Phase: 35/add-context-import
+Date: 2026-06-19
+Type: trade-off
+Context: 35b must let a rep bring in calls that predate Critiq AND have them feed consolidation (23/24) + working memory (25). The account-consolidation reader reads the STRUCTURED Phase 20 output (recap/observations), not the raw report — so a bare "mark completed" import would feed consolidation empty material.
+Chosen: an import routes the pasted text through the SAME `generateDebriefForAccount` (Phase 20 structuring) → a completed debrief, then fires the same `after()` consolidation triggers as a live debrief. `normalizeImport` uses a much larger char cap (`IMPORT_MAX_CHARS` 50k) than the live-debrief field because a transcript is verbatim, not a summary.
+Alternatives: mark-completed-without-structuring (rejected — consolidation reads the structured output, so it'd ingest empty material); a new dedicated import/transcript pipeline (rejected — the spec says reuse the debrief path, "no new pipeline").
+Rationale: an import becomes indistinguishable from a real debrief, so every downstream consumer works with zero special-casing.
+Iterability: high (the cap + the structuring prompt are tunable).
+Trade-off flag: YES (quality) — the Phase 20 reporter prompt is tuned for short guided answers, not raw transcripts; very long pastes produce shallower structuring and, on a model failure, an opaque 502. Validate structuring quality on real transcripts; consider a transcript-specific prompt later. Bulk-importing many calls can also cross the rep's every-10 consolidation interval on synthetic data (claim guards double-runs; functionally safe).
+
 ---
 
 ## End-of-build summary

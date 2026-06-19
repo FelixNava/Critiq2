@@ -73,7 +73,25 @@ PHASE_CURRENT_PR=
 # critiq-fullauto-34-35 builds Phase 34 (quick-record + recordings inbox + manual assign + wire
 # recording→coaching) then Phase 35 (add context + import transcripts + wire working-memory→coaching)
 # → review-for-main, then self-stops. Specs in docs/PHASE_LEDGER.md (Phase 34/35 entries).
-PHASE_NEXT=35/add-context-import-wire-working-memory
+# 2026-06-19 (critiq-fullauto-34-35 firing #3): Phase 35 ADDITIVE parts 35a + 35b DONE
+# -> merged review-for-main (PR #35, squash 22a6369). 35a: rep_context table (rep-private)
+# + shared account_records.context column (mig 0018); src/lib/context.ts (access-gated
+# get/set); routes GET/PUT /api/profile/context + /api/accounts/[id]/context; UI /profile +
+# account "What you've told Critiq" card via shared ContextEditor + Profile nav link; rep +
+# account context wired into the Phase 26 grounded corpus with synthetic tags (rep-context/
+# account-context) so context is grounded, never redacted. 35b: src/lib/debrief/import.ts +
+# POST /api/accounts/[id]/import (structures the paste via the SAME Phase 20 generator ->
+# completed debrief -> fires 23/24 consolidation via after(); NO new pipeline) + /accounts/
+# [id]/import page + ImportPanel. typecheck+build clean; verify-phase35 23/23; verify-phase
+# 20/21/25/26 no-regression; throwaway real-PG probe (context round-trip, ACCESS BOUNDARY,
+# grounding inclusion, import->structured-debrief->consolidation +1). /code-review high-effort
+# + /design-critique (static; P0/P1 addressed in-branch). DEC-049..052. FLAGGED (UI_VERIFY_
+# PENDING=35ab): live auth UI eyeball owed; rep-context grounding is account-agnostic; import
+# structuring quality on raw transcripts; AI value NOT proven until 35c. Per DEC-049 (additive-
+# first), 35c (WIRE Phase 25 working memory + the new context into pre-call/script/debrief/
+# coaching via buildCachedSystem, Phase 26 guard intact) is DEFERRED to firing #4 -> then the
+# critiq-fullauto-34-35 task self-disables (BOTH 34 and 35 incl. 35c merged).
+PHASE_NEXT=35c/wire-working-memory-into-consumers
 # Phase 33 DONE 2026-06-18 (aggressive-auto, relaxed gate + mandatory /design-critique):
 # Marketing Landing Redesign — replaced the Phase 4 landing at `/` with the Felix-approved
 # cinematic prototype, ported into Next.js 16 + React (one "use client" LandingPage component
@@ -311,8 +329,8 @@ PHASE_NEXT=35/add-context-import-wire-working-memory
 # block ~929 tok sits under the Sonnet 1024 cacheable floor on its own (caches once per-rep layer
 # extends the prefix); confirm the rep-private raw scope is intended; the ~4-chars/tok estimate is a
 # heuristic not a tokenizer; WIRING the consumers onto the builder is the real payoff + is NOT done.
-PHASE_LAST_COMPLETED=34d/wire-recording-coaching
-PHASE_LAST_COMPLETED_AT=2026-06-19T13:05:00-04:00
+PHASE_LAST_COMPLETED=35ab/add-context-import
+PHASE_LAST_COMPLETED_AT=2026-06-19T15:40:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -354,7 +372,10 @@ ENV_READY=true
 # CLEARED 2026-06-18: Phase 14 device gate PASSED (notifications on iPhone; coverage
 # session b47ea693 ~91%, gap_ms=10005 persisted). VAPID + Deepgram keys provisioned.
 # Phase 14 merged (PR #18, c517ce7) + promoted to review-for-main.
-UI_VERIFY_PENDING=34d
+# 2026-06-19: 35ab added to the pending list — the /profile rep-context page, the account
+# "What you've told Critiq" card, and /accounts/[id]/import need a live authenticated UI
+# eyeball on the preview (this firing was headless; SSO-walled preview; no browser).
+UI_VERIFY_PENDING=34d,35ab
 
 # --- SESSION HEARTBEAT ---
 # Phase 21 DONE 2026-06-18 (aggressive-auto run, scheduled task critiq-fullauto-
@@ -424,9 +445,9 @@ UI_VERIFY_PENDING=34d
 # expert coach with sample outputs in the review packet — NOT gated. 🎯 SCOPE COMPLETE: the marketing
 # landing redesign + Phase 25 + Phase 26 are ALL built+merged → the scheduled task self-disables
 # (update_scheduled_task enabled=false). Nothing further to build in this task's scope.
-SESSION_LAST_HEARTBEAT=2026-06-19T13:05:00-04:00
-SESSION_TOKEN_BUDGET_USED=700000
-SESSION_ID=fullauto-34-35-phase34abc-quick-record-2026-06-19
+SESSION_LAST_HEARTBEAT=2026-06-19T15:40:00-04:00
+SESSION_TOKEN_BUDGET_USED=600000
+SESSION_ID=fullauto-34-35-phase35ab-context-import-2026-06-19
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL
