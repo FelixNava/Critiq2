@@ -43,6 +43,7 @@ export default async function ProfilePage() {
             endpoint="/api/profile/context"
             initialContext={context}
             max={MAX_REP_CONTEXT}
+            label="How you sell"
             emptyHint="Nothing here yet. Add a few notes on how you sell and Critiq will factor them into your coaching."
             placeholder="e.g. I sell commercial paint to contractors and property managers. I'm strong at building rapport but I tend to rush past discovery when I sense a deal is close. I want to get better at slowing down and surfacing the real budget."
             ctaLabel="Add context"

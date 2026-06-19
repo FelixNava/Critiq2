@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   buttonClass,
   cardClass,
+  inlineSecondaryButtonClass,
   mobileInputClass,
   secondaryButtonClass,
   textareaClass,
@@ -167,6 +168,20 @@ export default function ImportPanel({ accountId }: { accountId: string }) {
             </p>
           </ResultCard>
         )}
+        {result.observations.length > 0 && (
+          <ResultCard title="What Critiq noticed">
+            <ul className="space-y-3">
+              {result.observations.map((o, i) => (
+                <li
+                  key={i}
+                  className="text-sm leading-relaxed text-slate-700"
+                >
+                  {o.note}
+                </li>
+              ))}
+            </ul>
+          </ResultCard>
+        )}
         {result.commitments.length > 0 && (
           <ResultCard title="Commitments & next steps">
             <ul className="space-y-2">
@@ -184,6 +199,23 @@ export default function ImportPanel({ accountId }: { accountId: string }) {
             </ul>
           </ResultCard>
         )}
+        {result.openQuestions.length > 0 && (
+          <ResultCard title="Loose ends to follow up">
+            <ul className="space-y-2">
+              {result.openQuestions.map((q, i) => (
+                <li
+                  key={i}
+                  className="flex gap-2 text-sm leading-relaxed text-slate-700"
+                >
+                  <span aria-hidden className="text-slate-400">
+                    •
+                  </span>
+                  <span>{q}</span>
+                </li>
+              ))}
+            </ul>
+          </ResultCard>
+        )}
 
         <div className="flex flex-col gap-3 sm:flex-row">
           <button
@@ -195,7 +227,7 @@ export default function ImportPanel({ accountId }: { accountId: string }) {
           </button>
           <Link
             href={`/accounts/${accountId}`}
-            className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-slate-300 px-6 text-sm font-medium text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+            className={`${inlineSecondaryButtonClass} sm:px-6`}
           >
             Back to the account
           </Link>

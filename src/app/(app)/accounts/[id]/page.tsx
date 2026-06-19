@@ -159,6 +159,7 @@ export default async function AccountDetailPage({
             endpoint={`/api/accounts/${account.id}/context`}
             initialContext={account.context}
             max={MAX_ACCOUNT_CONTEXT}
+            label="What you've told Critiq about this account"
             emptyHint="Nothing here yet. Jot down what you know about this account and Critiq factors it into your prep and coaching."
             placeholder="e.g. Family-run contractor, 30+ crew. Dana (ops) is our champion; her GM Marcus controls budget and is cost-driven. Burned by a competitor's peeling job two years ago — quality and warranty matter more than price to them."
             ctaLabel="Add context"

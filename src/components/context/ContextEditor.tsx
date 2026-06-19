@@ -3,9 +3,36 @@
 import { useEffect, useId, useState } from "react";
 import {
   buttonClass,
+  inlineSecondaryButtonClass,
   secondaryButtonClass,
   textareaClass,
 } from "@/components/onboarding/ui";
+
+/** Small inline spinner so an in-flight (multi-second) save reads as working. */
+function Spinner() {
+  return (
+    <svg
+      className="h-4 w-4 animate-spin text-current"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+      />
+    </svg>
+  );
+}
 
 /**
  * A small reusable editor for a single free-text "context" block (Phase 35a). Used
@@ -21,6 +48,7 @@ export default function ContextEditor({
   endpoint,
   initialContext,
   max,
+  label,
   emptyHint,
   placeholder,
   savedLabel = "Saved.",
@@ -31,6 +59,14 @@ export default function ContextEditor({
   endpoint: string;
   initialContext: string | null;
   max: number;
+  /**
+   * The accessible name for the textarea — names THIS surface distinctly (e.g. "How
+   * you sell" vs "What you've told Critiq about this account") so a screen-reader
+   * user editing the rep profile vs an account note hears which one they're in. The
+   * card heading that visually names the surface lives in the parent and isn't
+   * programmatically associated, so this prop is the field's real label.
+   */
+  label: string;
   /** Shown when there's no context yet (cold-start framing, no dev jargon). */
   emptyHint: string;
   placeholder: string;
@@ -97,23 +133,24 @@ export default function ContextEditor({
           <button
             type="button"
             onClick={startEdit}
-            className="inline-flex min-h-[44px] items-center rounded-lg border border-slate-300 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+            className={inlineSecondaryButtonClass}
           >
             {saved ? editLabel : ctaLabel}
           </button>
           {justSaved && (
-            <span className="text-sm text-emerald-600">{savedLabel}</span>
+            <span role="status" className="text-sm text-emerald-700">
+              {savedLabel}
+            </span>
           )}
         </div>
       </div>
     );
   }
 
-  const remaining = max - draft.length;
   return (
     <div>
       <label htmlFor={fieldId} className="sr-only">
-        Context
+        {label}
       </label>
       <textarea
         id={fieldId}
@@ -129,7 +166,7 @@ export default function ContextEditor({
         id={`${fieldId}-count`}
         className="mt-1 text-right text-xs text-slate-400"
       >
-        {remaining} characters left
+        {draft.length} / {max}
       </p>
 
       {error && (
@@ -147,8 +184,9 @@ export default function ContextEditor({
           onClick={save}
           disabled={submitting}
           aria-busy={submitting}
-          className={`${buttonClass} sm:w-auto sm:px-6`}
+          className={`${buttonClass} flex items-center justify-center gap-2 sm:w-auto sm:px-6`}
         >
+          {submitting && <Spinner />}
           {submitting ? "Saving…" : "Save"}
         </button>
         <button

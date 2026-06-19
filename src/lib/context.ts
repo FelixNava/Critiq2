@@ -36,6 +36,12 @@ export function normalizeContext(raw: unknown, max: number): string | null {
   return t.slice(0, max);
 }
 
+/** Read-side coercion: a stored context value is meaningful only if it has non-whitespace. */
+function emptyToNull(value: string | null | undefined): string | null {
+  const v = value?.trim();
+  return v && v.length > 0 ? v : null;
+}
+
 /* ------------------------------- rep context ------------------------------- */
 
 /** Read a rep's free-text context (null if they haven't set any). */
@@ -45,8 +51,7 @@ export async function getRepContext(userId: string): Promise<string | null> {
     .from(repContext)
     .where(eq(repContext.userId, userId))
     .limit(1);
-  const v = row?.context?.trim();
-  return v && v.length > 0 ? v : null;
+  return emptyToNull(row?.context);
 }
 
 /**
@@ -93,8 +98,7 @@ export async function getAccountContextForUser(
       ),
     )
     .limit(1);
-  const v = row?.context?.trim();
-  return v && v.length > 0 ? v : null;
+  return emptyToNull(row?.context);
 }
 
 /**
@@ -137,6 +141,5 @@ export async function getAccountContext(
     .from(accountsTbl)
     .where(and(eq(accountsTbl.id, accountId), isNull(accountsTbl.deletedAt)))
     .limit(1);
-  const v = row?.context?.trim();
-  return v && v.length > 0 ? v : null;
+  return emptyToNull(row?.context);
 }
