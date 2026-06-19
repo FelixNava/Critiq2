@@ -379,10 +379,11 @@ function RecordingPicker({
     <section className={cardClass}>
       <label htmlFor={selectId} className="block text-sm font-semibold text-slate-900">
         Was this call recorded?
+        <span className="ml-2 font-normal text-slate-400">Optional</span>
       </label>
       <p className="mt-1 text-sm text-slate-500">
         Attach the recording and Critiq factors in how the call actually went — your
-        coaching gets sharper. Optional.
+        coaching gets sharper.
       </p>
       <select
         id={selectId}
