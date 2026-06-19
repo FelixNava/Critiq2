@@ -605,9 +605,11 @@ Pre-output validator strips unsourced personal references. Conservative-mode def
 
 **Depends on:** Phase 21 (the wired consumer) + Phases 23/24/25 (the source-tagged grounded corpus).
 
-## Phase 27 — Cold-Start UX ☐ Planned
+## Phase 27 — Cold-Start UX ✅ DONE (review-for-main, PR #32)
 
-Per-account learning progress indicator. Onboarding expectation-setting ("~10 calls to personalize").
+> Fixes the cold-start dead-end: a new rep signed in with zero accounts hit a dashboard that only showed intake progress + a passive "Your accounts" link, so the product (briefs/debriefs/coaching — all account-scoped) was invisible and the app looked empty. The dashboard (`src/app/(app)/dashboard/page.tsx`) now LEADS with the rep's workspace — a prominent "Add the first company you're selling to" hero + CTA when they have no accounts, or their account list (reuses `StageBadge` + the `/accounts` card pattern) otherwise — with intake progress demoted to a secondary section. Pure server-component UI (reuses `listAccountsForUser`); no schema/API/migration. VERIFIED live on the preview across both paths (0-account hero via a fresh login + ≥1-account workspace via test2). Branch `phase-27/cold-start-ux` off review-for-main; base review-for-main (NEVER master).
+
+(The original "per-account learning progress indicator" already exists from Phase 10; this phase delivers the core cold-start on-ramp — the dashboard front door to the product.)
 
 ## Phase 28 — NY/NJ Consent Attestation ☐ Planned
 
