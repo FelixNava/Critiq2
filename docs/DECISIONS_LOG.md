@@ -738,6 +738,28 @@ Rationale: an import becomes indistinguishable from a real debrief, so every dow
 Iterability: high (the cap + the structuring prompt are tunable).
 Trade-off flag: YES (quality) — the Phase 20 reporter prompt is tuned for short guided answers, not raw transcripts; very long pastes produce shallower structuring and, on a model failure, an opaque 502. Validate structuring quality on real transcripts; consider a transcript-specific prompt later. Bulk-importing many calls can also cross the rep's every-10 consolidation interval on synthetic data (claim guards double-runs; functionally safe).
 
+## DEC-053 — Wire working memory into all four consumers via a thin adapter that the CALLER authorizes
+Phase: 35c/wire-working-memory-into-consumers
+Date: 2026-06-19 (scheduled task `critiq-fullauto-34-35`, firing #4)
+Type: trade-off
+Context: 35c had to plug the dormant Phase 25 builder (`buildWorkingMemory`) into pre-call/script/debrief/coaching "via buildCachedSystem, keeping the guard." Each consumer already carries its OWN task-specific system prompt + the shared account summary, so the working-memory `METHODOLOGY_BLOCK` stable layer is NOT what a consumer wants; only the rep profile (cached layer 2) + the volatile tail (account summary + raw interactions + the new context) are.
+Chosen: a new `buildConsumerWorkingMemory(userId, accountId, account)` adapter (`src/lib/workingmemory/forConsumer.ts`) that reuses the existing readers + the pure assembler to return `{ repProfile, repProfileSource, memoryContext, manifest }`. Each consumer sets its cached layer 2 from `repProfile` (a strict upgrade over the old intake-only block — learned P24 when present, identical at cold start) and injects `memoryContext` into the user message via a shared pure `renderAccountKnowledge` (memory → bare summary → cold-start note, byte-identical fallback). The adapter does NOT re-run `getAccountForUser`; the caller already authorized + holds the account, so it's passed in (removes a duplicate row query + a wasted contacts query per generation). Free-text context (35a) is added on TOP of the budgeted tail (un-budgeted — small, rep-entered ground truth).
+Alternatives: (A) call `buildWorkingMemory` and use its `stableLayers` directly — rejected, its methodology layer would discard each consumer's task prompt. (B) keep the self-contained access boundary inside the adapter (re-fetch the account) — rejected on the review's efficiency finding; the four callers all authorize first, so the boundary is the caller's and the adapter's readers are rep-scoped/already-authorized. (C) fold context into the Phase-25 assembler/manifest — rejected to keep `assemble.ts`/`types.ts` (and verify-phase25) untouched; context rides on top instead.
+Rationale: lowest blast radius (Phase-25 internals + verify-phase25 untouched), uniform across all four consumers (right altitude, no special-casing), cache split preserved, and the cold path is provably unchanged.
+Iterability: high (the budget, the on-top context, and the adapter shape are all tunable; reverting is deleting two files + four small call-site edits).
+Trade-off flag: NO (mechanical wiring sanctioned by the ledger spec) — but see DEC-054 for the grounding/quality flag.
+
+## DEC-054 — Rep context flows into per-account prompts (account-agnostic), grounded as non-redactable
+Phase: 35c/wire-working-memory-into-consumers
+Date: 2026-06-19
+Type: trade-off
+Context: The ledger spec says the assembled set must include "the new rep + account context." Rep context is rep-level (one block, applies to all the rep's accounts); account context is account-specific. DEC-051 already grounds both (synthetic source tags) so the Phase 26 guard won't redact a true detail the rep typed — but it flagged that rep context being account-agnostic means a concrete value (a $ figure, a name) a rep types into `/profile` grounds in EVERY account's coaching.
+Chosen: include BOTH per the spec. The memory context labels the rep block "rep-level — applies across all their accounts, not specific to this one" and the account block "treat as ground truth about this account," so the model knows the scope. The grounding (DEC-051) is honored end-to-end — the throwaway probe confirmed the guard KEEPS a grounded account-context name in coaching (0 priorities dropped).
+Alternatives: flow ONLY account context into per-account prompts (rejected — the spec explicitly lists rep context; rep-level selling style is legitimately useful coaching context). Drop rep context's grounding so specifics get redacted (rejected — would strip true details the rep deliberately added, defeating 35a).
+Rationale: follows the locked spec while surfacing the scope via prompt labels; the guard remains the backstop against fabricated specifics.
+Iterability: high (a one-line change in the adapter scopes rep context out of per-account prompts if the coach prefers).
+Trade-off flag: YES (AI-safety/quality, for Felix + the expert coach) — validate that account-agnostic rep context doesn't cause coaching to assert a rep-profile specific as if it were account-specific; revisit whether rep context belongs in per-account prompts at all. Also flagged: the debrief reporter now sees prior interactions as background (watch for a prior-call detail leaking into a current-call recap), and the relaxed gate proves it runs, not that coaching improved.
+
 ---
 
 ## End-of-build summary

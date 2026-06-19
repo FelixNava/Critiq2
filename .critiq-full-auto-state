@@ -91,7 +91,34 @@ PHASE_CURRENT_PR=
 # first), 35c (WIRE Phase 25 working memory + the new context into pre-call/script/debrief/
 # coaching via buildCachedSystem, Phase 26 guard intact) is DEFERRED to firing #4 -> then the
 # critiq-fullauto-34-35 task self-disables (BOTH 34 and 35 incl. 35c merged).
-PHASE_NEXT=35c/wire-working-memory-into-consumers
+# 2026-06-19 (critiq-fullauto-34-35 firing #4): Phase 35c DONE -> merged review-for-main
+# (PR #36, squash 8cef470). WIRED the Phase 25 working-memory builder + the Phase 35a
+# rep/account free-text context into all four AI consumers (pre-call 18/script 19/debrief
+# 20/coaching 21). New buildConsumerWorkingMemory adapter (src/lib/workingmemory/
+# forConsumer.ts) reuses the Phase-25 readers + pure assembler -> richer rep profile
+# (learned P24->intake P18->none, identical at cold start) for the CACHED layer 2 + a
+# VOLATILE memory context (rep/account context + account summary + last-3 raw interactions,
+# budgeted; account summary falls back to account_records.summary). Pure renderAccountKnowledge
+# (consumerPrompt.ts): memory->summary->cold-start note, byte-identical fallback so the cold
+# path is unchanged. Cache split intact (rep profile cached, memory volatile). Caller owns the
+# access boundary (account passed in, no re-fetch). Phase 26 guard UNTOUCHED -> everything the
+# memory context injects is already in buildGroundedSources (no false redaction; probe: grounded
+# name kept, 0 dropped). NO schema, NO UI. typecheck+build clean; verify-phase35c 32/32;
+# verify-phase18/19/20/21/25/26 no-regression; throwaway real-PG+real-Claude probe (assembly,
+# access boundary, grounding inclusion, guard keeps grounded refs, real before/after showing
+# memory sharpening coaching). High-effort /code-review (7 angles) no correctness bugs;
+# efficiency/cleanup fixes applied in-branch. DEC-053/054. FLAGGED (not gated): relaxed gate
+# proves it runs not that coaching improved; rep context is account-agnostic (DEC-054); debrief
+# sees prior interactions as background. 35c has NO UI -> no /design-critique.
+# 🎯 SCOPE COMPLETE: Phase 34 (34a/b/c + 34d) AND Phase 35 (35a/b + 35c) are BOTH built+merged
+# to review-for-main -> the critiq-fullauto-34-35 task SELF-DISABLES (update_scheduled_task
+# enabled=false). Nothing further to build in this task's scope. review-for-main now holds
+# Phases 2-21 + 23-27 + 33 + 34 + 35.
+PHASE_NEXT=
+# (scope complete — 34 + 35 both merged; task self-disabled. Next, when Felix resumes:
+# Phase 28 consent attestation / Phase 36 AI auto-detect account from transcript (deferred
+# fast-follow), + the AI-quality validation pass across 15-26 + 35c with the expert coach,
+# + the pre-beta prod-DB/Blob separation. See /critiq-context.)
 # Phase 33 DONE 2026-06-18 (aggressive-auto, relaxed gate + mandatory /design-critique):
 # Marketing Landing Redesign — replaced the Phase 4 landing at `/` with the Felix-approved
 # cinematic prototype, ported into Next.js 16 + React (one "use client" LandingPage component
@@ -329,8 +356,8 @@ PHASE_NEXT=35c/wire-working-memory-into-consumers
 # block ~929 tok sits under the Sonnet 1024 cacheable floor on its own (caches once per-rep layer
 # extends the prefix); confirm the rep-private raw scope is intended; the ~4-chars/tok estimate is a
 # heuristic not a tokenizer; WIRING the consumers onto the builder is the real payoff + is NOT done.
-PHASE_LAST_COMPLETED=35ab/add-context-import
-PHASE_LAST_COMPLETED_AT=2026-06-19T15:40:00-04:00
+PHASE_LAST_COMPLETED=35c/wire-working-memory-into-consumers
+PHASE_LAST_COMPLETED_AT=2026-06-19T17:20:00-04:00
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -445,9 +472,9 @@ UI_VERIFY_PENDING=34d,35ab
 # expert coach with sample outputs in the review packet — NOT gated. 🎯 SCOPE COMPLETE: the marketing
 # landing redesign + Phase 25 + Phase 26 are ALL built+merged → the scheduled task self-disables
 # (update_scheduled_task enabled=false). Nothing further to build in this task's scope.
-SESSION_LAST_HEARTBEAT=2026-06-19T15:40:00-04:00
-SESSION_TOKEN_BUDGET_USED=600000
-SESSION_ID=fullauto-34-35-phase35ab-context-import-2026-06-19
+SESSION_LAST_HEARTBEAT=2026-06-19T17:20:00-04:00
+SESSION_TOKEN_BUDGET_USED=350000
+SESSION_ID=fullauto-34-35-phase35c-wire-working-memory-2026-06-19
 
 # --- CRON SCHEDULE ---
 # Phase 8 merged live/supervised 2026-06-05. ARMED: hourly self-bounding LOCAL
