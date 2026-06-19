@@ -139,9 +139,9 @@ async function main() {
     "Transcribing",
   );
   eq(
-    "pipeline: scoring (transcript done, score pending)",
+    "pipeline: transcript-ready wins over a pending score",
     pipelineState({ ...base, transcriptStatus: "partial", scoreStatus: "pending" }).label,
-    "Transcribed", // transcript-ready wins the label; still informative
+    "Transcribed",
   );
   eq("pipeline: saved fallback", pipelineState(base).label, "Saved");
 

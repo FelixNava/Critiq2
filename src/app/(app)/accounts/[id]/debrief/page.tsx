@@ -33,9 +33,13 @@ export default async function DebriefPage({
   const account = await getAccountForUser(userId, id);
   if (!account) notFound();
 
-  // Recordings the rep can attach to this debrief (Phase 34d) — already scoped to
-  // this account + owner on the server. Serialize Dates to ISO for the client.
-  const accountRecordings = await listAssignedRecordingsForAccount(userId, id);
+  // The attachable recordings (Phase 34d) and the latest debrief are independent
+  // queries — run them together. Both are owner+account-scoped on the server; the
+  // recordings' Dates are serialized to ISO for the client picker.
+  const [accountRecordings, latest] = await Promise.all([
+    listAssignedRecordingsForAccount(userId, id),
+    getLatestDebriefForAccount(userId, id),
+  ]);
   const recordingOptions: DebriefRecordingOption[] = accountRecordings.map(
     (r) => ({
       id: r.id,
@@ -49,7 +53,6 @@ export default async function DebriefPage({
     }),
   );
 
-  const latest = await getLatestDebriefForAccount(userId, id);
   const initialDebrief: InitialDebrief | null = latest
     ? {
         id: latest.id,

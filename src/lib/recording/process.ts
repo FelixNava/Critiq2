@@ -23,11 +23,13 @@ export type ProcessOutcome = {
 };
 
 /**
- * Whether a transcription outcome produced a transcript worth scoring. 'completed'
- * and 'skipped' both mean a transcript ROW exists (skipped = an earlier run already
- * finished/claimed it); the scoring runner re-checks actual scorability and no-ops
- * cleanly if the text isn't usable. 'empty'/'failed' have nothing to score yet.
- * Pure + exported so the chaining decision is unit-testable without a DB/network.
+ * Whether a transcription outcome is worth handing to the scorer. 'completed' is
+ * the obvious case; 'skipped' means another run already claimed the transcript —
+ * either finished (then it's scorable now) or still in-progress (then the scorer
+ * cleanly no-ops with 'no-transcript' and the score cron is the net), so trying is
+ * safe and cheap. 'empty'/'failed' have nothing to score. The scoring runner
+ * re-checks real scorability regardless, so this is only a cheap pre-filter. Pure +
+ * exported so the chaining decision is unit-testable without a DB/network.
  */
 export function transcriptIsScorable(status: TranscribeOutcome["status"]): boolean {
   return status === "completed" || status === "skipped";

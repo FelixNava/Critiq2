@@ -144,9 +144,8 @@ export function pipelineState(r: RecordingPipelineInfo): {
   if (r.transcriptStatus === "processing" || r.transcriptStatus === "pending") {
     return { label: "Transcribing", tone: "warn" };
   }
-  if (r.scoreStatus === "processing" || r.scoreStatus === "pending") {
-    return { label: "Scoring", tone: "warn" };
-  }
+  // (No "Scoring" state: a score row only exists once the transcript is
+  // completed/partial, which the branch above already labels "Transcribed".)
   return { label: "Saved", tone: "off" };
 }
 
