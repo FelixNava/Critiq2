@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import {
   buttonClass,
   cardClass,
+  mobileInputClass,
   secondaryButtonClass,
   textareaClass,
 } from "@/components/onboarding/ui";
+import { pipelineState, recordingLabel } from "@/components/recording/recordingUi";
 import CoachingPanel, {
   type InitialCoaching,
 } from "@/components/coaching/CoachingPanel";
@@ -18,6 +20,21 @@ import type {
   DebriefObservation,
   ObservationLens,
 } from "@/lib/debrief/types";
+
+/**
+ * A recording the rep can attach to this debrief (Phase 34d) — serialized for the
+ * client (startedAt as an ISO string). Already scoped to this account on the server.
+ */
+export interface DebriefRecordingOption {
+  id: string;
+  title: string | null;
+  startedAt: string;
+  durationMs: number | null;
+  status: string;
+  transcriptStatus: string | null;
+  scoreStatus: string | null;
+  overallScore: number | null;
+}
 
 export interface InitialDebrief {
   id: string;
@@ -98,11 +115,14 @@ function Spinner() {
 export default function DebriefPanel({
   accountId,
   hasSummary,
+  recordings,
   initialDebrief,
   initialCoaching,
 }: {
   accountId: string;
   hasSummary: boolean;
+  /** This account's recordings the rep can attach (Phase 34d). Empty for cold-start reps. */
+  recordings: DebriefRecordingOption[];
   initialDebrief: InitialDebrief | null;
   /** The latest coaching for `initialDebrief` (null if none / for a fresh debrief). */
   initialCoaching: InitialCoaching | null;
@@ -111,12 +131,19 @@ export default function DebriefPanel({
     () => `critiq:debrief:v1:${accountId}`,
     [accountId],
   );
+  // The attached-recording choice persists separately (project rule: selections
+  // persist across reloads), keyed per account so two accounts don't collide.
+  const recKey = useMemo(
+    () => `critiq:debrief:rec:v1:${accountId}`,
+    [accountId],
+  );
 
   const [debrief, setDebrief] = useState<InitialDebrief | null>(
     initialDebrief,
   );
   const [showForm, setShowForm] = useState<boolean>(!initialDebrief);
   const [form, setForm] = useState<FormState>({});
+  const [recordingId, setRecordingId] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -130,6 +157,29 @@ export default function DebriefPanel({
       /* ignore storage errors */
     }
   }, [draftKey, initialDebrief]);
+
+  // Restore the attached-recording choice, but only if that recording still
+  // exists for this account (it may have been re-assigned/deleted since).
+  useEffect(() => {
+    if (initialDebrief) return;
+    try {
+      const saved = window.localStorage.getItem(recKey);
+      if (saved && recordings.some((r) => r.id === saved)) {
+        setRecordingId(saved);
+      }
+    } catch {
+      /* ignore storage errors */
+    }
+  }, [recKey, initialDebrief, recordings]);
+
+  useEffect(() => {
+    try {
+      if (recordingId) window.localStorage.setItem(recKey, recordingId);
+      else window.localStorage.removeItem(recKey);
+    } catch {
+      /* ignore storage errors */
+    }
+  }, [recKey, recordingId]);
 
   useEffect(() => {
     try {
@@ -158,10 +208,16 @@ export default function DebriefPanel({
         const v = (form[p.key] ?? "").trim();
         if (v) report[p.key] = v;
       }
+      // Only send a recording id that's still a valid option for this account
+      // (the picker is filtered server-side; this guards a stale restored value).
+      const attach =
+        recordingId && recordings.some((r) => r.id === recordingId)
+          ? recordingId
+          : undefined;
       const res = await fetch(`/api/accounts/${accountId}/debrief`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ report }),
+        body: JSON.stringify(attach ? { report, recordingId: attach } : { report }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -172,6 +228,7 @@ export default function DebriefPanel({
       setShowForm(false);
       try {
         window.localStorage.removeItem(draftKey);
+        window.localStorage.removeItem(recKey);
       } catch {
         /* ignore */
       }
@@ -211,6 +268,15 @@ export default function DebriefPanel({
         recap and flag the commitments and loose ends, so nothing slips and your
         next prep is sharper.
       </p>
+
+      {recordings.length > 0 && (
+        <RecordingPicker
+          recordings={recordings}
+          value={recordingId}
+          onChange={setRecordingId}
+          disabled={submitting}
+        />
+      )}
 
       <section className={cardClass}>
         <div className="space-y-6">
@@ -280,6 +346,66 @@ export default function DebriefPanel({
         </button>
       </section>
     </div>
+  );
+}
+
+/* ----------------------- Attach-a-recording picker (34d) ---------------------- */
+
+/**
+ * Optional "was this call recorded?" picker shown above the debrief form when this
+ * account has recordings (Phase 34d). Attaching one lets the coaching step factor
+ * in the objective three-pillar score. Cold-start reps (no recordings) never see
+ * this — the un-recorded debrief flow is unchanged.
+ */
+function RecordingPicker({
+  recordings,
+  value,
+  onChange,
+  disabled,
+}: {
+  recordings: DebriefRecordingOption[];
+  value: string;
+  onChange: (id: string) => void;
+  disabled: boolean;
+}) {
+  const selectId = useId();
+  const selected = recordings.find((r) => r.id === value);
+  // Surface whether the chosen recording is scored yet so the rep knows what the
+  // coaching will have to work with. Coaching reads the score when it runs (after
+  // the debrief), so "still scoring" is fine — it'll be ready by then in most cases.
+  const selectedState = selected ? pipelineState(selected) : null;
+
+  return (
+    <section className={cardClass}>
+      <label htmlFor={selectId} className="block text-sm font-semibold text-slate-900">
+        Was this call recorded?
+        <span className="ml-2 font-normal text-slate-400">Optional</span>
+      </label>
+      <p className="mt-1 text-sm text-slate-500">
+        Attach the recording and Critiq factors in how the call actually went — your
+        coaching gets sharper.
+      </p>
+      <select
+        id={selectId}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className={`mt-3 ${mobileInputClass} disabled:opacity-60`}
+      >
+        <option value="">Don&apos;t attach a recording</option>
+        {recordings.map((r) => (
+          <option key={r.id} value={r.id}>
+            {recordingLabel(r)} — {pipelineState(r).label}
+          </option>
+        ))}
+      </select>
+      {selectedState && selectedState.tone !== "on" && (
+        <p className="mt-2 text-sm text-slate-500">
+          This recording is still processing. You can still attach it — Critiq will
+          use the score once it&apos;s ready.
+        </p>
+      )}
+    </section>
   );
 }
 

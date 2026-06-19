@@ -4,9 +4,11 @@ import AppHeader from "@/components/AppHeader";
 import StageBadge from "@/components/accounts/StageBadge";
 import type { InitialCoaching } from "@/components/coaching/CoachingPanel";
 import DebriefPanel, {
+  type DebriefRecordingOption,
   type InitialDebrief,
 } from "@/components/debrief/DebriefPanel";
 import { getAccountForUser } from "@/lib/accounts";
+import { listAssignedRecordingsForAccount } from "@/lib/recordings";
 import { getLatestCoachingForDebrief } from "@/lib/coaching/store";
 import type {
   CoachingPriority,
@@ -31,7 +33,26 @@ export default async function DebriefPage({
   const account = await getAccountForUser(userId, id);
   if (!account) notFound();
 
-  const latest = await getLatestDebriefForAccount(userId, id);
+  // The attachable recordings (Phase 34d) and the latest debrief are independent
+  // queries — run them together. Both are owner+account-scoped on the server; the
+  // recordings' Dates are serialized to ISO for the client picker.
+  const [accountRecordings, latest] = await Promise.all([
+    listAssignedRecordingsForAccount(userId, id),
+    getLatestDebriefForAccount(userId, id),
+  ]);
+  const recordingOptions: DebriefRecordingOption[] = accountRecordings.map(
+    (r) => ({
+      id: r.id,
+      title: r.title,
+      startedAt: r.startedAt.toISOString(),
+      durationMs: r.durationMs,
+      status: r.status,
+      transcriptStatus: r.transcriptStatus,
+      scoreStatus: r.scoreStatus,
+      overallScore: r.overallScore,
+    }),
+  );
+
   const initialDebrief: InitialDebrief | null = latest
     ? {
         id: latest.id,
@@ -83,6 +104,7 @@ export default async function DebriefPage({
         <DebriefPanel
           accountId={id}
           hasSummary={Boolean(account.summary && account.summary.trim())}
+          recordings={recordingOptions}
           initialDebrief={initialDebrief}
           initialCoaching={initialCoaching}
         />

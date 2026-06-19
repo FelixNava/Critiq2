@@ -2,7 +2,13 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
-import { toneClass, type Tone } from "@/components/recording/recordingUi";
+import {
+  toneClass,
+  pipelineState,
+  fmtDuration,
+  fmtRecordingDate,
+  recordingLabel,
+} from "@/components/recording/recordingUi";
 import {
   inlineButtonClass,
   inlineSecondaryButtonClass,
@@ -27,47 +33,6 @@ export type InboxRecording = {
 };
 
 export type InboxAccount = { id: string; name: string };
-
-/** Where a recording is in the capture → transcript → score pipeline. */
-function pipelineState(r: InboxRecording): { label: string; tone: Tone } {
-  if (r.status === "recording") return { label: "In progress", tone: "warn" };
-  if (r.scoreStatus === "completed") {
-    return {
-      label: r.overallScore != null ? `Scored · ${r.overallScore}` : "Scored",
-      tone: "on",
-    };
-  }
-  if (r.transcriptStatus === "completed" || r.transcriptStatus === "partial") {
-    return { label: "Transcribed", tone: "on" };
-  }
-  if (r.transcriptStatus === "processing" || r.transcriptStatus === "pending") {
-    return { label: "Transcribing", tone: "warn" };
-  }
-  return { label: "Saved", tone: "off" };
-}
-
-function fmtDuration(ms: number | null): string {
-  if (ms == null || ms <= 0) return "—";
-  const total = Math.round(ms / 1000);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  if (m === 0) return `${s}s`;
-  return `${m}m ${s.toString().padStart(2, "0")}s`;
-}
-
-function fmtDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function defaultLabel(r: InboxRecording): string {
-  return r.title?.trim() ? r.title : `Recording · ${fmtDate(r.startedAt)}`;
-}
 
 export default function RecordingsInbox({
   recordings,
@@ -149,12 +114,12 @@ function RecordingRow({
         <div className="min-w-0">
           <p
             className="line-clamp-2 text-base font-semibold text-slate-900"
-            title={defaultLabel(r)}
+            title={recordingLabel(r)}
           >
-            {defaultLabel(r)}
+            {recordingLabel(r)}
           </p>
           <p className="mt-0.5 text-sm text-slate-500">
-            {fmtDate(r.startedAt)} · {fmtDuration(r.durationMs)}
+            {fmtRecordingDate(r.startedAt)} · {fmtDuration(r.durationMs)}
             {hasGaps && coveragePct != null && (
               <span className="text-amber-700"> · {coveragePct}% captured</span>
             )}

@@ -14,8 +14,8 @@ BUILD_TOTAL_TOKEN_BUDGET=4000000
 BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
-PHASE_CURRENT=
-PHASE_CURRENT_STATUS=
+PHASE_CURRENT=34d/wire-recording-coaching
+PHASE_CURRENT_STATUS=building
 PHASE_CURRENT_PR=
 # 2026-06-19 (critiq-fullauto-34-35 firing #1): Phase 34 ADDITIVE parts 34a/b/c
 # DONE -> merged review-for-main (PR #33, squash 0e55638). Quick-record (/record +
@@ -407,7 +407,7 @@ UI_VERIFY_PENDING=
 # expert coach with sample outputs in the review packet — NOT gated. 🎯 SCOPE COMPLETE: the marketing
 # landing redesign + Phase 25 + Phase 26 are ALL built+merged → the scheduled task self-disables
 # (update_scheduled_task enabled=false). Nothing further to build in this task's scope.
-SESSION_LAST_HEARTBEAT=2026-06-19T11:30:00-04:00
+SESSION_LAST_HEARTBEAT=2026-06-19T12:45:00-04:00
 SESSION_TOKEN_BUDGET_USED=700000
 SESSION_ID=fullauto-34-35-phase34abc-quick-record-2026-06-19
 

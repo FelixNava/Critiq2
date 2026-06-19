@@ -179,6 +179,66 @@ export async function listRecordingsForUser(
 }
 
 /**
+ * A recording the rep can attach to a debrief (Phase 34d). Scoped to ONE account:
+ * only the rep's recordings already assigned to that account, with the title/date
+ * label inputs + the transcript/score pipeline state so the debrief picker can show
+ * whether a score is (or will be) available. Mirrors the inbox row but trimmed to
+ * what the picker needs.
+ */
+export type AccountRecordingOption = {
+  id: string;
+  title: string | null;
+  startedAt: Date;
+  durationMs: number | null;
+  status: string;
+  transcriptStatus: string | null;
+  scoreStatus: string | null;
+  overallScore: number | null;
+};
+
+/**
+ * List the rep's recordings ASSIGNED TO a specific account (newest first) for the
+ * debrief attach-a-recording picker (Phase 34d). Double-scoped: the rep owns the
+ * recording (userId) AND it's assigned to this account (accountId) — the same
+ * linkage the debrief route re-verifies before storing recordingId. Excludes
+ * soft-deleted captures. The transcript + score tables are UNIQUE per recording so
+ * the LEFT JOINs never multiply rows. The CALLER must already have verified the rep
+ * has access to the account (getAccountForUser).
+ */
+export async function listAssignedRecordingsForAccount(
+  userId: string,
+  accountId: string,
+): Promise<AccountRecordingOption[]> {
+  const rows = await db
+    .select({
+      id: recordings.id,
+      title: recordings.title,
+      startedAt: recordings.startedAt,
+      durationMs: recordings.durationMs,
+      status: recordings.status,
+      transcriptStatus: recordingTranscripts.status,
+      scoreStatus: callScores.status,
+      overallScore: callScores.overallScore,
+    })
+    .from(recordings)
+    .leftJoin(
+      recordingTranscripts,
+      eq(recordingTranscripts.recordingId, recordings.id),
+    )
+    .leftJoin(callScores, eq(callScores.recordingId, recordings.id))
+    .where(
+      and(
+        eq(recordings.userId, userId),
+        eq(recordings.accountId, accountId),
+        isNull(recordings.deletedAt),
+      ),
+    )
+    .orderBy(desc(recordings.startedAt));
+
+  return rows;
+}
+
+/**
  * Manually assign (or re-assign / clear) a recording's account, and optionally
  * set its title (Phase 34c). Rep-owned (the WHERE scopes to userId), so a rep
  * can't touch another rep's recording. The CALLER must already have verified the
