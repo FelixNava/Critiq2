@@ -37,8 +37,12 @@ PHASE_CURRENT_PR=
 # wired only into coaching so far (adopt in pre-call/script/debrief); 8th extractJsonObject copy →
 # shared-helper cleanup PR; CRITIQ_HALLUCINATION_GUARD_MODE=off|balanced is the field kill-switch.
 # 🎯 AGGRESSIVE-AUTO SCOPE COMPLETE: the landing redesign + Phases 25 + 26 are all built+merged to
-# review-for-main → this scheduled task (critiq-fullauto-aggressive-15-26) self-disables.
-PHASE_NEXT=scope-complete-task-self-disabled
+# review-for-main → that task (critiq-fullauto-aggressive-15-26) self-disabled. Phase 27 (Cold-Start UX)
+# done interactively 2026-06-19 (PR #32, squash 8253c58). NEW RUN armed 2026-06-19: task
+# critiq-fullauto-34-35 builds Phase 34 (quick-record + recordings inbox + manual assign + wire
+# recording→coaching) then Phase 35 (add context + import transcripts + wire working-memory→coaching)
+# → review-for-main, then self-stops. Specs in docs/PHASE_LEDGER.md (Phase 34/35 entries).
+PHASE_NEXT=34/quick-record-inbox-assign
 # Phase 33 DONE 2026-06-18 (aggressive-auto, relaxed gate + mandatory /design-critique):
 # Marketing Landing Redesign — replaced the Phase 4 landing at `/` with the Felix-approved
 # cinematic prototype, ported into Next.js 16 + React (one "use client" LandingPage component
@@ -58,7 +62,7 @@ PHASE_NEXT=scope-complete-task-self-disabled
 # NEXT = 26 Hallucination Guard (Phase 22 email-drafting is DEFERRED post-launch; 25 done this firing).
 # Phase 26 gets SCRUTINIZED (it consumes the source-tagged facts/traits from P23+P24 + the
 # working set from P25). After 26 → the MARKETING LANDING REDESIGN (final scope item).
-PHASE_NEXT=26/hallucination-guard
+# (stale, superseded by the 34/35 run) PHASE_NEXT=26/hallucination-guard
 # Phase 24 DONE 2026-06-18 (aggressive-auto, relaxed gate): Semantic Memory — Rep
 # Consolidation (Block 4, BACKEND, no UI). The REP side of the semantic tier and the
 # mirror-image of Phase 23: a PRIVATE running profile of how a rep sells (strengths,

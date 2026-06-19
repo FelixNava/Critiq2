@@ -655,6 +655,53 @@ Drive every flow end-to-end. Document known limitations. Final test pass.
 
 ---
 
+## Phase 34 — Quick-Record from the Dashboard + Recordings Inbox + Manual Account Assignment ☐ Planned
+
+> Felix-approved 2026-06-19 ("broader plan approved, full auto it"). DECISIONS: manual-assign FIRST (AI auto-detect of the account from the transcript is a deferred fast-follow = Phase 36, NOT in 34); WIRE THE VALUE THROUGH (a recording must visibly drive coaching, not just sit in storage).
+
+**Why:** recording today lives only on the dev `/recording-lab` surface, and the recording→debrief→score→coaching path is DOCUMENTED-DORMANT (the debrief UI never sets `recordingId`, so the three-pillar score never reaches coaching). A rep can't just "hit record" and have it matter.
+
+**Reuse — do NOT rebuild:** `recordings.account_id` is NULLABLE; `POST /api/recording/start` already takes an optional `accountId`; the reliability stack is built — `src/hooks/useRecorder.ts`, `src/lib/recording/*`, `src/lib/recordings.ts`, `src/lib/transcription/*` (Deepgram, runner, cron sweeper), `src/lib/scoring/*` + `POST /api/recording/[id]/score`. `RecordingLabPanel` already drives `useRecorder`.
+
+**Build (additive-first, then the wiring):**
+- **34a Quick-record entry (additive):** a "Record now" action on the Phase 27 dashboard workspace (+ a dedicated `/record` surface) starting a recording with `accountId = null` via the existing `useRecorder`. Rep-facing capture UI (not the dev lab): start/stop + keep-alive/coverage health + "keep screen on" guidance. Desktop-reliable; mobile best-effort (surface the existing gap/coverage warnings).
+- **34b Recordings inbox (additive):** new `/recordings` list (NONE exists today) — `listRecordingsForUser(userId)`: status (recording/completed + transcript/score state), duration, coverage %, account name or "Unassigned", date. Owner-scoped, empty state.
+- **34c Manual assign-to-account (additive):** `POST /api/recording/[id]/assign-account` setting the nullable `account_id`, GUARDED by recording-owner (`userId`) AND `getAccountForUser`. UI: an "Assign to an account" picker on each unassigned recording (+ inline new-account path). Re-assignment allowed.
+- **34d WIRE recording → coaching (the value; riskiest — do NOT regress the working loop):** on assign/on-demand, run transcription (built) → scoring (built); then light up the dormant score path — let a debrief on that account reference the recording (`call_debriefs.recordingId`) so Phase 21 coaching consumes the objective score (the documented-dormant ScoreCard). Recording stays OPTIONAL — never break the un-recorded debrief→coaching flow.
+
+**Schema:** additive only (account_id + linkage columns already exist); at most a small column (e.g., recording `title`); migration via `scripts/migrate.ts` direct SQL, additive, dev Neon. NO destructive changes.
+
+**UI phase → /design-critique REQUIRED** on every new surface; address P0/P1; Chrome/Preview MCP smoke; screenshots in the REVIEW PACKET.
+
+**FLAGGED for Felix:** the 34d wiring touches the live interaction loop — guard against regressing the un-recorded path; real audio capture is a device gate (the assign/score/linkage plumbing IS preview-verifiable); ~84s scoring latency; consent attestation (Phase 28) is NOT built — internal/beta capture only until 28.
+
+**Depends on:** Phases 12–16, 20/21, 27.
+
+---
+
+## Phase 35 — Add Context + Import Past Transcripts/Notes + Wire Working Memory into Coaching ☐ Planned
+
+> Felix-approved 2026-06-19. DECISIONS: context is rep-level AND account-level; import is PASTE-TEXT first (file-upload deferred); WIRE THE VALUE THROUGH — Phase 25 working memory is BUILT but consumed by NOTHING today; this phase plugs it in so added context + imports visibly sharpen coaching.
+
+**Why:** reps arrive with existing knowledge (themselves, their accounts, past calls) Critiq can't ingest, and the memory tier that should make coaching personal (Phase 25) is dormant.
+
+**Reuse — do NOT rebuild:** debrief-centric memory — `call_debriefs` (raw `report.happened` = episodic source), Phase 23 `account_summaries` + Phase 24 `rep_summaries` consolidation (consume completed debriefs, source-attributed), Phase 25 `src/lib/workingmemory/*` (methodology + rep profile + account summary + last-3 raw interactions, budgeted, split into cached stable layers + volatile context), Phase 26 hallucination guard, `buildRepProfileBlock` (18) + `buildCachedSystem` (17) consumer seams.
+
+**Build (additive-first, then the wiring):**
+- **35a Free-text context (additive):** rep-level ("what should Critiq know about how you sell" — new `rep_context` table or extend intake) + account-level (new `account_context_notes` table or additive `account_records.context` column). UI on profile (rep) + the account page (account). Each carries a SYNTHETIC source tag (`sourceId="rep-context"`/`"account-context"`) so the Phase 26 guard treats it as grounded, NOT redactable.
+- **35b Import past transcripts/notes (additive; paste-text first):** account-scoped "import a past call" (paste transcript/notes) → create a synthetic `call_debriefs` row (`report.happened = rawText`; run Phase 20 structuring OR mark completed) so it AUTOMATICALLY feeds 23/24 consolidation + 25 working memory — NO new pipeline. Fire consolidation after import. File-upload deferred.
+- **35c WIRE Phase 25 working memory into the AI consumers (the value; riskiest):** plug `buildWorkingMemory` into pre-call brief (18), script (19), debrief (20), coaching (21) via `buildCachedSystem`, keeping the Phase 26 guard in the path, so the assembled set (incl. the new context) drives the prompts. Touches all four consumers — SURGICAL; do not regress the working loop; honor token budgets.
+
+**Schema:** additive only (new context tables/columns; imports reuse `call_debriefs`); migrations via `scripts/migrate.ts` direct SQL, additive, dev Neon. NO destructive changes.
+
+**UI phase → /design-critique REQUIRED** on the context + import surfaces; screenshots in the REVIEW PACKET.
+
+**FLAGGED for Felix + the expert coach:** wiring working memory into all four consumers is the highest-leverage AND highest-regression-risk change in the plan — the relaxed gate proves it builds/runs, NOT that coaching improved; validate on real inputs; confirm the hallucination guard still holds with injected free-text context (synthetic source tags must be honored); imported transcripts are rep-private debrief material (rep-scoped).
+
+**Depends on:** Phases 20/21, 23/24/25, 26, 18.
+
+---
+
 # What actually happened on 2026-06-05 (Path B)
 
 The original plan was to arm cron firings at 3/4/5/6am ET to autobuild Phases 2–6.
