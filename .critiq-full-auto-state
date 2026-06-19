@@ -14,9 +14,14 @@ BUILD_TOTAL_TOKEN_BUDGET=4000000
 BUILD_PHASE_TOKEN_BUDGET=800000
 
 # --- PHASE TRACKING ---
-PHASE_CURRENT=
-PHASE_CURRENT_STATUS=
+PHASE_CURRENT=34/quick-record-inbox-assign
+PHASE_CURRENT_STATUS=building
 PHASE_CURRENT_PR=
+# 2026-06-19 (critiq-fullauto-34-35 firing): building Phase 34 ADDITIVE parts only
+# (34a quick-record + 34b recordings inbox + 34c manual assign-to-account) on
+# branch phase-34/quick-record-inbox-assign off review-for-main. Per the build
+# discipline (additive-first; split a large phase across firings), 34d (WIRE
+# recording -> coaching, the riskiest part) is DEFERRED to the next firing.
 # Phase 26 DONE 2026-06-18 (aggressive-auto, relaxed gate + high-effort code review). Hallucination
 # Guard — the conservative pre-output validator (the locked credibility guardrail). src/lib/
 # hallucinationguard/ (types/policy/detect/prompt/anthropic/guard/sources): a PURE LLM-free
