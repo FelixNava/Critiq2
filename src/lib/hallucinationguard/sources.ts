@@ -17,6 +17,7 @@
 import { getAccountSummary } from "@/lib/consolidation/store";
 import { getRepSummary } from "@/lib/repconsolidation/store";
 import { getRecentRawInteractionsForAccount } from "@/lib/workingmemory/sources";
+import { getRepContext, getAccountContext } from "@/lib/context";
 import type { DebriefReport } from "@/lib/debrief/types";
 import type { GroundedSource } from "./types";
 
@@ -79,7 +80,7 @@ export async function buildGroundedSources(
   accountId: string,
   identity: AccountIdentity = {},
 ): Promise<GroundedSource[]> {
-  const [accountSummary, repSummary, raw] = await Promise.all([
+  const [accountSummary, repSummary, raw, repCtx, accountCtx] = await Promise.all([
     getAccountSummary(accountId),
     getRepSummary(userId),
     getRecentRawInteractionsForAccount(
@@ -87,9 +88,26 @@ export async function buildGroundedSources(
       accountId,
       GROUNDING_MAX_RAW_INTERACTIONS,
     ),
+    getRepContext(userId),
+    getAccountContext(accountId),
   ]);
 
   const sources: GroundedSource[] = [];
+
+  // Phase 35a — human-entered context the rep explicitly told Critiq. These carry a
+  // stable SYNTHETIC source id (the locked decision: context is grounded, never
+  // redactable) so a true detail the rep added surfaces in coaching unredacted. The
+  // rep context is rep-private; the account context is the shared account note.
+  if (repCtx) {
+    sources.push({ id: "rep-context", kind: "rep-context", text: repCtx });
+  }
+  if (accountCtx) {
+    sources.push({
+      id: "account-context",
+      kind: "account-context",
+      text: accountCtx,
+    });
+  }
 
   // The account's own NAME is ground truth — the rep created/named the account, and the
   // generator is given the name, so it must be groundable (else legitimately naming the

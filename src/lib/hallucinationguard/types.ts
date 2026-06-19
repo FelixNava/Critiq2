@@ -46,7 +46,9 @@ export type GroundedSourceKind =
   | "account-fact" // Phase 23 attributed account fact (sourceDebriefId)
   | "rep-trait" // Phase 24 attributed rep trait (sourceDebriefId)
   | "raw-interaction" // Phase 25 verbatim debrief report (debriefId)
-  | "account-summary"; // the account running narrative/headline (Phase 23 write-back)
+  | "account-summary" // the account running narrative/headline (Phase 23 write-back)
+  | "rep-context" // Phase 35a rep-entered free-text context (id "rep-context")
+  | "account-context"; // Phase 35a shared account-entered context (id "account-context")
 
 /**
  * One unit of grounded truth Critiq is allowed to assert. `id` is the ORIGINATING
