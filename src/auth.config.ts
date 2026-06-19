@@ -10,6 +10,8 @@ const PROTECTED_PREFIXES = [
   "/dashboard",
   "/onboarding",
   "/accounts",
+  "/record",
+  "/recordings",
   "/recording-check",
   "/recording-lab",
 ];

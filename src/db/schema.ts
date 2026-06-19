@@ -283,6 +283,10 @@ export const recordings = pgTable(
     accountId: text("account_id").references(() => accountsTbl.id, {
       onDelete: "set null",
     }),
+    // Optional rep-given label for the recording (Phase 34) — e.g. "Beacon
+    // Builders — first call". Null on legacy rows and quick-records the rep
+    // hasn't named; the inbox falls back to a date label when absent.
+    title: text("title"),
     status: text("status").notNull().default("recording"), // recording | completed | failed | aborted
     startedAt: timestamp("started_at", { withTimezone: true })
       .notNull()
