@@ -59,25 +59,29 @@ export default async function DashboardPage() {
           Welcome, {name}.
         </h1>
 
-        {/* Quick capture — record now, assign to an account afterward (Phase 34). */}
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          <Link
-            href="/record"
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
-          >
-            <span
-              aria-hidden
-              className="inline-block h-2 w-2 rounded-full bg-red-400"
-            />
-            Record a call
-          </Link>
-          <Link
-            href="/recordings"
-            className="text-sm font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
-          >
-            Your recordings
-          </Link>
-        </div>
+        {/* Quick capture — record now, assign to an account afterward. Shown
+            once the rep has accounts; a brand-new user leads with "add your
+            first account" (a recording isn't useful until it has an account). */}
+        {hasAccounts && (
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <Link
+              href="/record"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+            >
+              <span
+                aria-hidden
+                className="inline-block h-2 w-2 rounded-full bg-red-400"
+              />
+              Record a call
+            </Link>
+            <Link
+              href="/recordings"
+              className="rounded-md text-sm font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+            >
+              Your recordings
+            </Link>
+          </div>
+        )}
 
         {/* PRIMARY: the rep's workspace — accounts are where the product lives. */}
         {!hasAccounts ? (

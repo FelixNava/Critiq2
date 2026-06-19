@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useRecorder } from "@/hooks/useRecorder";
 import { usePushAlerts } from "@/hooks/usePushAlerts";
-import { buttonClass, secondaryButtonClass } from "@/components/onboarding/ui";
+import {
+  buttonClass,
+  secondaryButtonClass,
+  cardClass,
+  inlineButtonClass,
+  inlineSecondaryButtonClass,
+} from "@/components/onboarding/ui";
 import {
   toneClass,
   statusLabel,
@@ -29,7 +35,6 @@ import {
 export default function RecordingPanel() {
   const {
     status,
-    recordingId,
     chunks,
     pending,
     keepAlive,
@@ -62,9 +67,9 @@ export default function RecordingPanel() {
   const saved = !isRecording && !captureLost && uploaded > 0;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+    <div className={cardClass}>
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-base font-semibold text-slate-900">Record a call</h2>
+        <h2 className="text-base font-semibold text-slate-900">Audio capture</h2>
         <span
           className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${toneClass[s.tone]}`}
         >
@@ -77,7 +82,7 @@ export default function RecordingPanel() {
       </p>
 
       <div className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm ring-1 ring-slate-200">
-        <p className="font-medium text-slate-700">
+        <p className="font-semibold text-slate-800">
           Make sure everyone on the call knows they&apos;re being recorded.
         </p>
       </div>
@@ -146,7 +151,7 @@ export default function RecordingPanel() {
               type="button"
               onClick={() => void stop()}
               disabled={busy}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50"
+              className={inlineButtonClass}
             >
               Keep &amp; stop
             </button>
@@ -154,7 +159,7 @@ export default function RecordingPanel() {
               type="button"
               onClick={() => void discard()}
               disabled={busy}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+              className={inlineSecondaryButtonClass}
             >
               Discard
             </button>
@@ -171,10 +176,7 @@ export default function RecordingPanel() {
           <p className="mt-0.5 text-emerald-800">
             Assign it to an account to turn it into coaching.
           </p>
-          <Link
-            href="/recordings"
-            className="mt-3 inline-flex items-center gap-1 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
-          >
+          <Link href="/recordings" className={`${inlineButtonClass} mt-3`}>
             Go to your recordings →
           </Link>
         </div>
@@ -196,7 +198,7 @@ export default function RecordingPanel() {
               type="button"
               onClick={() => void start()}
               disabled={busy}
-              className={buttonClass}
+              className={saved ? secondaryButtonClass : buttonClass}
             >
               {saved ? "Record another" : "Start recording"}
             </button>
@@ -263,6 +265,11 @@ export default function RecordingPanel() {
               {uploaded} saved{pending > 0 ? ` · ${pending} waiting` : ""}
             </p>
           </div>
+          {uploaded === 0 && (
+            <p className="mt-2 text-sm text-slate-400">
+              Saving as you go — parts appear here as they&apos;re recorded.
+            </p>
+          )}
         </div>
       )}
 
@@ -351,11 +358,6 @@ export default function RecordingPanel() {
         )}
       </div>
 
-      {recordingId && (
-        <p className="mt-4 text-xs text-slate-300">
-          Session {recordingId.slice(0, 8)}
-        </p>
-      )}
     </div>
   );
 }
