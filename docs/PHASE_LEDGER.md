@@ -720,6 +720,70 @@ Drive every flow end-to-end. Document known limitations. Final test pass.
 
 ---
 
+## Phase 36 — AI auto-detect account from a recording's transcript ☐ Deferred (fast-follow)
+
+> Deferred out of Phase 34 (manual assign-to-account shipped first, DEC-042). After scoring, infer the likely account from the transcript and suggest/auto-assign it, removing the manual step. Backend + light UI; full-auto-able. NOT blocking the call-analysis epic.
+
+---
+
+## Phase 37 — Account & Data Controls + Workspace Nav ✅ DONE (review-for-main, PR #37, squash 6ab6d9b, 2026-06-20)
+
+> Built supervised from the expectation-vs-reality audit, which found `/profile` existed (Phase 35a) but the rep's LEARNED model was invisible, there was no data-deletion path (a P0 vs the "your data stays yours" promise), and the header lacked workspace nav.
+
+- **37a — Workspace nav:** `AppHeader` now carries Dashboard · Accounts · Recordings (mobile-safe `flex-wrap` so the nav never pushes Sign out off-screen).
+- **37b — `/profile`:** account basics (name/email/role/member-since) + the read-only **learned model** (`rep_summaries` headline/narrative/traits — previously stored-but-never-rendered, audit MODEL-1) + intake completion status, alongside the existing Phase 35a free-text context editor.
+- **37c — P0 hard-delete (DEC-055, Option A):** `POST /api/account/delete` (authenticated owner + type-your-email confirm; admin self-delete blocked) → `purgeUserAccount()` del()s the rep's Vercel Blob audio then `DELETE users` (FK cascade wipes rep-private data; `created_by`/`account_id` SET NULL preserve shared account intelligence); a red "Danger zone" on `/profile` + honest `/privacy` "Deleting your data" copy.
+- **No migration** (additive; cascade FKs pre-existed). Build/types clean; **P0 delete verified end-to-end live on the preview** (confirm → purge → signed out → login rejected); `/design-critique` done, fixes deployed (`d2b0264`: mobile header wrap, 44px confirm/Cancel, focus-on-reveal, Read-only pill, contrast). Editing intake answers deferred to a later onboarding-persistence phase (needs DB-hydration).
+
+**Depends on:** Phases 9/10 (accounts), 24 (rep_summaries), 35a (context editor).
+
+---
+
+# Call Analysis Experience (Phases 38–44) — the bread-and-butter
+
+> Approved direction 2026-06-20 ("make the call analysis THE most robust part of the app"). Scoped by the `robust-call-analysis-approach` workflow (8 agents: user-research + Gong/Chorus benchmark + codebase audit + the recovered Manus original + experience design + connectivity architecture + design-critique + plan). **AWAITING Felix's go to build.**
+>
+> **Core finding:** the objective pipeline (capture → Deepgram transcript → 3-pillar SPIN/Voss/Navarro score with 12 sub-dimensions + verbatim evidence quotes) is BUILT and runs, but it is STRANDED — no `/recordings/[id]` detail page, no audio playback (chunk blobs read only by the transcriber), the rich score is computed-but-never-rendered (only an overall number reaches a coaching card, and only via a debrief + attach), and the score is a MEMORY DEAD-END (account/rep/working memory read debriefs only; scoring ignores memory IN, the score never feeds memory OUT). So the build is **surface it richly + close the loop both ways** — most of the hard AI work already exists.
+>
+> **MODEL decision (Felix owns; recommended):** all Claude calls are `claude-sonnet-4-6` today (transcription = Deepgram nova-3). Move **scoring + coaching to Opus 4.8 (`claude-opus-4-8`)** — the credibility core + the "what to say instead" wow; scoring is async (cron) so its ~84s latency is hidden. Keep Sonnet for consolidation + prep (brief/script/debrief). One-line per-runner `model` default change + bump the cached methodology layer past Opus's 4096-tok cacheable floor. Apply in Phase 38 (scoring) + 43/44 (coaching).
+>
+> **Design must-fixes (from `/design-critique`, baked into the phases below):** (1) a refine affordance on the OVERALL score, not just sub-dimensions; (2) mobile designed first-class (single column + sticky mini-player — phones are the primary rep context); (3) an honest trust badge ("grounded in your call" + a live evidence counter, never an over-claim); (4) lock the AUDIO CONTRACT via a spike BEFORE building the player (audio-time not wall-clock; gaps as non-seekable regions); (5) a Quick-read default (verdict + top 3 moments above the fold).
+>
+> **Full-auto map:** 38–42 = auto-build + interactive-verify + mandatory `/design-critique` (Felix owns ONLY the audio device-gate in 38/40). 43–44 = build the plumbing auto behind flags, but Felix + the expert coach own the CALIBRATION (what a "this isn't right" flag does to the score/memory; what objective signal enters shared memory + its weight).
+
+## Phase 38 — Recording Analysis Page (keystone): playback + transcript + assessment ☐ Planned
+
+> The keystone — everything else hangs off it. Begin with a short AUDIO SPIKE to lock the playback contract before building the player.
+
+**Build:** FIX the assign-flow bug (the inline "+ New account" on the assign screen hard-navigates to `/accounts/new` → `/accounts` with no return and drops the recording context — `RecordingsInbox.tsx:291`, `accounts/new/page.tsx:40`; the recording itself is safe + unassigned in `/recordings`). New `GET /api/recording/[id]/audio` (auth via `getRecordingForUser`; single-segment = live ordered-concat of chunk blobs with HTTP Range; multi-segment = cached server remux) + a transcript-words-with-global-time route for sync. New `/recordings/[id]` page (`max-w-6xl` desktop / single-column mobile) that upgrades section-by-section as transcript→score→coaching land (poll while pending, with backoff + a hard timeout): **verdict** (overall/100 + SPIN/Voss/Navarro bars + plain summary + honest trust badge + a score-level refine affordance), **audio player**, **speaker-labeled transcript**. Wire the three orphaned GET routes (recording/transcript/score). Honest failure + partial-capture states (never a fabricated score). "Saved → See your analysis" deep-link from `/record`.
+**Depends on:** 12–16, 34. **Risk:** HIGH (brand-new audio primitive over chunked Blob; device-sensitive; the assign-fix touches the pre-warm trigger that gates the whole pipeline). **Full-auto:** auto-build + interactive-verify; **Felix owns the audio device-gate.** **Model:** wire memory INTO scoring + bump scoring → Opus 4.8 here.
+
+## Phase 39 — Coachable Moments (evidence-cited cards) ☐ Planned
+**Build:** 3–5 ranked cards derived from `call_scores.dimensions` evidence + strengths/improvements, classified Pivotal (coral) / Missed (amber) / Strength (teal); each = tag + timestamp + evidence quote (jump-to-audio) + "why it matters" + a grounded **"try this instead"** line (methodology-labeled; shown ONLY when the model produced it, never invented). Hard cap 5 (no 25-point teardown). Bidirectional transcript↔moment jump off `transcript_segments.words`.
+**Depends on:** 38. **Risk:** MEDIUM (word-offset seek alignment; "try this instead" grounding quality). **Full-auto:** auto-build + interactive-verify.
+
+## Phase 40 — Synced Playback Polish ☐ Planned
+**Build:** current-line auto-highlight + follow-along auto-scroll; color-coded timeline moment markers (single source of timestamps shared with 39); in-transcript search; keyboard (space, ←/→ ±15s); 0.5–2× speed; sticky player; inline-EDITABLE diarization speaker labels (guards the mis-attribution credibility-inversion; corrections feed the refine loop and must reconcile with the score — display-only vs re-score, per the critique).
+**Depends on:** 38, 39. **Risk:** MEDIUM (cross-browser sync; speaker-edit write path). **Full-auto:** auto-build + interactive-verify; **playback scrub/seek/speed is device-gated (Felix).**
+
+## Phase 41 — Behavioral Metrics + Methodology Breakdown + Next Steps ☐ Planned
+**Build:** behavioral metrics (talk/listen, discovery-question count, longest monologue, focus skill) EACH vs the rep's own baseline (last-10 > team-best > research constant; cold-start hides "your avg" + shows the research benchmark flagged "building your baseline"; context-aware — no auto-penalize-too-many-questions); the 12-sub-dimension methodology accordion (collapsed by default; zero-evidence dims marked as grounding gaps; `partialJudgement` → "Not assessed" not a misleading 0); Phase 21 coaching/next-steps + a confirmed-next-step detector; account-linkage footer.
+**Depends on:** 38, 39. **Risk:** MEDIUM (baseline math over prior `call_scores`; rich `dimensions` jsonb has never been rendered). **Full-auto:** auto-build + interactive-verify.
+
+## Phase 42 — Shared Call Pill + Analysis Button ☐ Planned
+**Build:** ONE shared call-pill component (label + meta + state from the existing `pipelineState()`; a scored pill = score chip + an explicit **Analysis button** → `/recordings/[id]#assessment`; unscored = pipeline state + a disabled Analysis button w/ tooltip). Roll out to the recordings inbox, the account "Calls" list (replacing the hardcoded "Last interaction"/"How they buy" cold-start placeholders with real recordings/scores — audit Cluster B), dashboard recent activity, and the debrief attachment. Fix two stale schema/code comments (`call_debriefs.recordingId`; `workingmemory/build.ts`).
+**Depends on:** 38. **Risk:** LOW–MEDIUM (multi-surface rollout). **Full-auto:** auto-build + interactive-verify.
+
+## Phase 43 — AI-Feedback Refine Loop + per-rep calibration ☐ Planned
+**Build:** inline "Fair / This isn't right" on every moment, every sub-dimension, AND the overall score (critique P0); reason chips + free-text + an optional corrected-score nudge; a feedback table keyed to (scoreId, target, repId); an owner "override" (transparent, non-erasing). The PLUMBING (inline UI + table + write path) is auto-buildable; the BEHAVIOR — what a flag does to the score/memory/future calibration + the override semantics — is the AI-feedback refinement Felix flagged as his.
+**Depends on:** 39, 40, 41. **Risk:** HIGH (credibility-killer surface; mutates the calibration tier). **Full-auto:** SPLIT — 43a plumbing auto (interactive-verify); **43b calibration policy human-only (Felix + expert coach).**
+
+## Phase 44 — Close the Objective Memory Loop (score/transcript → memory) ☐ Planned
+**Build:** make the objective call stop being a memory dead-end — feed `call_scores` (+ salient transcript evidence) into `account_summaries` + `rep_summaries` + working memory (source-tagged `call-score:<id>` to honor the Phase 26 guard) so a scored recording sharpens the NEXT brief/script/debrief/coaching; derive a per-rep skill trend (the "I can see myself getting better" payoff); auto-link recording→debrief server-side so the score reliably reaches coaching. Additive schema only (`call_scores.fed_to_memory_at` high-water mark; optional skill-trend). Wire behind a flag.
+**Depends on:** 38; best AFTER 43 (so flagged/overridden scores can be weighted before they enter shared memory). **Risk:** HIGH (reshapes what feeds every downstream AI consumer). **Full-auto:** plumbing auto behind a flag; **what content enters shared memory + its weight = human-only sign-off (Felix + expert coach).**
+
+---
+
 # What actually happened on 2026-06-05 (Path B)
 
 The original plan was to arm cron firings at 3/4/5/6am ET to autobuild Phases 2–6.
