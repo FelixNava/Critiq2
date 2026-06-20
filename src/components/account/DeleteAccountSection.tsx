@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 
 /**
@@ -13,6 +13,13 @@ export default function DeleteAccountSection({ email }: { email: string }) {
   const [typed, setTyped] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Move focus to the confirm field when the destructive flow expands, so
+  // keyboard/screen-reader users land on the next step instead of the now-hidden trigger.
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
 
   const confirmed = typed.trim().toLowerCase() === email.trim().toLowerCase();
 
@@ -73,12 +80,13 @@ export default function DeleteAccountSection({ email }: { email: string }) {
             Type <span className="font-semibold">{email}</span> to confirm
           </label>
           <input
+            ref={inputRef}
             id="confirm-email"
             type="email"
             autoComplete="off"
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
-            className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+            className="mt-2 min-h-[44px] w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
             placeholder={email}
           />
           {error && (
@@ -103,7 +111,7 @@ export default function DeleteAccountSection({ email }: { email: string }) {
                 setError(null);
               }}
               disabled={submitting}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-900 disabled:opacity-50"
+              className="inline-flex min-h-[44px] items-center rounded-lg px-4 text-sm font-medium text-slate-600 transition hover:text-slate-900 disabled:opacity-50"
             >
               Cancel
             </button>

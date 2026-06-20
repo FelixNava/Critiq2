@@ -14,15 +14,15 @@ export default function AppHeader({
   backLabel?: string;
 } = {}) {
   return (
-    <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-      <div className="flex items-center gap-4">
+    <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-slate-200 bg-white px-6 py-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Link
           href="/dashboard"
           className="text-lg font-semibold tracking-tight text-slate-900"
         >
           Critiq
         </Link>
-        <nav className="flex items-center gap-3 text-sm font-medium">
+        <nav className="flex flex-wrap items-center gap-3 text-sm font-medium">
           <Link
             href="/dashboard"
             className="rounded-md text-slate-600 transition hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"

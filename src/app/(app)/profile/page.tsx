@@ -143,9 +143,14 @@ export default async function ProfilePage() {
 
         {/* What Critiq has learned — read-only consolidated model (rep_summaries) */}
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="text-sm font-semibold text-slate-900">
-            What Critiq has learned about how you sell
-          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-sm font-semibold text-slate-900">
+              What Critiq has learned about how you sell
+            </h2>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+              Read-only
+            </span>
+          </div>
           {hasModel ? (
             <>
               {repSummary?.headline && (
@@ -214,7 +219,7 @@ export default async function ProfilePage() {
                   {done ? (
                     <span className="font-medium text-emerald-600">Done</span>
                   ) : (
-                    <span className="text-slate-500">Not yet</span>
+                    <span className="text-slate-600">Not yet</span>
                   )}
                 </li>
               );
