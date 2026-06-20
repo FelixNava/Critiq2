@@ -112,12 +112,13 @@ function RecordingRow({
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p
-            className="line-clamp-2 text-base font-semibold text-slate-900"
+          <Link
+            href={`/recordings/${r.id}`}
+            className="line-clamp-2 text-base font-semibold text-slate-900 underline-offset-2 hover:underline"
             title={recordingLabel(r)}
           >
             {recordingLabel(r)}
-          </p>
+          </Link>
           <p className="mt-0.5 text-sm text-slate-500">
             {fmtRecordingDate(r.startedAt)} · {fmtDuration(r.durationMs)}
             {hasGaps && coveragePct != null && (
@@ -186,30 +187,32 @@ function AssignControl({
     title?: string | null,
   ) => void;
 }) {
+  // Local accounts list so a just-created account immediately appears in the
+  // <select> and resolves in the name lookup, with no navigation or refetch.
+  const [accts, setAccts] = useState<InboxAccount[]>(accounts);
   const [accountId, setAccountId] = useState<string>(currentAccountId ?? "");
   const [title, setTitle] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Inline create-account state. Start in create mode when the rep has no
+  // accounts yet, so the empty case becomes "create + assign" in one flow
+  // instead of a dead-end link off /recordings (the assign-flow bug).
+  const [creating, setCreating] = useState(accounts.length === 0);
+  const [newName, setNewName] = useState("");
+  const [createBusy, setCreateBusy] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
   const selectId = useId();
   const titleId = useId();
+  const newNameId = useId();
 
-  if (accounts.length === 0) {
-    return (
-      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-        You don&apos;t have any accounts yet.{" "}
-        <Link
-          href="/accounts/new"
-          className="font-medium text-slate-900 underline underline-offset-2"
-        >
-          Add an account
-        </Link>{" "}
-        first, then come back to assign this recording.
-      </div>
-    );
-  }
-
-  async function submit() {
-    if (!accountId || busy) return;
+  // Assign the recording to `acctId`. The create flow passes an explicit id
+  // (React state isn't synchronous). Reuses the exact same request the normal
+  // path fires, so the server's after() pre-warm trigger is unaffected.
+  async function submit(explicitAccountId?: string) {
+    const acctId = explicitAccountId ?? accountId;
+    if (!acctId || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -217,7 +220,7 @@ function AssignControl({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          accountId,
+          accountId: acctId,
           ...(title.trim() ? { title: title.trim() } : {}),
         }),
       });
@@ -226,8 +229,8 @@ function AssignControl({
         setError(data.error ?? "Couldn't assign this recording.");
         return;
       }
-      const name = accounts.find((a) => a.id === accountId)?.name ?? "Account";
-      onDone(accountId, name, title.trim() ? title.trim() : undefined);
+      const name = accts.find((a) => a.id === acctId)?.name ?? "Account";
+      onDone(acctId, name, title.trim() ? title.trim() : undefined);
     } catch {
       setError("Couldn't reach the server. Try again.");
     } finally {
@@ -235,25 +238,83 @@ function AssignControl({
     }
   }
 
+  // Create a new account, then immediately assign this recording to it — one
+  // uninterrupted flow, no navigation away from /recordings. If the assign step
+  // fails afterward, the created account is harmless and stays selected to retry.
+  async function createAndAssign() {
+    const name = newName.trim();
+    if (!name || createBusy) return;
+    setCreateBusy(true);
+    setCreateError(null);
+    try {
+      const res = await fetch("/api/accounts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        id?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.id) {
+        setCreateError(data.error ?? "Couldn't create that account.");
+        return;
+      }
+      const created = { id: data.id, name };
+      setAccts((prev) => [...prev, created]);
+      setAccountId(created.id);
+      setNewName("");
+      setCreating(false);
+      await submit(created.id);
+    } catch {
+      setCreateError("Couldn't reach the server. Try again.");
+    } finally {
+      setCreateBusy(false);
+    }
+  }
+
   return (
     <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <label htmlFor={selectId} className="block text-sm font-medium text-slate-700">
-        <span className="block">Account</span>
-        <select
-          id={selectId}
-          aria-label="Account"
-          value={accountId}
-          onChange={(e) => setAccountId(e.target.value)}
-          className={`mt-1 ${mobileInputClass}`}
+      {creating ? (
+        <label
+          htmlFor={newNameId}
+          className="block text-sm font-medium text-slate-700"
         >
-          <option value="">Choose an account…</option>
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-      </label>
+          <span className="block">New account name</span>
+          <input
+            id={newNameId}
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            maxLength={200}
+            autoFocus
+            placeholder="e.g. Sherwin Williams — Newark"
+            className={`mt-1 ${mobileInputClass}`}
+          />
+        </label>
+      ) : (
+        <label
+          htmlFor={selectId}
+          className="block text-sm font-medium text-slate-700"
+        >
+          <span className="block">Account</span>
+          <select
+            id={selectId}
+            aria-label="Account"
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            className={`mt-1 ${mobileInputClass}`}
+          >
+            <option value="">Choose an account…</option>
+            {accts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <label
         htmlFor={titleId}
@@ -273,27 +334,63 @@ function AssignControl({
         />
       </label>
 
-      {error && (
+      {creating && createError && (
+        <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
+          {createError}
+        </p>
+      )}
+      {!creating && error && (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
           {error}
         </p>
       )}
 
-      <div className="mt-4 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={busy || !accountId}
-          className={inlineButtonClass}
-        >
-          {busy ? "Assigning…" : "Assign"}
-        </button>
-        <Link
-          href="/accounts/new"
-          className="text-sm font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
-        >
-          + New account
-        </Link>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        {creating ? (
+          <>
+            <button
+              type="button"
+              onClick={() => void createAndAssign()}
+              disabled={createBusy || busy || !newName.trim()}
+              className={inlineButtonClass}
+            >
+              {createBusy || busy ? "Creating…" : "Create & assign"}
+            </button>
+            {accts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCreating(false);
+                  setCreateError(null);
+                }}
+                className={inlineSecondaryButtonClass}
+              >
+                Cancel
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => void submit()}
+              disabled={busy || !accountId}
+              className={inlineButtonClass}
+            >
+              {busy ? "Assigning…" : "Assign"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCreating(true);
+                setError(null);
+              }}
+              className="text-sm font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
+            >
+              + New account
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
