@@ -741,6 +741,8 @@ Drive every flow end-to-end. Document known limitations. Final test pass.
 
 # Call Analysis Experience (Phases 38–44) — the bread-and-butter
 
+> **Canonical deep-dive: `docs/CALL_ANALYSIS_APPROACH.md`** (full research · design IA · architecture/connectivity · design-critique · plan). Read it before building any analysis phase; the entries below are the roadmap.
+>
 > Approved direction 2026-06-20 ("make the call analysis THE most robust part of the app"). Scoped by the `robust-call-analysis-approach` workflow (8 agents: user-research + Gong/Chorus benchmark + codebase audit + the recovered Manus original + experience design + connectivity architecture + design-critique + plan). **AWAITING Felix's go to build.**
 >
 > **Core finding:** the objective pipeline (capture → Deepgram transcript → 3-pillar SPIN/Voss/Navarro score with 12 sub-dimensions + verbatim evidence quotes) is BUILT and runs, but it is STRANDED — no `/recordings/[id]` detail page, no audio playback (chunk blobs read only by the transcriber), the rich score is computed-but-never-rendered (only an overall number reaches a coaching card, and only via a debrief + attach), and the score is a MEMORY DEAD-END (account/rep/working memory read debriefs only; scoring ignores memory IN, the score never feeds memory OUT). So the build is **surface it richly + close the loop both ways** — most of the hard AI work already exists.
