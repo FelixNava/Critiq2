@@ -15,7 +15,26 @@ export default function PrivacyPage() {
       </p>
       <p className="mt-4 text-slate-600">
         During the beta, your data is accessible only to you and Critiq
-        administrators, and is never sold. Questions? Email{" "}
+        administrators, and is never sold.
+      </p>
+
+      <h2 className="mt-6 text-lg font-semibold text-slate-900">
+        Deleting your data
+      </h2>
+      <p className="mt-2 text-slate-600">
+        You can permanently delete your account at any time from your{" "}
+        <a href="/profile" className="font-medium text-slate-900 underline">
+          profile
+        </a>
+        . Deleting your account immediately and permanently removes everything
+        private to you — your call recordings and their audio, transcripts,
+        scores, call prep, debriefs, coaching, your learned profile, and your
+        notes. Shared account records your team relies on remain, with your
+        personal link removed. This cannot be undone.
+      </p>
+
+      <p className="mt-4 text-slate-600">
+        Questions? Email{" "}
         <a
           href="mailto:hello@critiq.firstlap.dev"
           className="font-medium text-slate-900 underline"

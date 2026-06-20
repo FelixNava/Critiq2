@@ -22,6 +22,26 @@ export default function AppHeader({
         >
           Critiq
         </Link>
+        <nav className="flex items-center gap-3 text-sm font-medium">
+          <Link
+            href="/dashboard"
+            className="rounded-md text-slate-600 transition hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+          >
+            Dashboard
+          </Link>
+          <Link
+            href="/accounts"
+            className="rounded-md text-slate-600 transition hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+          >
+            Accounts
+          </Link>
+          <Link
+            href="/recordings"
+            className="rounded-md text-slate-600 transition hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+          >
+            Recordings
+          </Link>
+        </nav>
         {process.env.VERCEL_ENV !== "production" && (
           <Link
             href="/recording-lab"
