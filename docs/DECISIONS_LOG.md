@@ -772,3 +772,19 @@ This section is filled by the master orchestrator at the end of every Full Auto 
 - Decisions where Iterability=low (highest review priority)
 
 Felix reads this section first when reviewing.
+
+## DEC-055 — Phase 37 data-deletion: hard cascade delete (Option A)
+Phase: 37/account-data-controls
+Date: 2026-06-20 ET
+Type: trade-off
+
+Context: The P0 "delete my data" needed a deletion model (privacy decision #5 + the landing's "your data stays yours / cancel anytime"). Felix chose the model after a detailed walkthrough of the three options.
+
+Chosen: Option A — HARD delete of the user row. `DELETE users` cascades all rep-private data (intake, recordings/transcripts/scores, briefs, scripts, debriefs, coaching, rep model, rep context, push subs, auth sessions, account-rep links); `accounts.created_by` + `recordings.account_id` SET NULL preserve the SHARED, rep-agnostic account intelligence (matches the locked privacy model: account intel shared, full inheritance). Gated by an authenticated session + a type-your-email confirm; admin self-delete blocked (avoid locking out the only admin). Vercel Blob audio is explicitly del()'d BEFORE the cascade (blobs live outside Postgres, so the DB cascade alone would orphan them) — best-effort so a Blob failure never blocks the row delete. No migration (the cascade FKs already exist).
+
+Alternatives considered:
+  - Option A — hard delete (CHOSEN): literally honors the promise; cascade already set up; the soft-delete convention is for recoverable CONTENT, not a user's account-deletion right.
+  - Option B — soft-delete + purge cron (rejected): weaker/delayed "deleted" claim; needs a deletedAt column + leak-prone deletedAt filters on every rep-scoped query + a purge cron.
+  - Option C — both delete-my-data + delete-account (rejected): more than a 5–10 rep beta needs; revisit post-beta if a "wipe content, keep login" want emerges.
+
+Note: the per-task AI MODEL bump (Opus 4.8 for scoring/coaching) is a SEPARATE AI-quality decision Felix owns, not part of Phase 37.

@@ -356,8 +356,14 @@ PHASE_NEXT=
 # block ~929 tok sits under the Sonnet 1024 cacheable floor on its own (caches once per-rep layer
 # extends the prefix); confirm the rep-private raw scope is intended; the ~4-chars/tok estimate is a
 # heuristic not a tokenizer; WIRING the consumers onto the builder is the real payoff + is NOT done.
-PHASE_LAST_COMPLETED=35c/wire-working-memory-into-consumers
-PHASE_LAST_COMPLETED_AT=2026-06-19T17:20:00-04:00
+PHASE_LAST_COMPLETED=37/account-data-controls
+PHASE_LAST_COMPLETED_AT=2026-06-20T00:00:00-04:00
+# Phase 37 (account & data controls + workspace nav) merged to review-for-main (PR #37, squash 6ab6d9b),
+# verified live (P0 hard-delete end-to-end). NEXT (pending Felix's go) = the CALL-ANALYSIS experience:
+# robust approach delivered via the `robust-call-analysis-approach` workflow (research+design+architecture+
+# plan) — /recordings/[id] detail (playback + synced transcript + full assessment + evidence) + a call-pill
+# Analysis button + fix the assign-flow bug + close the score<->memory loop. 7 phases, 5 full-auto-able;
+# Felix owns the audio device-gate + the AI-feedback calibration (6-7). Model rec: Opus 4.8 for scoring+coaching.
 
 # --- ENVIRONMENT READINESS (checked by /critiq-full-auto Step 1d before any DB phase) ---
 # DATABASE_URL provisioned (dedicated Critiq Neon project, PG 18.4) + in Vercel prod/dev.
@@ -472,7 +478,7 @@ UI_VERIFY_PENDING=34d,35ab
 # expert coach with sample outputs in the review packet — NOT gated. 🎯 SCOPE COMPLETE: the marketing
 # landing redesign + Phase 25 + Phase 26 are ALL built+merged → the scheduled task self-disables
 # (update_scheduled_task enabled=false). Nothing further to build in this task's scope.
-SESSION_LAST_HEARTBEAT=2026-06-19T17:20:00-04:00
+SESSION_LAST_HEARTBEAT=2026-06-20T00:00:00-04:00
 SESSION_TOKEN_BUDGET_USED=350000
 SESSION_ID=fullauto-34-35-phase35c-wire-working-memory-2026-06-19
 
