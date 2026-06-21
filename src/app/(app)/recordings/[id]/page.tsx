@@ -9,11 +9,12 @@ import {
   fmtDuration,
   fmtRecordingDate,
   recordingLabel,
+  coveragePct,
 } from "@/components/recording/recordingUi";
 import { getRecordingForUser } from "@/lib/recordings";
 import { getTranscriptForRecording } from "@/lib/transcription/store";
 import { getScoreForRecording } from "@/lib/scoring/store";
-import { getAccountForUser } from "@/lib/accounts";
+import { getAccountNameById } from "@/lib/accounts";
 import ScoreCard, { type ScoreCardData } from "@/components/recording/ScoreCard";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +47,7 @@ export default async function RecordingDetailPage({
     getTranscriptForRecording(id),
     getScoreForRecording(id),
     recording.accountId
-      ? getAccountForUser(userId, recording.accountId)
+      ? getAccountNameById(recording.accountId)
       : Promise.resolve(null),
   ]);
 
@@ -81,7 +82,12 @@ export default async function RecordingDetailPage({
             voss: score.vossScore,
             navarro: score.navarroScore,
           },
-          dimensions: (score.dimensions as ScoreCardData["dimensions"]) ?? null,
+          dimensions:
+            score.dimensions &&
+            typeof score.dimensions === "object" &&
+            !Array.isArray(score.dimensions)
+              ? (score.dimensions as ScoreCardData["dimensions"])
+              : null,
           strengths: Array.isArray(score.strengths)
             ? (score.strengths as string[])
             : [],
@@ -97,13 +103,7 @@ export default async function RecordingDetailPage({
   const noScorableAudio = transcriptReady && (wordCount ?? 0) === 0;
   // Some audio was lost during capture (gap recovery). Honest, not a fake 100%.
   const hasGaps = (recording.gapCount ?? 0) > 0;
-  const coveragePct =
-    recording.durationMs && recording.durationMs > 0 && recording.gapMs != null
-      ? Math.round(
-          ((recording.durationMs - recording.gapMs) / recording.durationMs) *
-            100,
-        )
-      : null;
+  const coverage = coveragePct(recording.durationMs, recording.gapMs);
 
   // Poll only while the pipeline is genuinely expected to advance. For an
   // unassigned recording nothing runs until it's assigned, so we don't spin.
@@ -129,10 +129,10 @@ export default async function RecordingDetailPage({
             <h1 className="truncate text-2xl font-semibold text-slate-900">
               {recordingLabel({ title: recording.title, startedAt: startedIso })}
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-slate-600">
               {fmtRecordingDate(startedIso)} · {fmtDuration(recording.durationMs)}
-              {hasGaps && coveragePct != null && (
-                <span className="text-amber-700"> · {coveragePct}% captured</span>
+              {hasGaps && coverage != null && (
+                <span className="text-amber-700"> · {coverage}% captured</span>
               )}
             </p>
           </div>
@@ -216,7 +216,7 @@ export default async function RecordingDetailPage({
               {hasGaps ? (
                 <Muted>
                   Some audio was lost during capture
-                  {coveragePct != null ? ` (${coveragePct}% captured)` : ""}; the
+                  {coverage != null ? ` (${coverage}% captured)` : ""}; the
                   player will mark those gaps. Audio playback lands in the next
                   update.
                 </Muted>
@@ -271,7 +271,7 @@ function Muted({
   className?: string;
 }) {
   return (
-    <p className={`text-sm leading-relaxed text-slate-500 ${className}`}>
+    <p className={`text-sm leading-relaxed text-slate-600 ${className}`}>
       {children}
     </p>
   );

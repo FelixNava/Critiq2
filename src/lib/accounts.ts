@@ -71,6 +71,24 @@ export async function listAccountsForUser(
 }
 
 /**
+ * Lightweight account-name lookup ({id, name} only, soft-delete-guarded) for a
+ * surface that already has access to the account via a different owned entity —
+ * e.g. the rep's own recording, whose accountId was set through an access-checked
+ * assign. Avoids getAccountForUser's contacts query + summary/context columns when
+ * only the name is rendered.
+ */
+export async function getAccountNameById(
+  accountId: string,
+): Promise<{ id: string; name: string } | null> {
+  const rows = await db
+    .select({ id: accountsTbl.id, name: accountsTbl.name })
+    .from(accountsTbl)
+    .where(and(eq(accountsTbl.id, accountId), isNull(accountsTbl.deletedAt)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
  * Create an account and assign the creating rep as its owner. Returns the new
  * account id. The account is shared (intelligence is account-scoped), but the
  * creator is linked as `owner` so it appears in their list immediately.

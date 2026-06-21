@@ -8,6 +8,7 @@ import {
   fmtDuration,
   fmtRecordingDate,
   recordingLabel,
+  coveragePct,
 } from "@/components/recording/recordingUi";
 import {
   inlineButtonClass,
@@ -102,10 +103,7 @@ function RecordingRow({
 }) {
   const [open, setOpen] = useState(false);
   const state = pipelineState(r);
-  const coveragePct =
-    r.durationMs && r.durationMs > 0 && r.gapMs != null
-      ? Math.round(((r.durationMs - r.gapMs) / r.durationMs) * 100)
-      : null;
+  const coverage = coveragePct(r.durationMs, r.gapMs);
   const hasGaps = (r.gapCount ?? 0) > 0;
 
   return (
@@ -121,8 +119,8 @@ function RecordingRow({
           </Link>
           <p className="mt-0.5 text-sm text-slate-500">
             {fmtRecordingDate(r.startedAt)} · {fmtDuration(r.durationMs)}
-            {hasGaps && coveragePct != null && (
-              <span className="text-amber-700"> · {coveragePct}% captured</span>
+            {hasGaps && coverage != null && (
+              <span className="text-amber-700"> · {coverage}% captured</span>
             )}
           </p>
         </div>
@@ -210,7 +208,7 @@ function AssignControl({
   // Assign the recording to `acctId`. The create flow passes an explicit id
   // (React state isn't synchronous). Reuses the exact same request the normal
   // path fires, so the server's after() pre-warm trigger is unaffected.
-  async function submit(explicitAccountId?: string) {
+  async function submit(explicitAccountId?: string, explicitName?: string) {
     const acctId = explicitAccountId ?? accountId;
     if (!acctId || busy) return;
     setBusy(true);
@@ -229,7 +227,10 @@ function AssignControl({
         setError(data.error ?? "Couldn't assign this recording.");
         return;
       }
-      const name = accts.find((a) => a.id === acctId)?.name ?? "Account";
+      // Prefer an explicitly-passed name (the create flow knows it before React
+      // state catches up); fall back to the list, then a safe default.
+      const name =
+        explicitName ?? accts.find((a) => a.id === acctId)?.name ?? "Account";
       onDone(acctId, name, title.trim() ? title.trim() : undefined);
     } catch {
       setError("Couldn't reach the server. Try again.");
@@ -266,7 +267,7 @@ function AssignControl({
       setAccountId(created.id);
       setNewName("");
       setCreating(false);
-      await submit(created.id);
+      await submit(created.id, name);
     } catch {
       setCreateError("Couldn't reach the server. Try again.");
     } finally {

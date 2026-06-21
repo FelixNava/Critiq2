@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
   PILLARS,
   dimensionsForPillar,
@@ -29,30 +29,42 @@ const PILLAR_COLOR: Record<PillarKey, string> = {
 };
 
 /**
- * A dimension the model omitted shows as "Not assessed" (never a misleading 0).
- * We treat score 0 with no rationale as not-assessed; a real "skill absent" 0
- * carries a rationale explaining the absence.
+ * A dimension the model OMITTED shows as "Not assessed" (never a misleading 0).
+ * Only a fully-empty dimension counts: no points, no rationale, AND no quote. A
+ * real "skill absent" 0 carries a rationale (and legitimately no quote), and a 0
+ * that still cites a quote is clearly assessed — both stay real scores, not
+ * "Not assessed". (Keeping evidence in the test also stops the trust counter from
+ * ever exceeding its denominator.)
  */
 function isNotAssessed(d: StoredDim | undefined): boolean {
-  return (d?.score ?? 0) === 0 && !(d?.rationale ?? "").trim();
+  return (
+    (d?.score ?? 0) === 0 &&
+    !(d?.rationale ?? "").trim() &&
+    (d?.evidence?.length ?? 0) === 0
+  );
 }
 
 export default function ScoreCard({ data }: { data: ScoreCardData }) {
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [refineOpen, setRefineOpen] = useState(false);
+  const refineId = useId();
+  const breakdownId = useId();
 
   const dims = data.dimensions ?? {};
   const pillarKeys: PillarKey[] = ["spin", "voss", "navarro"];
 
-  // Trust: how many sub-scores cite at least one verbatim quote. Excludes
-  // not-assessed dims so the badge never over-claims grounding.
-  const assessed = Object.values(PILLARS).flatMap((p) =>
+  // Trust: of the sub-scores that AWARDED points, how many cite a verbatim
+  // quote? A positive score with no quote is a real grounding gap; a 0 (skill
+  // absent) legitimately has no quote, so it stays out of the denominator. This
+  // keeps groundedCount ≤ scoredCount by construction.
+  const allDims = Object.values(PILLARS).flatMap((p) =>
     dimensionsForPillar(p.key),
   );
-  const assessedCount = assessed.filter((d) => !isNotAssessed(dims[d.key])).length;
-  const groundedCount = assessed.filter(
-    (d) => (dims[d.key]?.evidence?.length ?? 0) > 0,
+  const scoredCount = allDims.filter((d) => (dims[d.key]?.score ?? 0) > 0).length;
+  const groundedCount = allDims.filter(
+    (d) => (dims[d.key]?.score ?? 0) > 0 && (dims[d.key]?.evidence?.length ?? 0) > 0,
   ).length;
+  const fullyGrounded = scoredCount > 0 && groundedCount === scoredCount;
 
   return (
     <div>
@@ -62,21 +74,25 @@ export default function ScoreCard({ data }: { data: ScoreCardData }) {
           <p className="text-sm text-slate-500">Overall</p>
           <p className="text-4xl font-semibold tracking-tight text-slate-900">
             {data.overall ?? "—"}
-            <span className="text-xl font-normal text-slate-400">/100</span>
+            <span className="text-xl font-normal text-slate-500">/100</span>
           </p>
         </div>
         <button
           type="button"
           onClick={() => setRefineOpen((v) => !v)}
-          className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+          className="inline-flex min-h-[44px] shrink-0 items-center rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
           aria-expanded={refineOpen}
+          aria-controls={refineId}
         >
           Not quite right?
         </button>
       </div>
 
       {refineOpen && (
-        <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600" role="status">
+        <p
+          id={refineId}
+          className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600"
+        >
           Soon you’ll be able to flag a score or moment that’s off and Critiq will
           factor it in. That’s coming in a later update — for now your feedback
           isn’t saved.
@@ -85,10 +101,26 @@ export default function ScoreCard({ data }: { data: ScoreCardData }) {
 
       {/* Trust badge + live evidence counter */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-          <span aria-hidden>✓</span> Grounded in your call · {groundedCount}/
-          {assessedCount} sub-scores cite evidence
-        </span>
+        {scoredCount === 0 ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+            Grounded in your call once scored
+          </span>
+        ) : (
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${
+              fullyGrounded
+                ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                : "bg-amber-50 text-amber-700 ring-amber-200"
+            }`}
+          >
+            {/* Verdict carried in text (not color/glyph alone) for SR + colorblind users. */}
+            <span className="sr-only">
+              {fullyGrounded ? "Fully grounded: " : "Partly grounded: "}
+            </span>
+            <span aria-hidden>{fullyGrounded ? "✓" : "⚠"}</span> Grounded in your
+            call · {groundedCount} of {scoredCount} scored areas cite evidence
+          </span>
+        )}
         {data.partialJudgement && (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
             Some dimensions weren’t assessed
@@ -100,15 +132,19 @@ export default function ScoreCard({ data }: { data: ScoreCardData }) {
       <div className="mt-5 space-y-3">
         {pillarKeys.map((pk) => {
           const p = PILLARS[pk];
-          const score = data.pillars[pk] ?? 0;
+          const raw = data.pillars[pk];
+          const score = raw ?? 0;
           const pct = p.maxPoints > 0 ? (score / p.maxPoints) * 100 : 0;
+          // Floor a real (>0) score's fill so a small score is never an
+          // invisible sliver mistaken for zero.
+          const fillPct = score > 0 ? Math.max(pct, 4) : 0;
           return (
             <div key={pk}>
               <div className="flex items-baseline justify-between text-sm">
                 <span className="font-medium text-slate-800">{p.name}</span>
                 <span className="tabular-nums text-slate-500">
-                  {data.pillars[pk] ?? "—"}
-                  <span className="text-slate-400">/{p.maxPoints}</span>
+                  {raw ?? "—"}
+                  <span className="text-slate-500">/{p.maxPoints}</span>
                 </span>
               </div>
               <div
@@ -117,11 +153,12 @@ export default function ScoreCard({ data }: { data: ScoreCardData }) {
                 aria-valuenow={score}
                 aria-valuemin={0}
                 aria-valuemax={p.maxPoints}
+                aria-valuetext={raw == null ? "Not scored" : undefined}
                 aria-label={`${p.name} score`}
               >
                 <div
                   className="h-full rounded-full"
-                  style={{ width: `${pct}%`, backgroundColor: PILLAR_COLOR[pk] }}
+                  style={{ width: `${fillPct}%`, backgroundColor: PILLAR_COLOR[pk] }}
                 />
               </div>
             </div>
@@ -152,7 +189,7 @@ export default function ScoreCard({ data }: { data: ScoreCardData }) {
               title="What to work on"
               items={data.improvements}
               marker="→"
-              markerClass="text-slate-400"
+              markerClass="text-slate-500"
             />
           )}
         </div>
@@ -163,14 +200,18 @@ export default function ScoreCard({ data }: { data: ScoreCardData }) {
         <button
           type="button"
           onClick={() => setShowBreakdown((v) => !v)}
-          className="text-sm font-medium text-slate-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+          className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-medium text-slate-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
           aria-expanded={showBreakdown}
+          aria-controls={breakdownId}
         >
+          <span aria-hidden className="text-slate-500">
+            {showBreakdown ? "▾" : "▸"}
+          </span>
           {showBreakdown ? "Hide the full breakdown" : "Show the full 12-point breakdown"}
         </button>
 
         {showBreakdown && (
-          <div className="mt-4 space-y-6">
+          <div id={breakdownId} className="mt-4 space-y-6">
             {pillarKeys.map((pk) => (
               <div key={pk}>
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -192,11 +233,11 @@ export default function ScoreCard({ data }: { data: ScoreCardData }) {
                           </span>
                           <span className="shrink-0 tabular-nums text-sm text-slate-500">
                             {notAssessed ? (
-                              <span className="text-slate-400">Not assessed</span>
+                              <span className="text-slate-500">Not assessed</span>
                             ) : (
                               <>
                                 {d?.score ?? 0}
-                                <span className="text-slate-400">
+                                <span className="text-slate-500">
                                   /{dim.maxPoints}
                                 </span>
                               </>
@@ -213,14 +254,16 @@ export default function ScoreCard({ data }: { data: ScoreCardData }) {
                             {evidence.map((q, i) => (
                               <li
                                 key={i}
-                                className="border-l-2 border-slate-200 pl-2 text-sm italic text-slate-500"
+                                className="border-l-2 border-slate-200 pl-2 text-sm italic text-slate-600"
                               >
                                 “{q}”
                               </li>
                             ))}
                           </ul>
                         ) : (
-                          !notAssessed && (
+                          // A positive score with no quote is the real grounding
+                          // gap; a 0 (skill absent) legitimately has no quote.
+                          (d?.score ?? 0) > 0 && (
                             <p className="mt-2 text-xs text-amber-700">
                               No transcript quote cited for this score.
                             </p>

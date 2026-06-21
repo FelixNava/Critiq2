@@ -158,6 +158,21 @@ export function fmtDuration(ms: number | null): string {
   return `${m}m ${s.toString().padStart(2, "0")}s`;
 }
 
+/**
+ * Captured-audio percentage (0–100, clamped) from a recording's duration + the
+ * total gap time. Null when there's no usable data. Clamped so a gap-accounting
+ * overshoot (gapMs > durationMs) can never surface a negative/over-100 figure.
+ * Shared by the inbox row and the recording detail page.
+ */
+export function coveragePct(
+  durationMs: number | null,
+  gapMs: number | null,
+): number | null {
+  if (durationMs == null || durationMs <= 0 || gapMs == null) return null;
+  const pct = Math.round(((durationMs - gapMs) / durationMs) * 100);
+  return Math.max(0, Math.min(100, pct));
+}
+
 export function fmtRecordingDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleString("en-US", {
