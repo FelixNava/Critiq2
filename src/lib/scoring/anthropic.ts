@@ -25,7 +25,14 @@ import type { DimensionScore, RawScoreResult, ScorableTranscript, Scorer } from 
 const ANTHROPIC_MESSAGES_ENDPOINT = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 
-export const SCORING_MODEL = "claude-sonnet-4-6";
+// Phase 38f: scoring moved to Opus 4.8 (the deepest reasoning tier) — scoring a
+// call against the 12-dimension rubric is the highest-stakes judgment in the
+// product, and the credibility core a rep sees. Coaching/consolidation stay on
+// Sonnet. NOTE (cache): Opus's advisory cacheable floor is 4096 tokens (vs
+// Sonnet's observed ~1024); whether the ~1.6k methodology block still caches on
+// Opus is verified empirically (a 2-identical-call probe) rather than assumed —
+// growing the methodology block is deferred to the expert-coach calibration pass.
+export const SCORING_MODEL = "claude-opus-4-8";
 /** Generous headroom: ~12 dimensions × (rationale + a few quotes) + summary, plus adaptive thinking. */
 export const SCORING_MAX_TOKENS = 8000;
 

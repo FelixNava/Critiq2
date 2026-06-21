@@ -14,6 +14,7 @@ import { getRecordingForUser } from "@/lib/recordings";
 import { getTranscriptForRecording } from "@/lib/transcription/store";
 import { getScoreForRecording } from "@/lib/scoring/store";
 import { getAccountForUser } from "@/lib/accounts";
+import ScoreCard, { type ScoreCardData } from "@/components/recording/ScoreCard";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,28 @@ export default async function RecordingDetailPage({
   const scoreInProgress = scoreStatus === "pending" || scoreStatus === "processing";
   const scoreReady = scoreStatus === "completed";
   const scoreFailed = scoreStatus === "failed";
+
+  // The full scorecard data (Phase 38e), coerced from the call_scores jsonb.
+  const scoreCardData: ScoreCardData | null =
+    score && scoreReady
+      ? {
+          overall: score.overallScore,
+          pillars: {
+            spin: score.spinScore,
+            voss: score.vossScore,
+            navarro: score.navarroScore,
+          },
+          dimensions: (score.dimensions as ScoreCardData["dimensions"]) ?? null,
+          strengths: Array.isArray(score.strengths)
+            ? (score.strengths as string[])
+            : [],
+          improvements: Array.isArray(score.improvements)
+            ? (score.improvements as string[])
+            : [],
+          summary: score.summary,
+          partialJudgement: score.partialJudgement,
+        }
+      : null;
 
   // "No scorable audio": the transcript finished but found essentially no speech.
   const noScorableAudio = transcriptReady && (wordCount ?? 0) === 0;
@@ -154,20 +177,8 @@ export default async function RecordingDetailPage({
             <Zone title="Your assessment">
               {isRecording ? (
                 <Muted>This call is still recording. The assessment runs once it’s saved.</Muted>
-              ) : scoreReady ? (
-                <div>
-                  <p className="text-sm text-slate-700">
-                    Overall{" "}
-                    <span className="text-2xl font-semibold text-slate-900">
-                      {score?.overallScore ?? "—"}
-                    </span>
-                    <span className="text-slate-400">/100</span>
-                  </p>
-                  <Muted className="mt-2">
-                    The full three-pillar breakdown, sub-dimensions, and evidence
-                    render here next.
-                  </Muted>
-                </div>
+              ) : scoreReady && scoreCardData ? (
+                <ScoreCard data={scoreCardData} />
               ) : scoreInProgress ? (
                 <Skeleton lines={3} label="Scoring this call…" />
               ) : scoreFailed ? (
