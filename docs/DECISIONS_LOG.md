@@ -788,3 +788,37 @@ Alternatives considered:
   - Option C — both delete-my-data + delete-account (rejected): more than a 5–10 rep beta needs; revisit post-beta if a "wipe content, keep login" want emerges.
 
 Note: the per-task AI MODEL bump (Opus 4.8 for scoring/coaching) is a SEPARATE AI-quality decision Felix owns, not part of Phase 37.
+
+## DEC-056 — Scoring → Opus 4.8 by flipping the constant; caching confirmed live (no methodology growth)
+Phase: 38/recording-analysis-page
+Date: 2026-06-21 ET
+Type: trade-off (Felix chose "flip the constant" over per-row threading)
+
+Context: 38f moves scoring (the credibility core) to the deepest reasoning tier. The plan worried Opus's advisory 4096-token cacheable floor (vs Sonnet's observed ~1024) would stop the ~1.6k methodology block from caching, requiring a risky prompt-growth that touches scoring quality (coach territory).
+
+Chosen: change `SCORING_MODEL` → `claude-opus-4-8` (one constant in anthropic.ts); coaching/consolidation stay Sonnet. Verified EMPIRICALLY rather than assumed: two identical real Opus scoring calls → call 1 `cache_creation=2133`, call 2 `cache_read=2133` (72% hit), parse clean, no truncation, ~20s/call. So caching IS live on Opus and NO methodology-prompt growth is needed (the 4096 floor over-states, exactly like Sonnet's documented 2048 did). Per-row model provenance is NOT tracked (flip-the-constant; `call_scores.model` stays its default) — Felix's pick over threading a per-row model for provenance.
+
+Alternatives: thread a per-row `model` through the scorer + persist it (rejected for now — more churn; the column exists to backfill later if A/B testing models).
+
+## DEC-057 — Transcription/players read the PRIVATE Vercel Blob via the authenticated SDK (the value-path 403 fix)
+Phase: 38/recording-analysis-page
+Date: 2026-06-21 ET
+Type: bug fix (P0 for the value path)
+
+Context: Diagnosing "can I record a call and expect an assessment?" found EVERY real recording transcribed to 0 words → no score. Root cause: `blobFetcher.ts` read audio chunks with a plain unauthenticated `fetch(blobUrl)`, but the store is `access:'private'` → **403** → segment failed → empty transcript. The transcription→scoring value path had therefore NEVER worked on a real deployed capture (prior "real probes" ran with mocks/local; the device-gate recordings predate Phase 15).
+
+Chosen: read chunks via `@vercel/blob` `get(url, { access:'private', useCache:false })` (auth from `BLOB_READ_WRITE_TOKEN`), buffer the returned stream. Same private-read reality the audio-contract spike flagged; the 38c player will use the same authenticated/server-proxied read. Code-only (no schema). Live 403→words proof owed to a fresh record→assign on the preview (BLOB token isn't local + preview API is SSO-walled) — Felix CONFIRMED it works end-to-end after deploy.
+
+## DEC-058 — Scorecard trust model: "grounded = scored areas that cite a quote" (grounded ≤ scored)
+Phase: 38/recording-analysis-page
+Date: 2026-06-21 ET
+Type: obvious (credibility correctness, from code-review)
+
+Context: the trust badge is the product's credibility core. The first cut could read "N/M" with N>M and showed a 0-with-evidence dim as "Not assessed". Chosen: the counter denominator = sub-dimensions that AWARDED points (score>0); numerator = those that cite a verbatim quote → grounded ≤ scored by construction; a 0 (skill absent) legitimately has no quote and is out of the denominator; "Not assessed" is reserved for a fully-empty dim (no score, no rationale, no evidence); the per-dim "no quote cited" warning fires only on a POSITIVE score.
+
+## DEC-059 — Readable/copyable transcript shipped as a standalone slice (audio-independent), separate from synced 38d
+Phase: 38/recording-analysis-page
+Date: 2026-06-21 ET
+Type: obvious (scope split, Felix request)
+
+Context: Felix asked to read + copy/paste the transcript after a call. Chosen: ship `TranscriptView` (full text + Copy button) NOW as an audio-independent addition — it only needs `recording_transcripts.text`, which the Blob fix makes real. The fuller Phase 38d (transcript SYNCED to playback: click-to-seek, current-line highlight) stays gated on the audio player. Splitting them means the read/copy win doesn't wait on the audio contract.
