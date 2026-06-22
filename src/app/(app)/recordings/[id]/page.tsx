@@ -16,6 +16,7 @@ import { getTranscriptForRecording } from "@/lib/transcription/store";
 import { getScoreForRecording } from "@/lib/scoring/store";
 import { getAccountNameById } from "@/lib/accounts";
 import ScoreCard, { type ScoreCardData } from "@/components/recording/ScoreCard";
+import TranscriptView from "@/components/recording/TranscriptView";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,9 @@ export default async function RecordingDetailPage({
   const transcriptStatus = transcriptRow?.transcript.status ?? null;
   const scoreStatus = score?.status ?? null;
   const wordCount = transcriptRow?.transcript.wordCount ?? null;
+  const transcriptText = transcriptRow?.transcript.text?.trim()
+    ? transcriptRow.transcript.text
+    : "";
 
   const state = pipelineState({
     status: recording.status,
@@ -229,10 +233,11 @@ export default async function RecordingDetailPage({
               {isRecording ? (
                 <Muted>The transcript appears once the recording is saved.</Muted>
               ) : transcriptReady ? (
-                <Muted>
-                  Transcript ready{wordCount ? ` · ${wordCount} words` : ""}. The
-                  speaker-labeled, click-to-play transcript renders here next.
-                </Muted>
+                transcriptText ? (
+                  <TranscriptView text={transcriptText} wordCount={wordCount} />
+                ) : (
+                  <Muted>No speech was detected in this recording.</Muted>
+                )
               ) : transcriptInProgress ? (
                 <Skeleton lines={4} label="Transcribing this call…" />
               ) : transcriptFailed ? (
