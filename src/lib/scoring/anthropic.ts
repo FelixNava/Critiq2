@@ -5,12 +5,15 @@
  * real Claude round-trip is the runtime gate Felix + the expert coach validate;
  * nothing here hits the network at import or build time.
  *
- * Model: claude-sonnet-4-6 — the locked tech-stack choice for scoring/coaching/
- * summaries (/critiq-context). Adaptive thinking is on (scoring against a 12-
- * dimension rubric is genuinely a reasoning task); the response is constrained by
- * a JSON schema (structured outputs) so the final text block is always parseable.
- * The locked methodology system block carries a cache_control breakpoint (Phase
- * 17 builds the full caching strategy on top of this).
+ * Model: claude-opus-4-8 (Phase 38f) — scoring against the 12-dimension rubric is
+ * the highest-stakes judgement in the product. The 12-dim + per-dimension evidence
+ * grammar is too large for the API's strict structured-output path, so the JSON
+ * shape is specified in the prompt and parsed defensively. Raw-JSON output is
+ * non-deterministic, so a transient UNPARSEABLE sampling is retried IN-CALL
+ * (isRetryableScoringError) before the row is failed — one bad sampling must not
+ * kill the assessment, especially on a preview deploy where the cron sweeper that
+ * would otherwise retry does not run. Adaptive thinking is on; the locked
+ * methodology system block carries a cache_control breakpoint (Phase 17).
  */
 
 import {
@@ -52,8 +55,9 @@ export interface AnthropicRequest {
  * grammar too large for the API's strict structured-output (`output_config`)
  * path (it returns "compiled grammar is too large"). So the JSON shape is
  * specified IN the prompt (buildOutputFormatSpec, rubric-derived) and parsed
- * defensively below — Sonnet 4.6 + the explicit contract returns clean JSON
- * reliably, and the engine validates every field regardless.
+ * defensively below — the explicit contract returns clean JSON nearly always; a
+ * rare unparseable sampling is retried in-call (see AnthropicScorer), and the
+ * engine validates every field regardless.
  */
 export function buildScoringRequest(
   transcript: ScorableTranscript,
@@ -206,21 +210,77 @@ export interface AnthropicScorerOptions {
    * can't fail the score.
    */
   onUsage?: (usage: CacheUsageSummary) => void;
+  /**
+   * Total attempts including the first (default 3). A transient unparseable
+   * response / empty body / truncation / 429 / 5xx is retried in-call — raw-JSON
+   * output is non-deterministic, so one bad sampling must not fail the row
+   * (especially on preview, where the cron sweeper that would otherwise retry
+   * does not run).
+   */
+  maxAttempts?: number;
+  /** Linear backoff base between retries in ms (default 400; ×attempt). */
+  backoffMs?: number;
+  /** Injectable sleep so tests don't actually wait between retries. */
+  sleep?: (ms: number) => Promise<void>;
+}
+
+/**
+ * Whether a scoring failure is worth re-sampling. A transient parse / empty /
+ * truncation error (no HTTP status) is retryable EXCEPT a policy refusal
+ * (re-sampling won't change a refusal). An HTTP error retries only on 429 / 5xx;
+ * a 4xx (auth / bad request) won't change between attempts. A missing API key is
+ * thrown before the retry loop, so it never reaches here.
+ */
+export function isRetryableScoringError(err: unknown): boolean {
+  if (!(err instanceof AnthropicScoringError)) return false;
+  if (typeof err.status === "number") {
+    return err.status === 429 || err.status >= 500;
+  }
+  return !/refused/i.test(err.message);
 }
 
 /** The real Claude-backed Scorer. */
 export class AnthropicScorer implements Scorer {
   private readonly fetchImpl: typeof fetch;
   private readonly onUsage?: (usage: CacheUsageSummary) => void;
+  private readonly maxAttempts: number;
+  private readonly backoffMs: number;
+  private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(opts: AnthropicScorerOptions = {}) {
     this.fetchImpl = opts.fetchImpl ?? fetch;
     this.onUsage = opts.onUsage;
+    this.maxAttempts = Math.max(1, opts.maxAttempts ?? 3);
+    this.backoffMs = Math.max(0, opts.backoffMs ?? 400);
+    this.sleep =
+      opts.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
   }
 
   async score(transcript: ScorableTranscript): Promise<RawScoreResult> {
+    // The key never changes between attempts → a missing one fails fast, not retried.
     const apiKey = requireApiKey();
     const body = buildScoringRequest(transcript);
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
+      try {
+        return await this.scoreOnce(apiKey, body);
+      } catch (err) {
+        lastErr = err;
+        if (attempt >= this.maxAttempts || !isRetryableScoringError(err)) {
+          throw err;
+        }
+        await this.sleep(this.backoffMs * attempt);
+      }
+    }
+    // Unreachable (the loop returns or throws), but satisfies the return type.
+    throw lastErr;
+  }
+
+  /** One Claude round-trip + parse. Throws AnthropicScoringError on any failure. */
+  private async scoreOnce(
+    apiKey: string,
+    body: AnthropicRequest,
+  ): Promise<RawScoreResult> {
     let res: Response;
     try {
       res = await this.fetchImpl(ANTHROPIC_MESSAGES_ENDPOINT, {

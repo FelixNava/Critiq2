@@ -144,7 +144,7 @@ async function main() {
 {
   const req = buildScoringRequest({ text: "hi", status: "completed", wordCount: 1 });
   ok(req.model === SCORING_MODEL, `request uses the locked model (${SCORING_MODEL})`);
-  ok(req.model === "claude-sonnet-4-6", "model is claude-sonnet-4-6");
+  ok(req.model === "claude-opus-4-8", "model is claude-opus-4-8 (Phase 38f)");
   ok(req.thinking.type === "adaptive", "request uses adaptive thinking");
   ok(
     req.system[0].cache_control?.type === "ephemeral",
