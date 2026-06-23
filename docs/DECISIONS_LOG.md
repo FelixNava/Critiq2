@@ -822,3 +822,18 @@ Date: 2026-06-21 ET
 Type: obvious (scope split, Felix request)
 
 Context: Felix asked to read + copy/paste the transcript after a call. Chosen: ship `TranscriptView` (full text + Copy button) NOW as an audio-independent addition — it only needs `recording_transcripts.text`, which the Blob fix makes real. The fuller Phase 38d (transcript SYNCED to playback: click-to-seek, current-line highlight) stays gated on the audio player. Splitting them means the read/copy win doesn't wait on the audio contract.
+
+## DEC-060 — Audio playback (38c): single-segment server-proxied Range stream now; multi-segment + native controls deferred
+Phase: 38c/audio-player
+Date: 2026-06-22 ET
+Type: trade-off (scope bound by the locked audio contract)
+
+Context: `docs/CALL_ANALYSIS_AUDIO_CONTRACT.md` locks the design half (§A–C: private Blob → server-proxy, audio-time timeline, word re-basing) but leaves the cross-segment ASSEMBLY strategy (§D1 — MSE vs server-remux vs per-segment playlist) + iOS MP4 decodability (§D2) PENDING a real ≥10-min iPhone recording. None of the 21 existing recordings is multi-segment, yet the keystone needs a working player today.
+
+Chosen: ship the SINGLE-segment path live (covers every existing recording + any <10-min capture). `GET /api/recording/[id]/audio` server-proxies private chunk bytes (never a `blob_url` to the browser) as one concatenated, dense, gap-checked byte timeline with full HTTP Range (200/206/`Content-Range`/`Content-Length`, the iOS `bytes=0-1` probe, 416). A pure `audioPlan` classifies: a dense single uploaded segment → `ready`; multi-segment / non-dense / empty → an HONEST degrade (422 on the route; an explicit message on the page) — never a corrupt naive concat. The player is the native `<audio controls>` (the robust MVP; the synced scrubber / markers / keyboard / speed are Phase 40). Content-Type is inferred from the deterministic chunk pathname (no `content_type` column; avoids an extra Blob round-trip). The real captured duration shows as a LABEL because a MediaRecorder-WebM has no in-header duration (the element reads `duration=NaN` until played). Reuses the Phase 38f authenticated private-read (DEC-057). No schema, no CSP, no env change.
+
+Verified on the preview against real recordings (PR #39): 401 unauth (no leak); 200 full + valid WebM EBML magic `1a 45 df a3`; 206 iOS-probe + mid-range with correct `Content-Range`/`Content-Length`; two adjacent ranges concatenate BYTE-IDENTICAL to the full body; 416 over-EOF; 422 "no audio is stored" on the seeded score; the `<audio>` element decodes (`readyState 4`). Unit: `scripts/verify-phase38c.ts` 41/41.
+
+Remaining (device gate, Felix): iOS Safari decode of MP4-origin chunks + the cross-segment boundary + lock/background playback (contract §D1–D4) — need a real ≥10-min iPhone recording.
+
+Alternatives: build a custom MSE / server-remux multi-segment player now (rejected — the contract marks the strategy unresolved pending empirical iOS data; guessing risks a corrupt stream + wasted work); hand the browser a `blob_url` (rejected — the store is private, breaks the privacy model + 403s, exactly the DEC-057 trap).
