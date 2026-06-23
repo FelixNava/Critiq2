@@ -11,12 +11,14 @@ import {
   recordingLabel,
   coveragePct,
 } from "@/components/recording/recordingUi";
-import { getRecordingForUser } from "@/lib/recordings";
+import { getRecordingForUser, getAudioChunkRefs } from "@/lib/recordings";
+import { buildAudioPlan } from "@/lib/recording/audioPlan";
 import { getTranscriptForRecording } from "@/lib/transcription/store";
 import { getScoreForRecording } from "@/lib/scoring/store";
 import { getAccountNameById } from "@/lib/accounts";
 import ScoreCard, { type ScoreCardData } from "@/components/recording/ScoreCard";
 import TranscriptView from "@/components/recording/TranscriptView";
+import RecordingAudioPlayer from "@/components/recording/RecordingAudioPlayer";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +27,8 @@ export const dynamic = "force-dynamic";
  * already-built capture → transcript → score pipeline. Owner-scoped (the rep
  * owns the recording = the access boundary). This skeleton stands up the page,
  * the access boundary, and HONEST pipeline states; the rich renders land next:
- *   - audio playback (Zone C) — Phase 38c, after the audio-contract spike
+ *   - audio playback (Zone C) — Phase 38c (single-segment live; multi-segment +
+ *     iOS pending the device gate)
  *   - synced transcript (Zone D) — Phase 38d
  *   - full assessment + coachable moments (Zones A/B) — Phase 38e / 39
  * No fabricated content in any pending/failed state.
@@ -44,13 +47,17 @@ export default async function RecordingDetailPage({
   // Ownership is the access boundary; a soft-deleted recording reads as gone.
   if (!recording || recording.deletedAt) notFound();
 
-  const [transcriptRow, score, account] = await Promise.all([
+  const [transcriptRow, score, account, audioRefs] = await Promise.all([
     getTranscriptForRecording(id),
     getScoreForRecording(id),
     recording.accountId
       ? getAccountNameById(recording.accountId)
       : Promise.resolve(null),
+    getAudioChunkRefs(id),
   ]);
+  // Server-side playback availability (metadata only — no bytes fetched). Gates
+  // whether the player renders so the rep never sees a dead control.
+  const audioPlan = buildAudioPlan(audioRefs);
 
   const transcriptStatus = transcriptRow?.transcript.status ?? null;
   const scoreStatus = score?.status ?? null;
@@ -217,15 +224,32 @@ export default async function RecordingDetailPage({
 
           <div className="mt-6 space-y-6 lg:mt-0 lg:sticky lg:top-6">
             <Zone title="Playback">
-              {hasGaps ? (
+              {isRecording ? (
+                <Muted>Audio playback appears once the recording is saved.</Muted>
+              ) : audioPlan.status === "ready" ? (
+                <RecordingAudioPlayer
+                  recordingId={id}
+                  durationLabel={
+                    recording.durationMs
+                      ? fmtDuration(recording.durationMs)
+                      : null
+                  }
+                  hasGaps={hasGaps}
+                  coveragePct={coverage}
+                />
+              ) : audioPlan.status === "multisegment" ? (
                 <Muted>
-                  Some audio was lost during capture
-                  {coverage != null ? ` (${coverage}% captured)` : ""}; the
-                  player will mark those gaps. Audio playback lands in the next
-                  update.
+                  This call was recorded in multiple parts. Combined playback is
+                  coming soon — the transcript and assessment are complete below.
+                </Muted>
+              ) : audioPlan.status === "incomplete" ? (
+                <Muted>
+                  Some audio didn’t finish uploading
+                  {coverage != null ? ` (${coverage}% captured)` : ""}, so
+                  playback isn’t available for this call.
                 </Muted>
               ) : (
-                <Muted>Audio playback for this call lands in the next update.</Muted>
+                <Muted>No audio is stored for this call.</Muted>
               )}
             </Zone>
 

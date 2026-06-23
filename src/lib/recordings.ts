@@ -18,6 +18,7 @@ import {
   accountsTbl,
   type Recording,
 } from "@/db/schema";
+import type { AudioChunkRef } from "@/lib/recording/audioPlan";
 
 export const RECORDING_STATUSES = [
   "recording",
@@ -65,6 +66,31 @@ export async function getRecordingForUser(
     .where(and(eq(recordings.id, recordingId), eq(recordings.userId, userId)))
     .limit(1);
   return rows[0] ?? null;
+}
+
+/**
+ * Chunk metadata for audio PLAYBACK (Phase 38c), distinct from the transcription
+ * reader `getChunkRefsForRecording` which silently filters to status='uploaded'
+ * and omits blob_pathname/size_bytes. Playback needs ALL rows (to detect a
+ * non-dense / partly-unuploaded sequence → honest "incomplete") plus size_bytes
+ * (for the byte timeline) and blob_pathname (for Content-Type). Ordered by
+ * chunk_index. The caller must already have proven the rep owns the recording.
+ */
+export async function getAudioChunkRefs(
+  recordingId: string,
+): Promise<AudioChunkRef[]> {
+  return db
+    .select({
+      chunkIndex: recordingChunks.chunkIndex,
+      segmentIndex: recordingChunks.segmentIndex,
+      blobUrl: recordingChunks.blobUrl,
+      blobPathname: recordingChunks.blobPathname,
+      sizeBytes: recordingChunks.sizeBytes,
+      status: recordingChunks.status,
+    })
+    .from(recordingChunks)
+    .where(eq(recordingChunks.recordingId, recordingId))
+    .orderBy(recordingChunks.chunkIndex);
 }
 
 /**
