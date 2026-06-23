@@ -1,7 +1,7 @@
 # Phase 38 — Audio Playback & Timeline Contract (DRAFT)
 
-> Status: **DRAFT — design half locked, empirical half pending an iPhone device gate.** Dated 2026-06-20.
-> The player (38c) and synced-transcript (38d) deliverables consume this verbatim. Do not build them until this is marked LOCKED.
+> Status: **§A–C LOCKED + SHIPPED in 38c (single-segment player), preview-verified 2026-06-22 (PR #39). §D (multi-segment assembly + iOS decode) remains PENDING an iPhone device gate.** Dated 2026-06-20; updated 2026-06-22.
+> 38c built the single-segment player against §A–C (server-proxy + Range + Content-Type). The synced transcript (38d) + the multi-segment playback path consume §D — build those AFTER Felix's real ≥10-min iPhone recording signs off §D1–D4.
 
 ## Why this exists
 The objective pipeline (chunks → Deepgram transcript → score) is built and persisted but never surfaced. Playback is the missing primitive. Audio is captured in ~10-min **segments** of 5s **chunks** with a 2s rotation **overlap**; the contract defines how those reassemble into one seekable timeline and how word/evidence times map onto it.
@@ -47,3 +47,5 @@ The existing 21 recordings are **single-segment WebM only**; none exercises thes
 
 ## HTTP contract (headless-verifiable on the preview, no iPhone)
 `GET /api/recording/[id]/audio`: `auth()`→401, owner-scoped→404; `Accept-Ranges: bytes`; `206` + correct `Content-Range` + `Content-Length`; handles the iOS `bytes=0-1` probe; correct `Content-Type`; non-dense chunks → honest "unavailable." These are 38c acceptance criteria verifiable via `javascript_tool` fetch on the preview.
+
+> ✅ **ALL SATISFIED by 38c — verified on the preview 2026-06-22** against real recordings (`41d87fd3` 50s, `ec923db9` 42s, seeded `33c19af1`): 401 unauthenticated (no body leak); `200` full body + valid WebM EBML magic `1a 45 df a3` + `Content-Length` == body + `Accept-Ranges: bytes` + `Cache-Control: private, no-store`; `206` for `bytes=0-1` (→ `bytes 0-1/TOTAL`) and a mid-range; **two adjacent ranges concatenate BYTE-IDENTICAL to the full body** (slice correctness); `416 bytes */TOTAL` over-EOF; `422 {"reason":"empty"}` honest-degrade on the no-audio seeded score; the `<audio>` element reaches `readyState 4`. (owner-scoped 404 is the same `getRecordingForUser` guard the 401 + owned-200/422 paths exercise.) Unit: `scripts/verify-phase38c.ts` 41/41.
