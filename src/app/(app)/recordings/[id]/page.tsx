@@ -19,6 +19,9 @@ import { getAccountNameById } from "@/lib/accounts";
 import ScoreCard, { type ScoreCardData } from "@/components/recording/ScoreCard";
 import TranscriptView from "@/components/recording/TranscriptView";
 import RecordingAudioPlayer from "@/components/recording/RecordingAudioPlayer";
+import SyncedPlayback from "@/components/recording/SyncedPlayback";
+import { Zone, Muted } from "@/components/recording/analysisZone";
+import { buildTranscriptTimeline } from "@/lib/recording/transcriptTimeline";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +61,23 @@ export default async function RecordingDetailPage({
   // Server-side playback availability (metadata only — no bytes fetched). Gates
   // whether the player renders so the rep never sees a dead control.
   const audioPlan = buildAudioPlan(audioRefs);
+
+  // Synced transcript (Phase 38d): time-anchored, click-to-seek lines re-based
+  // onto the audio timeline. Only meaningful when the audio is a playable single
+  // segment AND the transcript carries word times; otherwise the page falls back
+  // to the 38c player + the read/copy transcript below.
+  const timelineLines =
+    transcriptRow && transcriptRow.segments.length > 0
+      ? buildTranscriptTimeline(
+          transcriptRow.segments.map((s) => ({
+            segmentIndex: s.segmentIndex,
+            durationMs: s.durationMs,
+            words: s.words,
+          })),
+        )
+      : [];
+  const syncedTranscript =
+    audioPlan.status === "ready" && timelineLines.length > 0;
 
   const transcriptStatus = transcriptRow?.transcript.status ?? null;
   const scoreStatus = score?.status ?? null;
@@ -223,86 +243,81 @@ export default async function RecordingDetailPage({
           </div>
 
           <div className="mt-6 space-y-6 lg:mt-0 lg:sticky lg:top-6">
-            <Zone title="Playback">
-              {isRecording ? (
-                <Muted>Audio playback appears once the recording is saved.</Muted>
-              ) : audioPlan.status === "ready" ? (
-                <RecordingAudioPlayer
-                  recordingId={id}
-                  durationLabel={
-                    recording.durationMs
-                      ? fmtDuration(recording.durationMs)
-                      : null
-                  }
-                  hasGaps={hasGaps}
-                  coveragePct={coverage}
-                />
-              ) : audioPlan.status === "multisegment" ? (
-                <Muted>
-                  This call was recorded in multiple parts. Combined playback is
-                  coming soon — the transcript and assessment are complete below.
-                </Muted>
-              ) : audioPlan.status === "incomplete" ? (
-                <Muted>
-                  Some audio didn’t finish uploading
-                  {coverage != null ? ` (${coverage}% captured)` : ""}, so
-                  playback isn’t available for this call.
-                </Muted>
-              ) : (
-                <Muted>No audio is stored for this call.</Muted>
-              )}
-            </Zone>
+            {syncedTranscript ? (
+              <SyncedPlayback
+                recordingId={id}
+                durationLabel={
+                  recording.durationMs ? fmtDuration(recording.durationMs) : null
+                }
+                hasGaps={hasGaps}
+                coveragePct={coverage}
+                lines={timelineLines}
+                fullText={transcriptText}
+                wordCount={wordCount}
+              />
+            ) : (
+              <>
+                <Zone title="Playback">
+                  {isRecording ? (
+                    <Muted>Audio playback appears once the recording is saved.</Muted>
+                  ) : audioPlan.status === "ready" ? (
+                    <RecordingAudioPlayer
+                      recordingId={id}
+                      durationLabel={
+                        recording.durationMs
+                          ? fmtDuration(recording.durationMs)
+                          : null
+                      }
+                      hasGaps={hasGaps}
+                      coveragePct={coverage}
+                    />
+                  ) : audioPlan.status === "multisegment" ? (
+                    <Muted>
+                      This call was recorded in multiple parts. Combined playback
+                      is coming soon — the transcript and assessment are complete
+                      below.
+                    </Muted>
+                  ) : audioPlan.status === "incomplete" ? (
+                    <Muted>
+                      Some audio didn’t finish uploading
+                      {coverage != null ? ` (${coverage}% captured)` : ""}, so
+                      playback isn’t available for this call.
+                    </Muted>
+                  ) : (
+                    <Muted>No audio is stored for this call.</Muted>
+                  )}
+                </Zone>
 
-            <Zone title="Transcript">
-              {isRecording ? (
-                <Muted>The transcript appears once the recording is saved.</Muted>
-              ) : transcriptReady ? (
-                transcriptText ? (
-                  <TranscriptView text={transcriptText} wordCount={wordCount} />
-                ) : (
-                  <Muted>No speech was detected in this recording.</Muted>
-                )
-              ) : transcriptInProgress ? (
-                <Skeleton lines={4} label="Transcribing this call…" />
-              ) : transcriptFailed ? (
-                <Muted>
-                  Transcription didn’t complete for this recording.
-                </Muted>
-              ) : recording.accountId == null ? (
-                <Muted>
-                  Assign this recording to an account to transcribe and score it.
-                </Muted>
-              ) : (
-                <Skeleton lines={3} label="Queued for transcription…" />
-              )}
-            </Zone>
+                <Zone title="Transcript">
+                  {isRecording ? (
+                    <Muted>The transcript appears once the recording is saved.</Muted>
+                  ) : transcriptReady ? (
+                    transcriptText ? (
+                      <TranscriptView text={transcriptText} wordCount={wordCount} />
+                    ) : (
+                      <Muted>No speech was detected in this recording.</Muted>
+                    )
+                  ) : transcriptInProgress ? (
+                    <Skeleton lines={4} label="Transcribing this call…" />
+                  ) : transcriptFailed ? (
+                    <Muted>
+                      Transcription didn’t complete for this recording.
+                    </Muted>
+                  ) : recording.accountId == null ? (
+                    <Muted>
+                      Assign this recording to an account to transcribe and score
+                      it.
+                    </Muted>
+                  ) : (
+                    <Skeleton lines={3} label="Queued for transcription…" />
+                  )}
+                </Zone>
+              </>
+            )}
           </div>
         </div>
       </main>
     </div>
-  );
-}
-
-function Zone({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
-      <div className="mt-3">{children}</div>
-    </section>
-  );
-}
-
-function Muted({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <p className={`text-sm leading-relaxed text-slate-600 ${className}`}>
-      {children}
-    </p>
   );
 }
 
