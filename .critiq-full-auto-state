@@ -356,8 +356,18 @@ PHASE_NEXT=
 # block ~929 tok sits under the Sonnet 1024 cacheable floor on its own (caches once per-rep layer
 # extends the prefix); confirm the rep-private raw scope is intended; the ~4-chars/tok estimate is a
 # heuristic not a tokenizer; WIRING the consumers onto the builder is the real payoff + is NOT done.
-PHASE_LAST_COMPLETED=38/recording-analysis-page (core; 38c/38d audio still open)
-PHASE_LAST_COMPLETED_AT=2026-06-21T00:00:00-04:00
+PHASE_LAST_COMPLETED=38/recording-analysis-page (FULL — 38a-f + 38c/38d, PR #39) + 16b/scoring-retry (PR #40)
+PHASE_LAST_COMPLETED_AT=2026-06-23T00:00:00-04:00
+# 2026-06-23: MERGED to review-for-main on Felix's explicit command — PR #40 (scoring in-call
+#   retry, squash 8da58d9) + PR #39 (38c audio player + 38d synced transcript, single-segment,
+#   squash 68e066e; Felix checked the device gate + authorized). Post-merge gate GREEN: verify-
+#   phase38c/38d/scoring-retry/16 all PASS + build clean on the merged review-for-main. review-for-
+#   main now holds Phases 2-21 + 23-27 + 33 + 34 + 35 + 37 + 38(FULL) + the scoring-retry fix.
+#   The remaining build SEQUENCE is LOCKED in docs/PHASE_LEDGER.md (Blocks A-D; invariants =
+#   everything-feeds-everything + effortless voice capture; new Phases 45 voice / 46 AI router).
+#   Multi-segment audio playback (§D) deferred (no multi-segment recording exists yet). master is
+#   still frozen at Phase 13 (45 commits behind) — the promotion is gated on the prod DB/Blob split
+#   + Felix's command. NOTHING armed/scheduled.
 # Phase 38 CORE merged to review-for-main 2026-06-21 (PR #38, squash 4ac5416): 38a assign-flow
 # inline-create fix, 38b /recordings/[id] page + honest states, 38e scorecard render, 38f scoring
 # -> Opus 4.8 (caching confirmed LIVE on Opus, no prompt growth), the VALUE-PATH Blob-read 403 fix
