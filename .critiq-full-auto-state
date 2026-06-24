@@ -7,6 +7,30 @@
 # --- KILL SWITCH (the only field you should ever edit manually) ---
 STOP=false
 
+# --- ⏸️ PROD PROMOTION — PAUSED 2026-06-23 (RESUME HERE) ---
+# Promoting review-for-main → master (Phases 14-38, 49 commits) via Path A: separate prod
+# DB/Blob FIRST, then promote (DEC-029). PAUSED mid-flight. master is UNTOUCHED + still
+# healthy at Phase 13. Clean stop — the new prod DB is migrated but nothing points at it yet,
+# so nothing is half-wired in a breaking way.
+# DONE:
+#   ✓ New prod Neon "critiq prod" (endpoint ep-summer-shadow-airsoxaf, us-east-1) provisioned by
+#     Felix; Claude applied ALL 19 migrations → 24 tables, 0 rows (clean, ISOLATED prod schema,
+#     separate from the shared dev/preview DB ep-restless-field). Creds live in Felix's hands /
+#     Vercel prod env — deliberately NOT stored here (public repo / secret hygiene).
+# REMAINING (the resume steps):
+#   1. [Felix dashboard] Vercel Production env: EDIT the Production rows of DATABASE_URL +
+#      DATABASE_URL_UNPOOLED → the new prod pooled/unpooled. (3 separate per-target entries exist;
+#      leave Preview + Development on the shared dev DB.)
+#   2. [Blob] BLOB_READ_WRITE_TOKEN + BLOB_STORE_ID are ONE shared prod+preview entry → Claude
+#      re-scopes them to PREVIEW-ONLY (metadata only, value untouched) on Felix's word; then Felix
+#      creates a new prod Blob store (e.g. critiq2-blob-prod) + connects it to Production.
+#   3. [Claude, after Felix pings both done] vercel env pull --environment=production (confirm prod
+#      now points at the NEW DB + Blob, different endpoints) → promote review-for-main → master
+#      (FELIX-COMMAND-GATED) → prod smoke test (signup/login 200; a recording writes to the NEW
+#      prod DB/Blob) → update ledger/state/critiq-context skill/project_critiq_status memory.
+# SEPARATE GATE before inviting any REAL rep (NOT blocking this promotion): consent attestation
+#   (Phase 28) + Privacy/ToS (Phase 30) — legal, for a call-recording product.
+
 # --- BUILD METADATA ---
 BUILD_START_ET=2026-06-05T02:25:00-04:00
 BUILD_LABEL=critiq-beta-foundation-live-supervised
